@@ -1,3 +1,5 @@
+import type { HealthReport } from "./health-report";
+
 export type ScanStatus = "pending" | "queued" | "cloning" | "scanning" | "grading" | "complete" | "error";
 
 export interface ScanJobRequest {
@@ -18,7 +20,7 @@ export interface ScanJobStatus {
   status: ScanStatus;
   progress: number;
   message: string;
-  result?: import("./health-report").HealthReport;
+  result?: HealthReport;
   error?: string;
   createdAt: string;
   completedAt?: string;
