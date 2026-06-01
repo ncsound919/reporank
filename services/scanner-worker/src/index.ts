@@ -1,6 +1,6 @@
 import "dotenv/config";
 import Bull from "bull";
-import { fetchRepoData, repoDataToGradeInput } from "@reporank/grading-engine/src/scanners/github";
+import { fetchRepoData, repoDataToGradeInput } from "@reporank/grading-engine/scanners/github";
 import { GradingService } from "@reporank/grading-engine";
 import { analyzeVibe } from "@reporank/vibe-analyzer";
 import { generateFixPacks } from "@reporank/fix-pack-generator";
@@ -28,7 +28,16 @@ queue.process(async (job) => {
     clawSecrets: clawResults,
   } as any);
 
-  report.vibe = vibe;
+  report.vibe = {
+    ...report.vibe,
+    namingScore: vibe.namingScore,
+    modernityScore: vibe.modernityScore,
+    hygieneScore: vibe.hygieneScore,
+    configCoherence: vibe.configCoherence,
+    dependencyFreshness: vibe.dependencyFreshness,
+    overall: vibe.overall,
+    recommendations: [...new Set([...vibe.recommendations, ...(report.vibe.recommendations || [])])],
+  };
 
   const fixPacks = generateFixPacks(report);
   const roadmap = buildRoadmap(report.quickWins, report.overallScore);
