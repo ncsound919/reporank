@@ -1,7 +1,8 @@
 import { Router } from "express";
 import type { Router as ExpressRouter } from "express";
 import { prisma } from "../db/client";
-import { authMiddleware, AuthRequest } from "../middleware/auth";
+import { authMiddleware, orgAccessMiddleware, AuthRequest } from "../middleware/auth";
+import { AppError } from "../middleware/errorHandler";
 import crypto from "node:crypto";
 
 const router: ExpressRouter = Router();
@@ -26,7 +27,7 @@ router.get("/", authMiddleware, async (req: AuthRequest, res) => {
   });
 });
 
-router.get("/:id", authMiddleware, async (req: AuthRequest, res) => {
+router.get("/:id", authMiddleware, orgAccessMiddleware, async (req: AuthRequest, res) => {
   const org = await prisma.org.findUnique({
     where: { id: req.params.id },
     include: { members: { include: { user: { select: { id: true, email: true, displayName: true, avatarUrl: true } } } } },
@@ -36,6 +37,11 @@ router.get("/:id", authMiddleware, async (req: AuthRequest, res) => {
 });
 
 router.post("/:id/api-keys", authMiddleware, async (req: AuthRequest, res) => {
+  const membership = await prisma.orgMember.findUnique({
+    where: { orgId_userId: { orgId: req.params.id, userId: req.userId! } },
+  });
+  if (!membership) throw new AppError(403, "Not a member of this organization", "FORBIDDEN");
+
   const key = `gr_${crypto.randomBytes(32).toString("hex")}`;
   const keyHash = crypto.createHash("sha256").update(key).digest("hex");
   await prisma.apiKey.create({
