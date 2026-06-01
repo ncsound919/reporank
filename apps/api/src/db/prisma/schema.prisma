@@ -1,0 +1,154 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id               String    @id @default(cuid())
+  email            String    @unique
+  displayName      String?
+  firebaseUid      String?   @unique
+  githubId         String?   @unique
+  avatarUrl        String?
+  tier             String    @default("free")
+  scansThisMonth   Int       @default(0)
+  stripeCustomerId String?
+  createdAt        DateTime  @default(now())
+  orgs             OrgMember[]
+  apiKeys          ApiKey[]
+  scans            Scan[]
+}
+
+model Org {
+  id                    String    @id @default(cuid())
+  name                  String
+  slug                  String    @unique
+  plan                  String    @default("free")
+  stripeSubscriptionId  String?
+  stripePriceId         String?
+  scanLimit             Int       @default(3)
+  scansThisPeriod       Int       @default(0)
+  periodStart           DateTime?
+  periodEnd             DateTime?
+  createdAt             DateTime  @default(now())
+  members               OrgMember[]
+  scans                 Scan[]
+  clawAgents            ClawAgent[]
+  clawAlerts            ClawAlert[]
+  subscriptions         Subscription[]
+  webhooks              Webhook[]
+}
+
+model OrgMember {
+  id       String   @id @default(cuid())
+  role     String   @default("member")
+  joinedAt DateTime @default(now())
+  orgId    String
+  org      Org      @relation(fields: [orgId], references: [id])
+  userId   String
+  user     User     @relation(fields: [userId], references: [id])
+
+  @@unique([orgId, userId])
+}
+
+model Scan {
+  id               String    @id @default(cuid())
+  repoUrl          String
+  repoName         String
+  repoOwner        String
+  branch           String    @default("main")
+  status           String    @default("pending")
+  progress         Int       @default(0)
+  message          String?
+  overallScore     Int?
+  gradeCategory    String?
+  maturityLevel    String?
+  vibeScore        Int?
+  report           Json?
+  complianceReport Json?
+  fixPack          Json?
+  clawFindings     Json?
+  errorMessage     String?
+  duration         Int?
+  createdAt        DateTime  @default(now())
+  completedAt      DateTime?
+  userId           String
+  user             User      @relation(fields: [userId], references: [id])
+  orgId            String?
+  org              Org?      @relation(fields: [orgId], references: [id])
+
+  @@index([orgId])
+  @@index([userId])
+  @@index([repoUrl])
+  @@index([status])
+}
+
+model ApiKey {
+  id         String    @id @default(cuid())
+  keyPrefix  String
+  keyHash    String    @unique
+  name       String
+  tier       String    @default("free")
+  lastUsedAt DateTime?
+  createdAt  DateTime  @default(now())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id])
+}
+
+model ClawAgent {
+  id         String      @id @default(cuid())
+  name       String
+  type       String
+  config     Json?
+  trustScore Int         @default(100)
+  status     String      @default("active")
+  createdAt  DateTime    @default(now())
+  orgId      String
+  org        Org         @relation(fields: [orgId], references: [id])
+  alerts     ClawAlert[]
+}
+
+model ClawAlert {
+  id           String      @id @default(cuid())
+  module       String
+  severity     String
+  title        String
+  description  String?
+  raw          Json?
+  acknowledged Boolean     @default(false)
+  createdAt    DateTime    @default(now())
+  orgId        String
+  org          Org         @relation(fields: [orgId], references: [id])
+  agentId      String?
+  agent        ClawAgent?  @relation(fields: [agentId], references: [id])
+
+  @@index([orgId])
+  @@index([severity])
+}
+
+model Subscription {
+  id                   String    @id @default(cuid())
+  stripeSubscriptionId String    @unique
+  plan                 String
+  status               String
+  currentPeriodStart   DateTime?
+  currentPeriodEnd     DateTime?
+  createdAt            DateTime  @default(now())
+  orgId                String
+  org                  Org       @relation(fields: [orgId], references: [id])
+}
+
+model Webhook {
+  id        String   @id @default(cuid())
+  url       String
+  events    String[]
+  secret    String
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  orgId     String
+  org       Org      @relation(fields: [orgId], references: [id])
+}
