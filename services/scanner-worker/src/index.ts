@@ -1,7 +1,7 @@
 import "dotenv/config";
 import Bull from "bull";
 import { fetchRepoData, repoDataToGradeInput } from "@reporank/grading-engine/scanners/github";
-import { GradingService } from "@reporank/grading-engine";
+import { GradingService, runDeepAnalysis } from "@reporank/grading-engine";
 import { analyzeVibe } from "@reporank/vibe-analyzer";
 import { generateFixPacks } from "@reporank/fix-pack-generator";
 import { buildRoadmap } from "@reporank/fix-pack-generator";
@@ -23,9 +23,16 @@ queue.process(async (job) => {
   const allContent = repoData.sourceFiles.map(f => f.content).join("\n");
   const clawResults = scanSecrets(allContent);
 
+  // Run deep deterministic analyzers for real vibe-coder insights
+  const deep = runDeepAnalysis(
+    null, repoData.fileTree, repoData.sourceFiles, repoData.packageJson
+  );
+
   const report = await gradingService.gradeRepo(input, {
     vibeAnalysis: vibe,
     clawSecrets: clawResults,
+    deepAnalysis: deep.rawPromptBlock,
+    topRecommendations: deep.topRecommendations,
   } as any);
 
   report.vibe = {
@@ -51,7 +58,8 @@ queue.process(async (job) => {
   );
 
   console.log(`Complete: ${report.overallScore}/100 — ${report.gradeCategory}`);
-  return { scanId: job.data.scanId, report, fixPacks };
+  console.log(`Deep analysis: ${deep.worstFiles.length} hot files, ${deep.dependencies.findings.length} dep issues, ${deep.production.findings.length} production issues`);
+  return { scanId: job.data.scanId, report, fixPacks, deepAnalysis: deep };
 });
 
 queue.on("failed", (job, err) => {

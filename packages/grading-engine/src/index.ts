@@ -47,3 +47,4 @@ export class GradingService {
 
 export { buildGradingPrompt } from "./promptBuilder";
 export { parseHealthReport } from "./responseParser";
+export { runDeepAnalysis } from "./analyzers/index";
