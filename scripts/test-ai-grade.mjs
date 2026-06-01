@@ -34,11 +34,13 @@ const readmeContent = sourceFiles.find(f => f.path === "README.md")?.content || 
 const { GradingService } = await import("../packages/grading-engine/src/index.ts");
 const { runDeepAnalysis } = await import("../packages/grading-engine/src/analyzers/index.ts");
 const { runEnterpriseAnalysis } = await import("../packages/grading-engine/src/analyzers/enterprise.ts");
+const { scanCodeHygiene } = await import("../packages/grading-engine/src/analyzers/code-hygiene.ts");
 const { analyzeVibe } = await import("../packages/vibe-analyzer/src/index.ts");
 
 const vibe = analyzeVibe({ files: allFiles, sourceFiles });
 const deep = runDeepAnalysis(CLAW_PATH, allFiles, sourceFiles, packageJsonContent);
 const enterprise = runEnterpriseAnalysis(allFiles, sourceFiles);
+const hygiene = scanCodeHygiene(sourceFiles);
 
 const gradeInput = {
   repoUrl: "https://github.com/user/Claw-Protect",
@@ -60,7 +62,7 @@ console.log("🤖 Calling Gemini AI with deep analysis context...\n");
 try {
   const report = await grader.gradeRepo(gradeInput, {
     vibeAnalysis: vibe,
-    deepAnalysis: deep.rawPromptBlock + "\n" + enterprise.rawPromptBlock,
+    deepAnalysis: deep.rawPromptBlock + "\n" + enterprise.rawPromptBlock + `\n[Code Hygiene]\n${hygiene.findings.slice(0, 20).map(f => `  - ${f.severity.toUpperCase()}: ${f.detail} (${f.filePath}:${f.line || "?"})`).join("\n")}\n  Fix suggestion: ${hygiene.findings[0]?.fixSuggestion || "N/A"}`,
   });
 
   console.log("═".repeat(78));
@@ -155,7 +157,16 @@ try {
     console.log(`       ${f.seniorNote}`);
   }
 
-  console.log("\n  ✅ AI grading + enterprise analysis complete");
+  console.log(`\n  🧹 CODE HYGIENE — Basic Mistakes (${hygiene.score}/100):`);
+  for (const f of hygiene.findings.slice(0, 15)) {
+    const icon = f.severity === "critical" ? "🔴" : f.severity === "high" ? "⚠️" : f.severity === "medium" ? "🔶" : "💡";
+    console.log(`    ${icon} [${f.category}] ${f.filePath}${f.line ? `:${f.line}` : ""}`);
+    console.log(`       ${f.detail}`);
+    console.log(`       → ${f.fixSuggestion}`);
+  }
+  if (hygiene.findings.length > 15) console.log(`    ... and ${hygiene.findings.length - 15} more findings`);
+
+  console.log("\n  ✅ AI grading + enterprise analysis + code hygiene complete");
 
 } catch (e) {
   console.error("❌ AI grading failed:", e.message);
