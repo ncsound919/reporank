@@ -4,7 +4,7 @@ import { prisma } from "../db/client";
 import { config } from "../config";
 import { authMiddleware, AuthRequest } from "../middleware/auth";
 
-const router = Router();
+const router: Router = Router();
 
 router.post("/github", async (req, res) => {
   const { code } = req.body;
