@@ -30,6 +30,7 @@
     "ioredis": "^5.5.0",
     "jsonwebtoken": "^9.0.2",
     "stripe": "^17.6.0",
+    "pino": "^9.6.0",
     "zod": "^3.24.0"
   },
   "devDependencies": {

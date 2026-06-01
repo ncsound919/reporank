@@ -1,5 +1,6 @@
 import { scanQueue } from "./queue";
 import { prisma } from "../db/client";
+import { logger } from "../logger";
 import { fetchRepoData, repoDataToGradeInput } from "@reporank/grading-engine/scanners/github";
 import { GradingService, runDeepAnalysis } from "@reporank/grading-engine";
 import { analyzeVibe } from "@reporank/vibe-analyzer";
@@ -64,14 +65,14 @@ async function runDeepScanners(repoUrl: string): Promise<Record<string, any>> {
         const out = execSync(`${scanner.cmd} ${scanner.args.join(" ")}`, { cwd: tempDir, encoding: "utf-8", maxBuffer: 10*1024*1024, timeout: 120000, stdio: "pipe" });
         results[scanner.name] = scanner.parser ? scanner.parser(out) : out;
       } catch (e: any) {
-        console.warn(`Scanner ${scanner.name} skipped: ${e.message?.slice(0, 80)}`);
+        logger.warn(`Scanner ${scanner.name} skipped: ${e.message?.slice(0, 80)}`);
       }
     }
 
-    console.log(`Deep scan complete: ${Object.keys(results).length}/${scanners.length} scanners ran`);
+    logger.info(`Deep scan complete: ${Object.keys(results).length}/${scanners.length} scanners ran`);
     return results;
   } catch (e: any) {
-    console.warn("Deep scan clone failed:", e.message);
+      logger.warn("Deep scan clone failed:", e.message);
     return {};
   } finally {
     try { rmSync(tempDir, { recursive: true, force: true }); } catch { /* cleanup best effort */ }
@@ -138,18 +139,18 @@ export function startWorker() {
         },
       });
 
-      console.log(`Scan ${scanId} complete: ${report.overallScore}/100 — ${report.gradeCategory}`);
+      logger.info(`Scan ${scanId} complete: ${report.overallScore}/100 — ${report.gradeCategory}`);
 
     } catch (err: any) {
       await prisma.scan.update({
         where: { id: scanId }, data: { status: "error", errorMessage: err.message, completedAt: new Date() },
-      }).catch(e => console.error("Failed to update scan error:", e));
+      }).catch(e => logger.error(e, "Failed to update scan error"));
       throw err;
     }
   });
 
-  scanQueue.on("failed", (job, err) => { console.error(`Job ${job.id} failed:`, err.message); });
-  scanQueue.on("error", (err) => { console.error("Queue error:", err.message); });
+  scanQueue.on("failed", (job, err) => { logger.error(err, `Job ${job.id} failed`); });
+  scanQueue.on("error", (err) => { logger.error(err, "Queue error"); });
 
-  console.log("Worker started, processing scan jobs...");
+  logger.info("Worker started, processing scan jobs...");
 }

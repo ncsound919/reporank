@@ -20,24 +20,40 @@ export class GradingService {
   }
 
   async gradeRepo(input: GradeInput, scannerResults?: ScannerResults): Promise<HealthReport> {
-    const response = await this.ai.models.generateContent({
-      model: this.model,
-      contents: buildGradingPrompt(input, scannerResults),
-      config: { temperature: 0.2, responseMimeType: "application/json" },
-    });
-    const text = response.text;
-    if (!text) throw new Error("Empty response from Gemini");
+    const prompt = buildGradingPrompt(input, scannerResults);
+    const MAX_RETRIES = 3;
+    let lastError: Error | null = null;
 
-    const report = parseHealthReport(text);
-    report.repoOwner = input.repoOwner;
-    report.repoName = input.repoName;
-    report.mainLanguage = input.mainLanguage;
-    report.starsCount = input.starsCount;
-    report.forksCount = input.forksCount;
-    report.openIssuesCount = input.openIssuesCount;
-    report.lastPushedAt = input.lastPushedAt;
-    report.scannedAt = new Date().toISOString();
-    return report;
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        const response = await this.ai.models.generateContent({
+          model: this.model,
+          contents: prompt,
+          config: { temperature: 0.2, responseMimeType: "application/json" },
+        });
+
+        const text = response.text;
+        if (!text) throw new Error("Empty response from Gemini");
+
+        const report = parseHealthReport(text);
+        report.repoOwner = input.repoOwner;
+        report.repoName = input.repoName;
+        report.mainLanguage = input.mainLanguage;
+        report.starsCount = input.starsCount;
+        report.forksCount = input.forksCount;
+        report.openIssuesCount = input.openIssuesCount;
+        report.lastPushedAt = input.lastPushedAt;
+        report.scannedAt = new Date().toISOString();
+        return report;
+      } catch (err: any) {
+        lastError = err;
+        if (attempt < MAX_RETRIES) {
+          const delay = Math.min(1000 * Math.pow(2, attempt - 1) + Math.random() * 1000, 8000);
+          await new Promise(r => setTimeout(r, delay));
+        }
+      }
+    }
+    throw lastError || new Error("Gemini request failed after retries");
   }
 
   async dispose(): Promise<void> {

@@ -3,7 +3,6 @@
   "references": [
     { "path": "apps/api" },
     { "path": "apps/web" },
-    { "path": "apps/agent-sdk" },
     { "path": "packages/shared-types" },
     { "path": "packages/grading-engine" },
     { "path": "packages/vibe-analyzer" },

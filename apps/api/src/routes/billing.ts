@@ -65,6 +65,76 @@ router.post("/webhook", async (req, res) => {
     }
   }
 
+  if (event.type === "invoice.payment_succeeded") {
+    const invoice = event.data.object as Stripe.Invoice;
+    const subscriptionId = invoice.subscription as string;
+    if (subscriptionId) {
+      const sub = await stripe.subscriptions.retrieve(subscriptionId);
+      const orgId = sub.metadata?.orgId;
+      if (orgId) {
+        await prisma.subscription.update({
+          where: { stripeSubscriptionId: subscriptionId },
+          data: {
+            status: "active",
+            currentPeriodStart: new Date(sub.current_period_start * 1000),
+            currentPeriodEnd: new Date(sub.current_period_end * 1000),
+          },
+        });
+        await prisma.org.update({
+          where: { id: orgId },
+          data: {
+            plan: sub.items.data[0]?.price?.nickname?.toLowerCase() ?? "pro",
+            periodStart: new Date(sub.current_period_start * 1000),
+            periodEnd: new Date(sub.current_period_end * 1000),
+          },
+        });
+      }
+    }
+  }
+
+  if (event.type === "invoice.payment_failed") {
+    const invoice = event.data.object as Stripe.Invoice;
+    console.warn("Invoice payment failed:", invoice.id, invoice.subscription);
+  }
+
+  if (event.type === "customer.subscription.updated") {
+    const subscription = event.data.object as Stripe.Subscription;
+    const orgId = subscription.metadata?.orgId;
+    if (orgId) {
+      await prisma.subscription.update({
+        where: { stripeSubscriptionId: subscription.id },
+        data: {
+          status: subscription.status,
+          currentPeriodStart: new Date(subscription.current_period_start * 1000),
+          currentPeriodEnd: new Date(subscription.current_period_end * 1000),
+        },
+      });
+      await prisma.org.update({
+        where: { id: orgId },
+        data: {
+          plan: subscription.items.data[0]?.price?.nickname?.toLowerCase() ?? "pro",
+          periodStart: new Date(subscription.current_period_start * 1000),
+          periodEnd: new Date(subscription.current_period_end * 1000),
+        },
+      });
+    }
+  }
+
+  if (event.type === "customer.subscription.deleted") {
+    const subscription = event.data.object as Stripe.Subscription;
+    const orgId = subscription.metadata?.orgId;
+    if (orgId) {
+      await prisma.subscription.update({
+        where: { stripeSubscriptionId: subscription.id },
+        data: { status: "canceled" },
+      });
+      await prisma.org.update({
+        where: { id: orgId },
+        data: { plan: "free" },
+      });
+    }
+  }
+
   res.json({ received: true });
 });
 

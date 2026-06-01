@@ -4,10 +4,6 @@
   "private": true,
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "scripts": {
-    "build": "tsc",
-    "clean": "rm -rf dist",
-    "lint": "tsc --noEmit"
-  },
+  "scripts": { "build": "tsc", "clean": "rm -rf dist", "lint": "tsc --noEmit" },
   "devDependencies": { "typescript": "^5.8.0" }
 }
