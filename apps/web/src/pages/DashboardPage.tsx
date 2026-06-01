@@ -1,12 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { api } from "../api/client";
-import { useState as usePollingState, useEffect, useRef } from "react";
 
 export default function DashboardPage() {
   const { user, login } = useAuth();
   const [repoUrl, setRepoUrl] = useState("");
-  const [scanId, setScanId] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -17,6 +15,10 @@ export default function DashboardPage() {
     if (user) api.scans.list().then(setHistory).catch(() => {});
   }, [user]);
 
+  useEffect(() => {
+    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+  }, []);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) { login(); return; }
@@ -24,7 +26,6 @@ export default function DashboardPage() {
 
     try {
       const result = await api.scans.submit(repoUrl);
-      setScanId(result.scanId);
       setStatus("Scan queued...");
       setProgress(10);
 
@@ -35,18 +36,18 @@ export default function DashboardPage() {
           setStatus(scan.message || scan.status);
 
           if (scan.status === "complete") {
-            clearInterval(pollRef.current!);
+            if (pollRef.current) clearInterval(pollRef.current);
             setStatus("Complete!");
             setProgress(100);
             setTimeout(() => window.location.href = `/scan/${result.scanId}`, 1000);
           }
           if (scan.status === "error") {
-            clearInterval(pollRef.current!);
+            if (pollRef.current) clearInterval(pollRef.current);
             setError(scan.error || "Scan failed");
             setStatus("Failed");
           }
         } catch (err: any) {
-          clearInterval(pollRef.current!);
+          if (pollRef.current) clearInterval(pollRef.current);
           setError(err.message);
         }
       }, 2000);

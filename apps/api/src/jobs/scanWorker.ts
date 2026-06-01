@@ -87,7 +87,7 @@ export function startWorker() {
     try {
       await prisma.scan.update({ where: { id: scanId }, data: { status: "cloning", message: "Fetching repository data..." } });
 
-      const repoData = await fetchRepoData(repoOwner, repoName, process.env.GITHUB_TOKEN);
+      const repoData = await fetchRepoData(repoOwner, repoName, config.github.token);
       const input = repoDataToGradeInput(repoData);
 
       await prisma.scan.update({ where: { id: scanId }, data: { status: "scanning", progress: 25, message: "Running deep analysis..." } });

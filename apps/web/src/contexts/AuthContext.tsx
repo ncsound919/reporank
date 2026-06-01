@@ -8,6 +8,7 @@ interface AuthState {
   logout: () => void;
 }
 
+// Set VITE_GITHUB_CLIENT_ID in apps/web/.env or replace below
 const GITHUB_CLIENT_ID = "your-github-client-id";
 const REDIRECT_URI = `${window.location.origin}/auth/callback`;
 
