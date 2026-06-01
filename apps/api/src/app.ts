@@ -5,6 +5,7 @@ import { errorHandler } from "./middleware/errorHandler";
 import authRoutes from "./routes/auth";
 import scanRoutes from "./routes/scans";
 import billingRoutes from "./routes/billing";
+import orgRoutes from "./routes/orgs";
 
 const app: express.Express = express();
 app.use(helmet());
@@ -15,6 +16,7 @@ app.get("/health", (_req, res) => res.json({ status: "ok", timestamp: new Date()
 app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/scans", scanRoutes);
 app.use("/api/v1/billing", billingRoutes);
+app.use("/api/v1/orgs", orgRoutes);
 
 app.use(errorHandler);
 export default app;
