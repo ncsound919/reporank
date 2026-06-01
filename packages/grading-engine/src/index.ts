@@ -39,6 +39,10 @@ export class GradingService {
     report.scannedAt = new Date().toISOString();
     return report;
   }
+
+  async dispose(): Promise<void> {
+    (this.ai as any) = null;
+  }
 }
 
 export { buildGradingPrompt } from "./promptBuilder";

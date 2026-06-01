@@ -54,4 +54,12 @@ queue.process(async (job) => {
   return { scanId: job.data.scanId, report, fixPacks };
 });
 
+queue.on("failed", (job, err) => {
+  console.error(`Job ${job.id} failed:`, err.message);
+});
+
+queue.on("error", (err) => {
+  console.error("Queue error:", err.message);
+});
+
 console.log("Scanner worker ready.");

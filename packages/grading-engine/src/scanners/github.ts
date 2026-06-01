@@ -11,17 +11,30 @@ export async function fetchRepoData(owner: string, repo: string, token?: string)
 
   const repoData = await gh<any>(`/repos/${owner}/${repo}`);
   let readme = "";
-  try { const rd = await gh<any>(`/repos/${owner}/${repo}/readme`); readme = Buffer.from(rd.content, "base64").toString("utf-8"); } catch {}
+  try { const rd = await gh<any>(`/repos/${owner}/${repo}/readme`); readme = Buffer.from(rd.content, "base64").toString("utf-8"); } catch (e) { console.warn(`No README for ${owner}/${repo}:`, e instanceof Error ? e.message : "unknown"); }
   const tree = await gh<any>(`/repos/${owner}/${repo}/git/trees/${repoData.default_branch}?recursive=1`);
   const fileTree = (tree.tree || []).map((i: any) => i.path);
 
   let packageJson = "";
-  try { const pkg = await gh<any>(`/repos/${owner}/${repo}/contents/package.json`); packageJson = Buffer.from(pkg.content, "base64").toString("utf-8"); } catch {}
+  try { const pkg = await gh<any>(`/repos/${owner}/${repo}/contents/package.json`); packageJson = Buffer.from(pkg.content, "base64").toString("utf-8"); } catch (e) { console.warn(`No package.json for ${owner}/${repo}:`, e instanceof Error ? e.message : "unknown"); }
 
   const sourceFiles: { path: string; content: string }[] = [];
   const exts = new Set([".ts",".tsx",".js",".jsx",".py",".go",".rs",".java",".rb",".php"]);
-  for (const fp of fileTree.filter((f: string) => exts.has(f.slice(f.lastIndexOf(".")))).slice(0, 8)) {
-    try { const f = await gh<any>(`/repos/${owner}/${repo}/contents/${fp}`); sourceFiles.push({ path: fp, content: Buffer.from(f.content, "base64").toString("utf-8").slice(0, 10000) }); } catch {}
+  const fetchPromises = fileTree
+    .filter((f: string) => exts.has(f.slice(f.lastIndexOf("."))))
+    .slice(0, 8)
+    .map(async (fp: string) => {
+      try {
+        const f = await gh<any>(`/repos/${owner}/${repo}/contents/${fp}`);
+        return { path: fp, content: Buffer.from(f.content, "base64").toString("utf-8").slice(0, 10000) };
+      } catch { return null; }
+    });
+
+  const results = await Promise.allSettled(fetchPromises);
+  for (const result of results) {
+    if (result.status === "fulfilled" && result.value) {
+      sourceFiles.push(result.value);
+    }
   }
 
   return { metadata: { owner, repo, language: repoData.language || "Unknown", stars: repoData.stargazers_count || 0, forks: repoData.forks_count || 0, openIssues: repoData.open_issues_count || 0, pushedAt: repoData.pushed_at || "" }, readme, packageJson, fileTree, sourceFiles };

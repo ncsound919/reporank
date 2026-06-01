@@ -9,10 +9,17 @@ const router: ExpressRouter = Router();
 
 router.post("/", authMiddleware, async (req: AuthRequest, res) => {
   const { name, slug } = req.body;
-  const org = await prisma.org.create({
-    data: { name, slug, members: { create: { userId: req.userId!, role: "owner" } } },
-  });
-  res.status(201).json({ data: org });
+  try {
+    const org = await prisma.org.create({
+      data: { name, slug, members: { create: { userId: req.userId!, role: "owner" } } },
+    });
+    res.status(201).json({ data: org });
+  } catch (err: any) {
+    if (err.code === "P2002") {
+      return res.status(409).json({ error: "Organization slug already exists", code: "DUPLICATE_SLUG" });
+    }
+    throw err;
+  }
 });
 
 router.get("/", authMiddleware, async (req: AuthRequest, res) => {
