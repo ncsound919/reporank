@@ -1,4 +1,4 @@
-import { Router, raw } from "express";
+import { Router } from "express";
 import Stripe from "stripe";
 import { config } from "../config";
 import { prisma } from "../db/client";
@@ -35,7 +35,7 @@ router.post("/checkout", authMiddleware, async (req: AuthRequest, res) => {
   }
 });
 
-router.post("/webhook", raw({ type: "application/json" }), async (req, res) => {
+router.post("/webhook", async (req, res) => {
   const sig = req.headers["stripe-signature"] as string;
   let event: Stripe.Event;
   try {

@@ -12,8 +12,12 @@ import orgRoutes from "./routes/orgs";
 const app: express.Express = express();
 app.use(helmet());
 app.use(cors({ origin: process.env.APP_URL || "http://localhost:5173", credentials: true }));
-app.use(express.json());
 app.use(apiRateLimit);
+
+// Stripe webhook needs raw body for signature verification — mount BEFORE express.json()
+app.use("/api/v1/billing/webhook", express.raw({ type: "application/json" }));
+
+app.use(express.json());
 
 app.get("/health", (_req, res) => res.json({ status: "ok", timestamp: new Date().toISOString() }));
 app.use("/api/v1/auth", authRoutes);

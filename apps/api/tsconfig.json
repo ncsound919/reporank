@@ -2,5 +2,11 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": { "outDir": "dist", "rootDir": "src", "lib": ["ES2022"], "types": ["node"] },
   "include": ["src"],
-  "references": [{ "path": "../../packages/shared-types" }]
+  "references": [
+    { "path": "../../packages/shared-types" },
+    { "path": "../../packages/grading-engine" },
+    { "path": "../../packages/vibe-analyzer" },
+    { "path": "../../packages/fix-pack-generator" },
+    { "path": "../../packages/claw-protect-core" }
+  ]
 }

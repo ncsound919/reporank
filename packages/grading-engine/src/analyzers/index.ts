@@ -2,12 +2,16 @@ import { analyzeComplexity, type ComplexityReport } from "./complexity";
 import { analyzeDependencies, type DependencyReport } from "./dependency-health";
 import { analyzeArchitecture, type ArchitectureReport } from "./architecture";
 import { analyzeProductionReadiness, type ProductionReport } from "./production";
+import { scanCodeHygiene, type CodeHygieneReport } from "./code-hygiene";
+import { runEnterpriseAnalysis, type EnterpriseReport } from "./enterprise";
 
 export interface DeepAnalysisReport {
   complexity: ComplexityReport;
   dependencies: DependencyReport;
   architecture: ArchitectureReport;
   production: ProductionReport;
+  codeHygiene: CodeHygieneReport;
+  enterprise: EnterpriseReport;
   worstFiles: { path: string; score: number; reasons: string[] }[];
   topRecommendations: string[];
   rawPromptBlock: string;
@@ -23,6 +27,8 @@ export function runDeepAnalysis(
   const dependencies = analyzeDependencies(packageJsonContent, sourceFiles);
   const architecture = analyzeArchitecture(fileTree, sourceFiles);
   const production = analyzeProductionReadiness(sourceFiles, fileTree);
+  const codeHygiene = scanCodeHygiene(sourceFiles);
+  const enterprise = runEnterpriseAnalysis(fileTree, sourceFiles);
 
   // Aggregate worst files
   const fileScores = new Map<string, { score: number; reasons: string[] }>();
@@ -68,6 +74,13 @@ export function runDeepAnalysis(
   if (complexity.fileSizeDistribution.xlarge > 0) {
     recommendations.push(`🟡 SPLIT ${complexity.fileSizeDistribution.xlarge} oversized files (>600 lines each)`);
   }
+  if (codeHygiene.findings.some(f => f.severity === "critical")) {
+    const critHygiene = codeHygiene.findings.filter(f => f.severity === "critical");
+    recommendations.push(`🔴 FIX ${critHygiene.length} critical code hygiene issues — ${critHygiene[0].detail}`);
+  }
+  if (enterprise.criticalBlockers.length > 0) {
+    recommendations.push(`🔴 FIX ${enterprise.criticalBlockers.length} enterprise blockers: ${enterprise.criticalBlockers[0]}`);
+  }
   if (production.findings.some(f => f.type === "unhandled-rejection")) {
     const ur = production.findings.filter(f => f.type === "unhandled-rejection");
     recommendations.push(`🟡 CATCH ${ur.length} unhandled promise rejections — will crash process`);
@@ -82,22 +95,22 @@ export function runDeepAnalysis(
   if (architecture.findings.some(f => f.type === "inconsistent-pattern")) {
     recommendations.push(`🟢 STANDARDIZE naming conventions across directories`);
   }
-  if (!production.findings.some(f => f.type === "insufficient-logging")) {
-    // Good — but recommend structured logging anyway if many console.log
-  }
   if (production.overallReadiness !== "ready") {
     recommendations.push(`🔴 DEPLOY-BLOCKING: ${production.deployBlockers.length} issues prevent safe deployment`);
   }
 
-  // Generate raw prompt block for AI
+  // Generate raw prompt blocks for AI
   const rawPromptBlock = `## Deep Analysis Results (authoritative)
 ${renderComplexityPrompt(complexity)}
 ${renderDependencyPrompt(dependencies)}
 ${renderArchitecturePrompt(architecture)}
-${renderProductionPrompt(production)}`;
+${renderProductionPrompt(production)}
+${renderCodeHygienePrompt(codeHygiene)}
+${renderEnterprisePrompt(enterprise)}`;
 
   return {
     complexity, dependencies, architecture, production,
+    codeHygiene, enterprise,
     worstFiles, topRecommendations: recommendations.slice(0, 10),
     rawPromptBlock,
   };
@@ -132,7 +145,25 @@ function renderProductionPrompt(p: ProductionReport): string {
     ).join("\n");
 }
 
+function renderCodeHygienePrompt(h: CodeHygieneReport): string {
+  return `\n[Code Hygiene]\n` +
+    `  ${h.totalCount} issues found across ${h.categoriesFound.length} categories. Score: ${h.score}/100.\n` +
+    h.findings.filter(f => f.severity === "critical" || f.severity === "high").slice(0, 10).map(f =>
+      `  - ${f.severity.toUpperCase()}: [${f.category}] ${f.filePath}${f.line ? `:${f.line}` : ""} — ${f.detail}`
+    ).join("\n");
+}
+
+function renderEnterprisePrompt(e: EnterpriseReport): string {
+  return `\n[Enterprise Readiness]\n` +
+    `  Overall score: ${e.overallSeniorScore}/100. ${e.criticalBlockers.length} critical blockers.\n` +
+    e.apiContract.findings.slice(0, 3).map(f => `  - [API] ${f.severity.toUpperCase()}: ${f.detail}`).join("\n") + "\n" +
+    e.buildCI.findings.filter(f => f.severity !== "low").slice(0, 3).map(f => `  - [CI] ${f.severity.toUpperCase()}: ${f.detail}`).join("\n") + "\n" +
+    e.license.findings.filter(f => f.severity !== "low").slice(0, 3).map(f => `  - [License] ${f.severity.toUpperCase()}: ${f.detail}`).join("\n");
+}
+
 export { analyzeComplexity, type ComplexityReport } from "./complexity";
 export { analyzeDependencies, type DependencyReport } from "./dependency-health";
 export { analyzeArchitecture, type ArchitectureReport } from "./architecture";
 export { analyzeProductionReadiness, type ProductionReport } from "./production";
+export { scanCodeHygiene, type CodeHygieneReport } from "./code-hygiene";
+export { runEnterpriseAnalysis, type EnterpriseReport } from "./enterprise";

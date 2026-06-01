@@ -15,7 +15,11 @@
   },
   "dependencies": {
     "@prisma/client": "^6.5.0",
+    "@reporank/claw-protect-core": "workspace:*",
+    "@reporank/fix-pack-generator": "workspace:*",
+    "@reporank/grading-engine": "workspace:*",
     "@reporank/shared-types": "workspace:*",
+    "@reporank/vibe-analyzer": "workspace:*",
     "bull": "^4.12.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.0",
