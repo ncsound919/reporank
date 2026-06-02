@@ -1,10 +1,12 @@
 import { useState, useEffect, useRef } from "react";
+import { useSearchParams } from "react-router";
 import { useAuth } from "../contexts/AuthContext";
 import { api } from "../api/client";
 
 export default function DashboardPage() {
   const { user, login } = useAuth();
-  const [repoUrl, setRepoUrl] = useState("");
+  const [searchParams] = useSearchParams();
+  const [repoUrl, setRepoUrl] = useState(searchParams.get("url") || "");
   const [status, setStatus] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
