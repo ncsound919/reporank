@@ -34,6 +34,12 @@ export const config = {
     model: process.env.GEMINI_MODEL || "gemini-2.5-flash",
   },
 
+  localAi: {
+    provider: (process.env.LOCAL_AI_PROVIDER || "gemini") as "gemini" | "ollama" | "lmstudio",
+    model: process.env.LOCAL_AI_MODEL || "",
+    endpoint: process.env.LOCAL_AI_ENDPOINT || "http://localhost:11434",
+  },
+
   stripe: {
     secretKey: process.env.STRIPE_SECRET_KEY || "",
     webhookSecret: process.env.STRIPE_WEBHOOK_SECRET || "",

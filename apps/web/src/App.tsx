@@ -5,6 +5,7 @@ import LandingPage from "./pages/LandingPage";
 import CallbackPage from "./pages/CallbackPage";
 import DashboardPage from "./pages/DashboardPage";
 import ScanDetailPage from "./pages/ScanDetailPage";
+import SettingsPage from "./pages/SettingsPage";
 
 export default function App() {
   return (
@@ -16,6 +17,7 @@ export default function App() {
             <Route path="/auth/callback" element={<CallbackPage />} />
             <Route path="/dashboard" element={<DashboardPage />} />
             <Route path="/scan/:id" element={<ScanDetailPage />} />
+          <Route path="/settings" element={<SettingsPage />} />
           </Routes>
         </AuthProvider>
       </BrowserRouter>
