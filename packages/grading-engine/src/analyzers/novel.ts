@@ -7,6 +7,7 @@ import { generateArchitectureDiagram, type ArchitectureDiagram } from "./arch-vi
 import { calculateTechDebt, type TechDebtReport } from "./tech-debt";
 import { generateDeadCodePlan, type DeadCodeReport } from "./dead-code";
 import { generateReadme, type GeneratedReadme } from "./readme-gen";
+import { analyzeAiCode, type AiCodeReport } from "./ai-code";
 import {
   analyzeBusFactor, type BusFactorItem,
   analyzeRiskHeatmap, type RiskItem,
@@ -27,6 +28,7 @@ export interface NovelAnalysisReport {
     changeCoupling: { pairs: CoChangePair[]; summary: string };
     debtRatio: TechDebtMetrics;
   };
+  aiCode: AiCodeReport;
   summary: string;
 }
 
@@ -64,13 +66,16 @@ export function runNovelAnalysis(
     sourceFiles.reduce((s, f) => s + (f.content?.split("\n").length || 0), 0),
   );
 
+  const aiCode = analyzeAiCode(sourceFiles, fileTree, sourceFiles.find(f => f.path === "package.json")?.content);
+
   return {
     architectureDiagram,
     techDebt,
     deadCode,
     readme,
     seniorDev: { busFactor, riskHeatmap, testGaps, changeCoupling, debtRatio },
-    summary: `Novel analysis: ${architectureDiagram.moduleCount} modules mapped, ${techDebt.items.length} debt items, ${deadCode.totalRemovable} dead exports, ${busFactor.items.length} bus factor risks, ${riskHeatmap.items.length} file risks, ${testGaps.gaps.length} test gaps.`,
+    aiCode,
+    summary: `Novel analysis: ${architectureDiagram.moduleCount} modules mapped, ${techDebt.items.length} debt items, ${deadCode.totalRemovable} dead exports, ${busFactor.items.length} bus factor risks, ${riskHeatmap.items.length} file risks, ${testGaps.gaps.length} test gaps, ${aiCode.findings.length} AI-code patterns.`,
   };
 }
 

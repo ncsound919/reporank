@@ -360,7 +360,45 @@ export default function ScanDetailPage() {
           </div>
         )}
 
-        {/* Hallucinated features */}
+        {/* Hallucinated features — now includes AI-code analysis first */}
+        {scan.clawFindings?.novel?.aiCode?.findings?.length > 0 && (
+          <div className="bg-gray-900 rounded-xl p-6 border border-gray-800 mb-8">
+            <h3 className="text-lg font-semibold mb-4 text-red-400">🤖 AI-Generated Code Analysis</h3>
+            <p className="text-sm text-gray-400 mb-4">
+              Patterns unique to LLM-generated code. Spaghetti score: <span className="font-bold">{scan.clawFindings.novel.aiCode.spaghettiScore}/100</span>.
+              Higher = more AI rewriting needed.
+            </p>
+
+            {/* Takeover points */}
+            <div className="bg-gray-800/50 rounded-lg p-4 mb-4">
+              <h4 className="text-sm font-semibold mb-2">🎯 Senior Dev Takeover Points</h4>
+              <div className="space-y-1">
+                {scan.clawFindings.novel.aiCode.takeOverPoints.map((point: string, i: number) => (
+                  <p key={i} className="text-sm text-gray-300">{point}</p>
+                ))}
+              </div>
+            </div>
+
+            {/* Findings */}
+            <div className="space-y-2">
+              {scan.clawFindings.novel.aiCode.findings.slice(0, 12).map((f: any, i: number) => (
+                <div key={i} className="flex items-start gap-3 p-3 bg-gray-800/50 rounded-lg">
+                  <span className={`px-2 py-0.5 rounded text-xs font-medium shrink-0 ${
+                    f.severity === "critical" ? "bg-red-500/20 text-red-400" :
+                    f.severity === "high" ? "bg-orange-500/20 text-orange-400" :
+                    f.severity === "medium" ? "bg-yellow-500/20 text-yellow-400" :
+                    "bg-blue-500/20 text-blue-400"}`}>{f.severity.toUpperCase()}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium">{f.detail}</p>
+                    <p className="text-xs text-gray-500 mt-1 italic">{f.seniorNote}</p>
+                    <p className="text-xs text-emerald-400 mt-1">→ {f.fixSuggestion}</p>
+                    <p className="text-xs text-gray-600 mt-0.5 font-mono">{f.file}{f.line ? `:${f.line}` : ""}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
         {report.hallucinatedFeatures.length > 0 && (
           <div className="bg-gray-900 rounded-xl p-6 border border-gray-800 mb-8">
             <h3 className="text-lg font-semibold mb-4 text-orange-400">🌀 Hallucinated Features</h3>
