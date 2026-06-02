@@ -276,6 +276,90 @@ export default function ScanDetailPage() {
           </div>
         )}
 
+        {/* Senior Dev: Tech Debt Ratio */}
+        {scan.clawFindings?.novel?.seniorDev?.debtRatio && (
+          <div className="bg-gray-900 rounded-xl p-6 border border-gray-800 mb-8">
+            <h3 className="text-lg font-semibold mb-4">📊 Tech Debt Ratio</h3>
+            <p className="text-sm text-gray-400 mb-4">
+              How long it would take to fix all identified issues vs. the original build time.
+            </p>
+            <div className="grid grid-cols-3 gap-4 mb-4">
+              <div className="bg-gray-800/50 rounded-lg p-4 text-center">
+                <p className="text-xs text-gray-500 mb-1">Fixable Issues</p>
+                <p className="text-2xl font-bold">{scan.clawFindings.novel.seniorDev.debtRatio.fixableIssues}</p>
+              </div>
+              <div className="bg-gray-800/50 rounded-lg p-4 text-center">
+                <p className="text-xs text-gray-500 mb-1">Est. Fix Time</p>
+                <p className="text-2xl font-bold">{scan.clawFindings.novel.seniorDev.debtRatio.estimatedFixHours}h</p>
+              </div>
+              <div className="bg-gray-800/50 rounded-lg p-4 text-center">
+                <p className="text-xs text-gray-500 mb-1">Debt Ratio</p>
+                <p className={`text-2xl font-bold ${scan.clawFindings.novel.seniorDev.debtRatio.debtRatio > 30 ? "text-red-400" : scan.clawFindings.novel.seniorDev.debtRatio.debtRatio > 15 ? "text-yellow-400" : "text-emerald-400"}`}>
+                  {scan.clawFindings.novel.seniorDev.debtRatio.debtRatio}%
+                </p>
+              </div>
+            </div>
+            <p className="text-sm text-gray-400">{scan.clawFindings.novel.seniorDev.debtRatio.summary}</p>
+          </div>
+        )}
+
+        {/* Senior Dev: Risk Heatmap */}
+        {scan.clawFindings?.novel?.seniorDev?.riskHeatmap?.items?.length > 0 && (
+          <div className="bg-gray-900 rounded-xl p-6 border border-gray-800 mb-8">
+            <h3 className="text-lg font-semibold mb-4 text-orange-400">🔥 Risk Heatmap</h3>
+            <p className="text-sm text-gray-400 mb-4">Files with high complexity × high change risk. These are where bugs are most likely to appear.</p>
+            <div className="space-y-2">
+              {scan.clawFindings.novel.seniorDev.riskHeatmap.items.slice(0, 8).map((item: any, i: number) => (
+                <div key={i} className="flex items-start gap-3 p-3 bg-gray-800/50 rounded-lg">
+                  <span className={`text-sm font-bold ${item.riskScore > 30 ? "text-red-400" : item.riskScore > 20 ? "text-orange-400" : "text-yellow-400"}`}>{item.riskScore}</span>
+                  <div className="flex-1">
+                    <p className="text-sm font-mono">{item.file}</p>
+                    <p className="text-xs text-gray-500 mt-1">{item.concern}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Senior Dev: Test Gaps */}
+        {scan.clawFindings?.novel?.seniorDev?.testGaps?.gaps?.length > 0 && (
+          <div className="bg-gray-900 rounded-xl p-6 border border-gray-800 mb-8">
+            <h3 className="text-lg font-semibold mb-4 text-yellow-400">🧪 Test Coverage Gaps</h3>
+            <p className="text-sm text-gray-400 mb-4">{scan.clawFindings.novel.seniorDev.testGaps.summary}</p>
+            <div className="space-y-2">
+              {scan.clawFindings.novel.seniorDev.testGaps.gaps.slice(0, 8).map((gap: any, i: number) => (
+                <div key={i} className="flex items-start gap-3 p-3 bg-gray-800/50 rounded-lg">
+                  <span className={`px-2 py-0.5 rounded text-xs font-medium ${gap.priority === "high" ? "bg-red-500/20 text-red-400" : "bg-yellow-500/20 text-yellow-400"}`}>{gap.priority.toUpperCase()}</span>
+                  <div className="flex-1">
+                    <p className="text-sm font-mono">{gap.sourceFile}</p>
+                    <p className="text-xs text-gray-500 mt-1">Complexity: {gap.complexity}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Senior Dev: Bus Factor */}
+        {scan.clawFindings?.novel?.seniorDev?.busFactor?.items?.length > 0 && (
+          <div className="bg-gray-900 rounded-xl p-6 border border-gray-800 mb-8">
+            <h3 className="text-lg font-semibold mb-4 text-red-400">👤 Bus Factor Analysis</h3>
+            <p className="text-sm text-gray-400 mb-4">{scan.clawFindings.novel.seniorDev.busFactor.summary}</p>
+            <div className="space-y-2">
+              {scan.clawFindings.novel.seniorDev.busFactor.items.slice(0, 5).map((item: any, i: number) => (
+                <div key={i} className="flex items-start gap-3 p-3 bg-gray-800/50 rounded-lg">
+                  <span className={`px-2 py-0.5 rounded text-xs font-medium ${item.risk === "critical" ? "bg-red-500/20 text-red-400" : item.risk === "high" ? "bg-orange-500/20 text-orange-400" : "bg-yellow-500/20 text-yellow-400"}`}>{item.risk.toUpperCase()}</span>
+                  <div className="flex-1">
+                    <p className="text-sm font-mono">{item.file}</p>
+                    <p className="text-xs text-gray-500 mt-1">{item.rationale}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Hallucinated features */}
         {report.hallucinatedFeatures.length > 0 && (
           <div className="bg-gray-900 rounded-xl p-6 border border-gray-800 mb-8">

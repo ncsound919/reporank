@@ -1,17 +1,32 @@
 /**
  * Novel Analyzers Bundle — features no other code review tool offers.
- * Architecture diagrams, tech debt interest, dead code plans, README generation.
+ * Architecture diagrams, tech debt interest, dead code plans, README generation,
+ * bus factor, risk heatmap, test gaps, change coupling, tech debt ratio.
  */
 import { generateArchitectureDiagram, type ArchitectureDiagram } from "./arch-visualizer";
 import { calculateTechDebt, type TechDebtReport } from "./tech-debt";
 import { generateDeadCodePlan, type DeadCodeReport } from "./dead-code";
 import { generateReadme, type GeneratedReadme } from "./readme-gen";
+import {
+  analyzeBusFactor, type BusFactorItem,
+  analyzeRiskHeatmap, type RiskItem,
+  analyzeTestGaps, type TestGap,
+  analyzeChangeCoupling, type CoChangePair,
+  calculateTechDebtRatio, type TechDebtMetrics,
+} from "./senior-dev";
 
 export interface NovelAnalysisReport {
   architectureDiagram: ArchitectureDiagram;
   techDebt: TechDebtReport;
   deadCode: DeadCodeReport;
   readme: GeneratedReadme;
+  seniorDev: {
+    busFactor: { items: BusFactorItem[]; score: number; summary: string };
+    riskHeatmap: { items: RiskItem[]; maxRisk: number; summary: string };
+    testGaps: { gaps: TestGap[]; summary: string };
+    changeCoupling: { pairs: CoChangePair[]; summary: string };
+    debtRatio: TechDebtMetrics;
+  };
   summary: string;
 }
 
@@ -30,18 +45,32 @@ export function runNovelAnalysis(
   mainLang: string,
   quickWins: { title: string; severity: string }[],
   recommendations: string[],
+  repoPath?: string,
 ): NovelAnalysisReport {
   const architectureDiagram = generateArchitectureDiagram(sourceFiles);
   const techDebt = calculateTechDebt(codeHygieneFindings, productionFindings, secretsCount, overallScore);
   const deadCode = generateDeadCodePlan(sourceFiles);
   const readme = generateReadme(repoName, repoOwner, description, overallScore, grade, language, fileTree.length, mainLang, architectureDiagram.mermaidCode, quickWins, recommendations);
 
+  // Senior dev analyses
+  const busFactor = analyzeBusFactor(repoPath);
+  const riskHeatmap = analyzeRiskHeatmap(sourceFiles);
+  const testGaps = analyzeTestGaps(sourceFiles);
+  const changeCoupling = analyzeChangeCoupling(repoPath);
+  const debtRatio = calculateTechDebtRatio(
+    codeHygieneFindings,
+    { hotSpots: [] },
+    productionFindings,
+    sourceFiles.reduce((s, f) => s + (f.content?.split("\n").length || 0), 0),
+  );
+
   return {
     architectureDiagram,
     techDebt,
     deadCode,
     readme,
-    summary: `Novel analysis: ${architectureDiagram.moduleCount} modules mapped, ${techDebt.items.length} debt items ($${techDebt.totalYearlyCost.toLocaleString()}/yr), ${deadCode.totalRemovable} dead exports found, README generated.`,
+    seniorDev: { busFactor, riskHeatmap, testGaps, changeCoupling, debtRatio },
+    summary: `Novel analysis: ${architectureDiagram.moduleCount} modules mapped, ${techDebt.items.length} debt items, ${deadCode.totalRemovable} dead exports, ${busFactor.items.length} bus factor risks, ${riskHeatmap.items.length} file risks, ${testGaps.gaps.length} test gaps.`,
   };
 }
 
@@ -49,6 +78,9 @@ export { generateArchitectureDiagram } from "./arch-visualizer";
 export { calculateTechDebt } from "./tech-debt";
 export { generateDeadCodePlan } from "./dead-code";
 export { generateReadme } from "./readme-gen";
+export { analyzeBusFactor } from "./senior-dev";
+export { analyzeRiskHeatmap } from "./senior-dev";
+export { analyzeTestGaps } from "./senior-dev";
 export type { ArchitectureDiagram } from "./arch-visualizer";
 export type { TechDebtReport } from "./tech-debt";
 export type { DeadCodeReport } from "./dead-code";
