@@ -18,6 +18,10 @@ export interface DeadCodeReport {
 }
 
 export function generateDeadCodePlan(sourceFiles: { path: string; content: string }[]): DeadCodeReport {
+  if (!sourceFiles || sourceFiles.length === 0) {
+    return { steps: [], totalRemovable: 0, estimatedSavingsLoc: 0, summary: "No source files to analyze for dead code" };
+  }
+
   const steps: EliminationStep[] = [];
   let totalLoc = 0;
 
@@ -26,6 +30,7 @@ export function generateDeadCodePlan(sourceFiles: { path: string; content: strin
   const allExports = new Map<string, Map<string, number>>(); // file -> exported symbol -> line count
 
   for (const file of sourceFiles) {
+    if (!file || !file.path || !file.content) continue;
     fileToImports.set(file.path, new Set());
 
     // Extract exported symbols (named exports only)
@@ -77,6 +82,11 @@ export function generateDeadCodePlan(sourceFiles: { path: string; content: strin
   const allImportedFiles = new Set<string>();
   for (const [, imports] of fileToImports) {
     for (const imp of imports) allImportedFiles.add(imp);
+  }
+
+  // Skip dead code analysis for single-file projects (all exports appear unused)
+  if (allExports.size <= 1) {
+    return { steps: [], totalRemovable: 0, estimatedSavingsLoc: 0, summary: "Single-file project — dead code analysis skipped" };
   }
 
   for (const [file, exports] of allExports) {

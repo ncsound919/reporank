@@ -150,8 +150,21 @@ const healthReportSchema = z.object({
 });
 
 export function parseHealthReport(raw: string): HealthReport {
-  const jsonMatch = raw.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) throw new Error("No JSON found in LLM response");
-  const parsed = JSON.parse(jsonMatch[0]);
-  return healthReportSchema.parse(parsed) as HealthReport;
+  // Non-regex JSON extraction to avoid ReDoS on large LLM responses
+  let braceDepth = 0;
+  let jsonStart = -1;
+  for (let i = 0; i < raw.length; i++) {
+    if (raw[i] === "{") {
+      if (braceDepth === 0) jsonStart = i;
+      braceDepth++;
+    } else if (raw[i] === "}") {
+      braceDepth--;
+      if (braceDepth === 0 && jsonStart >= 0) {
+        const jsonStr = raw.slice(jsonStart, i + 1);
+        try { return healthReportSchema.parse(JSON.parse(jsonStr)) as HealthReport; } catch { /* try next match */ }
+        jsonStart = -1;
+      }
+    }
+  }
+  throw new Error("No valid JSON found in LLM response");
 }

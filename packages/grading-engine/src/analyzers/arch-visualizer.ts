@@ -11,12 +11,18 @@ export interface ArchitectureDiagram {
 }
 
 export function generateArchitectureDiagram(sourceFiles: { path: string; content: string }[]): ArchitectureDiagram {
+  // Guard against undefined/null entries
+  if (!sourceFiles || sourceFiles.length === 0) {
+    return { mermaidCode: "graph LR\n  empty[\"No source files\"]", moduleCount: 0, dependencyCount: 0, summary: "No source files to analyze" };
+  }
+
   // Build a simplified dependency graph at the module/directory level
   const modules = new Map<string, Set<string>>();
   const dirFiles = new Map<string, string[]>();
 
   // Group files by top-level directory
   for (const file of sourceFiles) {
+    if (!file || !file.path || !file.content) continue;
     const parts = file.path.replace(/\\/g, "/").split("/");
     const topDir = parts[0] === "src" && parts.length > 1 ? `src/${parts[1]}` : parts[0];
     if (!dirFiles.has(topDir)) dirFiles.set(topDir, []);
@@ -26,6 +32,7 @@ export function generateArchitectureDiagram(sourceFiles: { path: string; content
 
   // Extract inter-module dependencies
   for (const file of sourceFiles) {
+    if (!file || !file.path || !file.content) continue;
     const parts = file.path.replace(/\\/g, "/").split("/");
     const sourceModule = parts[0] === "src" && parts.length > 1 ? `src/${parts[1]}` : parts[0];
     const imports = file.content.matchAll(/(?:from|require)\s*\(?\s*["']([^"']+)["']/g);

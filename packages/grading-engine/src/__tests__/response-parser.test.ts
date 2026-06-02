@@ -53,6 +53,6 @@ describe("parseHealthReport", () => {
   });
 
   it("throws on non-JSON response", () => {
-    expect(() => parseHealthReport("No JSON here")).toThrow("No JSON found");
+    expect(() => parseHealthReport("No JSON here")).toThrow("No valid JSON found");
   });
 });

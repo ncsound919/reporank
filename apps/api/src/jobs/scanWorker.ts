@@ -48,12 +48,14 @@ function parseSarif(raw: string): any {
   } catch { return raw; }
 }
 
-async function runDeepScanners(repoUrl: string): Promise<Record<string, any>> {
+async function runDeepScanners(owner: string, repo: string): Promise<Record<string, any>> {
   const results: Record<string, any> = {};
   const tempDir = mkdtempSync(join(tmpdir(), "reporank-"));
 
   try {
-    execSync(`git clone --depth 1 ${repoUrl} .`, { cwd: tempDir, encoding: "utf-8", timeout: 60000, stdio: "pipe" });
+    // Reconstruct URL from validated owner/repo only — never use raw user input in shell
+    const safeUrl = `https://github.com/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}.git`;
+    execSync(`git clone --depth 1 "${safeUrl}" .`, { cwd: tempDir, encoding: "utf-8", timeout: 60000, stdio: "pipe" });
 
     const scanners: { name: string; cmd: string; args: string[]; parser?: (out: string) => any }[] = [
       { name: "semgrep", cmd: "semgrep", args: ["scan", "--sarif", "--no-rewrite-rule-ids", "--quiet"], parser: parseSarif },
@@ -64,7 +66,7 @@ async function runDeepScanners(repoUrl: string): Promise<Record<string, any>> {
 
     for (const scanner of scanners) {
       try {
-        const out = execSync(`${scanner.cmd} ${scanner.args.join(" ")}`, { cwd: tempDir, encoding: "utf-8", maxBuffer: 10*1024*1024, timeout: 120000, stdio: "pipe" });
+        const out = execSync(`"${scanner.cmd}" ${scanner.args.map(a => `"${a}"`).join(" ")}`, { cwd: tempDir, encoding: "utf-8", maxBuffer: 10*1024*1024, timeout: 120000, stdio: "pipe" });
         results[scanner.name] = scanner.parser ? scanner.parser(out) : out;
       } catch (e: any) {
         logger.warn(`Scanner ${scanner.name} skipped: ${e.message?.slice(0, 80)}`);
@@ -74,7 +76,7 @@ async function runDeepScanners(repoUrl: string): Promise<Record<string, any>> {
     logger.info(`Deep scan complete: ${Object.keys(results).length}/${scanners.length} scanners ran`);
     return results;
   } catch (e: any) {
-      logger.warn("Deep scan clone failed:", e.message);
+    logger.warn("Deep scan clone failed:", e.message);
     return {};
   } finally {
     try { rmSync(tempDir, { recursive: true, force: true }); } catch { /* cleanup best effort */ }
@@ -126,7 +128,7 @@ export function startWorker() {
       if (config.deepScan) {
         await prisma.scan.update({ where: { id: scanId }, data: { status: "scanning", progress: 50, message: "Running deep scanners..." } });
         if (!isLocal && input.repoUrl !== "local") {
-          scannerResults = await runDeepScanners(`${input.repoUrl}.git`);
+          scannerResults = await runDeepScanners(input.repoOwner, input.repoName);
         }
       }
 

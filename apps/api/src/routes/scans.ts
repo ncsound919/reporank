@@ -15,8 +15,8 @@ const createScanSchema = z.object({
 
 const createLocalScanSchema = z.object({
   files: z.array(z.object({
-    path: z.string(),
-    content: z.string().max(500000), // 500KB per file max
+    path: z.string().regex(/^[a-zA-Z0-9_\/\.\-\\]+$/, "Invalid file path characters").max(500).refine(p => !p.includes(".."), "Path traversal not allowed"),
+    content: z.string().max(500000),
   })).min(1).max(500),
   privateMode: z.boolean().default(false),
   aiProvider: z.enum(["gemini", "ollama", "lmstudio"]).default("gemini"),
