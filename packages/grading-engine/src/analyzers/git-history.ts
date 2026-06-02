@@ -2,7 +2,7 @@
  * Git history analyzer — extracts insights from local .git directory.
  * Only runs when analyzing local directories with a .git folder.
  */
-import { execSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 
@@ -23,7 +23,7 @@ export function analyzeGitHistory(repoPath: string): { insights: GitInsight[]; h
 
   try {
     // Commit count
-    const commitCount = execSync(`git rev-list --count HEAD 2>nul`, { cwd: repoPath, encoding: "utf-8", timeout: 5000 }).trim();
+    const commitCount = execFileSync("git", ["rev-list", "--count", "HEAD"], { cwd: repoPath, encoding: "utf-8", timeout: 5000 }).trim();
     const commits = parseInt(commitCount, 10);
     insights.push({
       type: "commit-frequency", severity: commits > 100 ? "low" : "medium",
@@ -32,7 +32,8 @@ export function analyzeGitHistory(repoPath: string): { insights: GitInsight[]; h
     });
 
     // Author count
-    const authors = execSync(`git shortlog -s -n HEAD 2>nul`, { cwd: repoPath, encoding: "utf-8", timeout: 5000 }).trim().split("\n").length;
+    const authorOutput = execFileSync("git", ["shortlog", "-s", "-n", "HEAD"], { cwd: repoPath, encoding: "utf-8", timeout: 5000 }).trim();
+    const authors = authorOutput ? authorOutput.split("\n").length : 0;
     insights.push({
       type: "author-count", severity: authors > 1 ? "low" : "high" as any,
       detail: `${authors} contributor(s) — bus factor is ${authors}`,
@@ -40,16 +41,21 @@ export function analyzeGitHistory(repoPath: string): { insights: GitInsight[]; h
     });
 
     // Stale files (not modified in 90+ commits)
-    const staleCount = execSync(`git log --diff-filter=M --name-only --pretty=format: HEAD~100..HEAD 2>nul | sort | uniq -c | sort -rn | wc -l`, { cwd: repoPath, encoding: "utf-8", timeout: 5000 }).trim();
-    const recentlyModified = parseInt(staleCount, 10) || 0;
-    const allFiles = execSync(`git ls-files 2>nul | wc -l`, { cwd: repoPath, encoding: "utf-8", timeout: 5000 }).trim();
-    const totalFiles = parseInt(allFiles, 10) || 0;
-    if (totalFiles > 0 && recentlyModified < totalFiles * 0.3) {
-      insights.push({
-        type: "stale-files", severity: "medium",
-        detail: `Only ${recentlyModified} of ${totalFiles} files modified in recent history — ${totalFiles - recentlyModified} files potentially stale`,
-        value: totalFiles - recentlyModified,
-      });
+    try {
+      const logOutput = execFileSync("git", ["log", "--diff-filter=M", "--name-only", "--pretty=format:", "HEAD~100..HEAD"], { cwd: repoPath, encoding: "utf-8", timeout: 5000 }).trim();
+      const modifiedFiles = logOutput ? new Set(logOutput.split("\n").filter(Boolean)) : new Set<string>();
+      const recentlyModified = modifiedFiles.size;
+      const allFileList = execFileSync("git", ["ls-files"], { cwd: repoPath, encoding: "utf-8", timeout: 5000 }).trim();
+      const totalFiles = allFileList ? allFileList.split("\n").filter(Boolean).length : 0;
+      if (totalFiles > 0 && recentlyModified < totalFiles * 0.3) {
+        insights.push({
+          type: "stale-files", severity: "medium",
+          detail: `Only ${recentlyModified} of ${totalFiles} files modified in recent history — ${totalFiles - recentlyModified} files potentially stale`,
+          value: totalFiles - recentlyModified,
+        });
+      }
+    } catch {
+      // stale-files analysis is best effort
     }
 
   } catch (e: any) {

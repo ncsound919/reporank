@@ -6,13 +6,14 @@ import { GradingService, runDeepAnalysis } from "@reporank/grading-engine";
 import { runNovelAnalysis } from "@reporank/grading-engine/novel";
 import { generateUnstickPlan } from "@reporank/grading-engine/unstick";
 import { detectInvisibleBugs } from "@reporank/grading-engine/invisible-bugs";
+import { calculateVibeCodingIndex, calculateSoftware20Score, calculateTrustScore } from "@reporank/grading-engine";
 import { createProvider } from "@reporank/grading-engine/providers";
 import { analyzeVibe } from "@reporank/vibe-analyzer";
 import { generateFixPacks } from "@reporank/fix-pack-generator";
 import { buildRoadmap } from "@reporank/fix-pack-generator";
 import { scanSecrets } from "@reporank/claw-protect-core";
 import { config } from "../config";
-import { execSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -57,7 +58,7 @@ async function runDeepScanners(owner: string, repo: string): Promise<Record<stri
   try {
     // Reconstruct URL from validated owner/repo only — never use raw user input in shell
     const safeUrl = `https://github.com/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}.git`;
-    execSync(`git clone --depth 1 "${safeUrl}" .`, { cwd: tempDir, encoding: "utf-8", timeout: 60000, stdio: "pipe" });
+    execFileSync("git", ["clone", "--depth", "1", safeUrl, "."], { cwd: tempDir, encoding: "utf-8", timeout: 60000 });
 
     const scanners: { name: string; cmd: string; args: string[]; parser?: (out: string) => any }[] = [
       { name: "semgrep", cmd: "semgrep", args: ["scan", "--sarif", "--no-rewrite-rule-ids", "--quiet"], parser: parseSarif },
@@ -68,7 +69,7 @@ async function runDeepScanners(owner: string, repo: string): Promise<Record<stri
 
     for (const scanner of scanners) {
       try {
-        const out = execSync(`"${scanner.cmd}" ${scanner.args.map(a => `"${a}"`).join(" ")}`, { cwd: tempDir, encoding: "utf-8", maxBuffer: 10*1024*1024, timeout: 120000, stdio: "pipe" });
+        const out = execFileSync(scanner.cmd, scanner.args, { cwd: tempDir, encoding: "utf-8", maxBuffer: 10*1024*1024, timeout: 120000 });
         results[scanner.name] = scanner.parser ? scanner.parser(out) : out;
       } catch (e: any) {
         logger.warn(`Scanner ${scanner.name} skipped: ${e.message?.slice(0, 80)}`);
@@ -121,10 +122,11 @@ export function startWorker() {
       await prisma.scan.update({ where: { id: scanId }, data: { status: "scanning", progress: 25, message: "Running deep analysis..." } });
 
       // Phase 2: Deterministic analysis (runs for all modes)
-      const vibe = analyzeVibe({ files: repoData.fileTree, sourceFiles: repoData.sourceFiles });
-      const allContent = repoData.sourceFiles.map((f: any) => f.content).join("\n");
+      const vibe = analyzeVibe({ files: repoData.fileTree || [], sourceFiles: repoData.sourceFiles || [] });
+      const vibeCoding = calculateVibeCodingIndex(repoData.sourceFiles || [], repoData.fileTree || []);
+      const allContent = (repoData.sourceFiles || []).map((f: any) => f.content).join("\n");
       const clawResults = scanSecrets(allContent);
-      const deep = runDeepAnalysis(null, repoData.fileTree, repoData.sourceFiles, repoData.packageJson);
+      const deep = runDeepAnalysis(null, repoData.fileTree || [], repoData.sourceFiles || [], repoData.packageJson || "{}");
 
       let scannerResults: Record<string, any> = {};
       if (config.deepScan) {
@@ -152,7 +154,7 @@ export function startWorker() {
 
       if (isPrivate) {
         // Private mode: deterministic-only, generate a basic report
-        report = buildPrivateReport(input, vibe, deep, clawResults);
+        report = buildPrivateReport(input, vibe, deep, clawResults, vibeCoding);
       } else {
         await prisma.scan.update({ where: { id: scanId }, data: { status: "grading", progress: 75, message: "AI is evaluating results..." } });
 
@@ -194,6 +196,36 @@ export function startWorker() {
         overall: vibe.overall,
         recommendations: [...new Set([...vibe.recommendations, ...(report.vibe.recommendations || [])])],
       };
+      report.vibeCodingIndex = {
+        overallScore: vibeCoding.overallScore,
+        knownHumanScore: vibeCoding.knownHumanScore,
+        signalCount: vibeCoding.perFile.length,
+        fileCount: vibeCoding.perFile.length,
+        summary: vibeCoding.summary,
+      };
+
+      // Software 2.0 + Trust score — needed for /trust, /badges/*, and PR impact
+      const sourceFiles = repoData.sourceFiles || [];
+      const fileTree = repoData.fileTree || [];
+      const testFilePaths = new Set<string>(
+        sourceFiles
+          .filter((f: { path: string }) => /\.(test|spec)\.[a-z]+$/i.test(f.path) || f.path.includes("/tests/") || f.path.includes("/__tests__/"))
+          .map((f: { path: string }) => f.path)
+      );
+      const software20 = calculateSoftware20Score(sourceFiles, fileTree, testFilePaths);
+      report.software20Score = { overall: software20.overall, fileSizeScore: software20.fileSizeScore, commentDensity: software20.commentDensity, importClarity: software20.importClarity, testCoverage: software20.testCoverage, structureNotes: software20.structureNotes };
+
+      const securityCritical = (clawResults as any).critical ?? 0;
+      const securityHigh = (clawResults as any).high ?? 0;
+      const securityMedium = (clawResults as any).medium ?? 0;
+      const securityLow = (clawResults as any).low ?? 0;
+      const trust = calculateTrustScore({
+        overallScore: report.overallScore,
+        vibeCodingIndex: vibeCoding.overallScore,
+        securityFindings: { critical: securityCritical, high: securityHigh, medium: securityMedium, low: securityLow },
+        software20Inputs: { sourceFiles, fileTree, testFilePaths },
+      });
+      report.trust = { trust: trust.trust, grade: trust.grade, components: trust.components, feedback: trust.feedback };
 
       const fixPacks = generateFixPacks(report);
       report.roadmap = buildRoadmap(report.quickWins, report.overallScore);
@@ -211,8 +243,8 @@ export function startWorker() {
       // Invisible bugs — patterns even senior devs miss
       const invisible = detectInvisibleBugs(repoData.sourceFiles || []);
 
-      await prisma.scan.update({
-        where: { id: scanId },
+      await prisma.scan.updateMany({
+        where: { id: scanId, status: { notIn: ["complete", "error"] } },
         data: {
           status: "complete", progress: 100,
           overallScore: report.overallScore, gradeCategory: report.gradeCategory,
@@ -226,9 +258,10 @@ export function startWorker() {
       logger.info({ scanId, score: report.overallScore, grade: report.gradeCategory, private: isPrivate }, "Scan complete");
 
     } catch (err: any) {
-      await prisma.scan.update({
-        where: { id: scanId }, data: { status: "error", errorMessage: err.message, completedAt: new Date() },
-      }).catch(e => logger.error(e, "Failed to update scan error"));
+      await prisma.scan.updateMany({
+        where: { id: scanId, status: { notIn: ["complete"] } },
+        data: { status: "error", errorMessage: err.message, completedAt: new Date() },
+      }).catch((e: any) => logger.error(e, "Failed to update scan error"));
       throw err;
     }
   });
@@ -239,7 +272,7 @@ export function startWorker() {
   logger.info("Worker started, processing scan jobs...");
 }
 
-function buildPrivateReport(input: any, vibe: any, deep: any, clawResults: any): any {
+function buildPrivateReport(input: any, vibe: any, deep: any, clawResults: any, vibeCoding: any): any {
   return {
     repoOwner: input.repoOwner, repoName: input.repoName, mainLanguage: input.mainLanguage,
     starsCount: 0, forksCount: 0, openIssuesCount: 0,
@@ -248,6 +281,13 @@ function buildPrivateReport(input: any, vibe: any, deep: any, clawResults: any):
     gradeCategory: vibe.overall >= 80 ? "B+" : vibe.overall >= 60 ? "C" : vibe.overall >= 40 ? "D" : "F",
     maturityLevel: vibe.overall >= 80 ? "Production" : vibe.overall >= 60 ? "Beta" : "MVP",
     summary: "Private mode analysis (deterministic only). No AI grading performed.",
+    vibeCodingIndex: {
+      overallScore: vibeCoding.overallScore,
+      knownHumanScore: vibeCoding.knownHumanScore,
+      signalCount: vibeCoding.signalCount,
+      fileCount: vibeCoding.perFile.length,
+      summary: vibeCoding.summary,
+    },
     dimensionScores: {
       security: Math.max(0, 100 - clawResults.secretsFound * 10),
       quality: 60, vibe: vibe.overall, architecture: deep.complexity.fileSizeDistribution.xlarge > 0 ? 40 : 70,

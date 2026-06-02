@@ -1,9 +1,17 @@
 import { Router } from "express";
 import { prisma } from "../db/client";
+import rateLimit from "express-rate-limit";
 
 const router: Router = Router();
 
-router.get("/:owner/:repo", async (req, res) => {
+const badgeRateLimit = rateLimit({
+  windowMs: 60 * 1000,
+  max: 300,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+router.get("/:owner/:repo", badgeRateLimit, async (req, res) => {
   const scan = await prisma.scan.findFirst({
     where: { repoOwner: req.params.owner, repoName: req.params.repo, status: "complete" },
     orderBy: { createdAt: "desc" },

@@ -14,6 +14,7 @@ export interface HealthReport {
   security: SecurityScan;
   quality: QualityScorecard;
   vibe: VibeScore;
+  vibeCodingIndex: VibeCodingScore;
   architecture: ArchitectureMetrics;
   deployment: DeploymentReadiness;
   documentation: DocumentationScore;
@@ -28,6 +29,14 @@ export interface HealthReport {
   implementationPlan: ImplementationStep[];
   globalBenchmarkPercent: number;
   scannedAt: string;
+}
+
+export interface VibeCodingScore {
+  overallScore: number;
+  knownHumanScore: number;
+  signalCount: number;
+  fileCount: number;
+  summary: string;
 }
 
 export type GradeCategory = "A+" | "A" | "B+" | "B" | "C" | "D" | "F";

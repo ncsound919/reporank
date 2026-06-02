@@ -21,6 +21,28 @@ model User {
   orgs             OrgMember[]
   apiKeys          ApiKey[]
   scans            Scan[]
+  prConfigs        PrWebhookConfig[]
+  agentsVersions   AgentsFileVersion[]
+  projectBriefs    ProjectBrief[]
+}
+
+model AgentsFileVersion {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  repoFullName    String   // e.g. "owner/repo"
+  mode            String   // minimal | standard | comprehensive
+  content         String
+  contentHash     String   // SHA-256 of content
+  estimatedTokens Int
+  ruleCount       Int
+  generatedBy     String   // "user" | "scan" | "api"
+  scanId          String?  // optional link to originating scan
+  createdAt       DateTime @default(now())
+
+  @@unique([userId, repoFullName, contentHash])
+  @@index([repoFullName])
+  @@index([userId, createdAt])
 }
 
 model Org {
@@ -56,13 +78,13 @@ model OrgMember {
 }
 
 model Scan {
-  id               String    @id @default(cuid())
+  id               String        @id @default(cuid())
   repoUrl          String
   repoName         String
   repoOwner        String
-  branch           String    @default("main")
-  status           String    @default("pending")
-  progress         Int       @default(0)
+  branch           String        @default("main")
+  status           String        @default("pending")
+  progress         Int           @default(0)
   message          String?
   overallScore     Int?
   gradeCategory    String?
@@ -72,19 +94,25 @@ model Scan {
   complianceReport Json?
   fixPack          Json?
   clawFindings     Json?
+  builderMetadata  Json?         // buildSource, detectedStack, builderSignals, portability
   errorMessage     String?
   duration         Int?
-  createdAt        DateTime  @default(now())
+  createdAt        DateTime      @default(now())
   completedAt      DateTime?
   userId           String
-  user             User      @relation(fields: [userId], references: [id])
+  user             User          @relation(fields: [userId], references: [id])
   orgId            String?
-  org              Org?      @relation(fields: [orgId], references: [id])
+  org              Org?          @relation(fields: [orgId], references: [id])
+  projectBriefId   String?
+  projectBrief     ProjectBrief? @relation(fields: [projectBriefId], references: [id])
 
   @@index([orgId])
   @@index([userId])
   @@index([repoUrl])
   @@index([status])
+  @@index([projectBriefId])
+  @@index([orgId, createdAt])
+  @@index([projectBriefId, createdAt])
 }
 
 model ApiKey {
@@ -151,4 +179,197 @@ model Webhook {
   createdAt DateTime @default(now())
   orgId     String
   org       Org      @relation(fields: [orgId], references: [id])
+}
+
+model PrWebhookConfig {
+  id                String    @id @default(cuid())
+  userId            String
+  user              User      @relation(fields: [userId], references: [id])
+  repoFullName      String
+  enabled           Boolean   @default(true)
+  minScoreThreshold Int       @default(60)
+  commentOn         String[]
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  events            PrEvent[]
+
+  @@unique([userId, repoFullName])
+  @@index([repoFullName])
+}
+
+model PrEvent {
+  id        String          @id @default(cuid())
+  configId  String
+  config    PrWebhookConfig @relation(fields: [configId], references: [id])
+  prNumber  Int
+  prTitle   String
+  headSha   String
+  baseRef   String
+  action    String
+  status    String          @default("pending")
+  createdAt DateTime        @default(now())
+  commentId String?
+  scoreBefore Int?
+  scoreAfter  Int?
+
+  @@index([configId])
+  @@index([status])
+}
+
+model Course {
+  id          String       @id @default(cuid())
+  name        String
+  slug        String       @unique
+  description String?
+  lmsType     String       @default("custom") // canvas, gradescope, classroom, custom
+  lmsCourseId String?
+  instructorId String
+  settings    Json?
+  createdAt   DateTime     @default(now())
+  assignments Assignment[]
+  students    CourseStudent[]
+}
+
+model CourseStudent {
+  id       String   @id @default(cuid())
+  courseId String
+  course   Course   @relation(fields: [courseId], references: [id])
+  studentEmail String
+  studentName  String?
+  joinedAt DateTime @default(now())
+
+  @@unique([courseId, studentEmail])
+}
+
+model Assignment {
+  id          String   @id @default(cuid())
+  courseId    String
+  course      Course   @relation(fields: [courseId], references: [id])
+  title       String
+  description String?
+  language    String   @default("typescript")
+  guidelines  Json     // CourseGuideline[]
+  rubric      Json?
+  dueAt       DateTime?
+  createdAt   DateTime @default(now())
+  submissions StudentSubmission[]
+}
+
+model StudentSubmission {
+  id           String   @id @default(cuid())
+  assignmentId String
+  assignment   Assignment @relation(fields: [assignmentId], references: [id])
+  studentEmail String
+  studentName  String?
+  repoUrl      String?
+  sourceFiles  Json     // { path, content }[]
+  session      Json?    // ChatTurn[]
+  auditReport  Json?    // AuditReport
+  sessionAnalysis Json? // SessionAnalysis
+  overallScore Int?
+  overallGrade String?
+  aiContamination Int?
+  submittedAt  DateTime @default(now())
+
+  @@index([assignmentId])
+  @@index([studentEmail])
+}
+
+// ─── SCOPE CONTRACT ────────────────────────────────────────────────────────
+
+model ProjectBrief {
+  id                 String               @id @default(cuid())
+  orgId              String?
+  userId             String
+  user               User                 @relation(fields: [userId], references: [id])
+  name               String
+  repoUrl            String?
+  buildSource        String               @default("github") // github | bolt | lovable | manual-upload | other
+  objective          String
+  targetUsers        String?
+  deliverables       String[]
+  exclusions         String[]
+  constraints        String[]
+  assumptions        String[]
+  acceptanceCriteria String[]
+  intentDocument     Json?                // parsed from prompt/PRD: promisedFeatures, personas, integrations
+  deadline           DateTime?
+  timebox            String?
+  status             String               @default("draft") // draft | approved | archived
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+  approvals          BriefApproval[]
+  milestones         Milestone[]
+  scans              Scan[]
+  changeRequests     ScopeChangeRequest[]
+
+  @@index([userId])
+  @@index([orgId])
+}
+
+model BriefApproval {
+  id             String       @id @default(cuid())
+  projectBriefId String
+  brief          ProjectBrief @relation(fields: [projectBriefId], references: [id], onDelete: Cascade)
+  approvedBy     String
+  approvedAt     DateTime     @default(now())
+  version        Int          @default(1)
+  notes          String?
+}
+
+model Milestone {
+  id                         String           @id @default(cuid())
+  projectId                  String
+  brief                      ProjectBrief     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  name                       String
+  type                       String           @default("feature-complete") // baseline | feature-complete | qa-ready | launch-candidate | post-launch
+  targetDate                 DateTime?
+  goal                       String?
+  acceptanceCriteriaSnapshot String[]
+  scanId                     String?          // linked scan
+  status                     String           @default("pending") // pending | achieved | missed
+  createdAt                  DateTime         @default(now())
+  updatedAt                  DateTime         @updatedAt
+  gates                      AcceptanceGate[]
+
+  @@index([projectId])
+}
+
+model AcceptanceGate {
+  id             String     @id @default(cuid())
+  projectId      String
+  milestoneId    String?
+  milestone      Milestone? @relation(fields: [milestoneId], references: [id], onDelete: Cascade)
+  criterion      String
+  type           String     // code-present | tests-present | deploy-preview | health-endpoint | docs-updated | manual-qa | performance | security
+  status         String     @default("pending") // pending | passed | failed | overridden
+  evidence       String?
+  approvedBy     String?
+  overrideReason String?
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  @@index([milestoneId])
+  @@index([projectId])
+}
+
+model ScopeChangeRequest {
+  id               String       @id @default(cuid())
+  projectId        String
+  brief            ProjectBrief @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  title            String
+  description      String?
+  reason           String?
+  impactTime       String?
+  impactComplexity String?
+  impactCost       String?
+  requestedBy      String
+  approvedBy       String?
+  status           String       @default("pending") // pending | approved | rejected
+  oldScope         Json?        // snapshot of brief before change
+  newScope         Json?        // proposed new scope fields
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  @@index([projectId])
 }

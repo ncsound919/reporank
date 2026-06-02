@@ -3,8 +3,9 @@
  * change coupling, and tech debt ratio analysis that goes beyond
  * surface-level metrics. Built for engineers who own production systems.
  */
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { join } from "node:path";
+import { execFileSync } from "node:child_process";
 
 // ─── 1. Bus Factor ─────────────────────────────────────────────────────
 export interface BusFactorItem {
@@ -21,26 +22,27 @@ export function analyzeBusFactor(repoPath?: string): { items: BusFactorItem[]; s
     return { items, score: 100, summary: "Bus factor analysis requires a local git repository with .git directory." };
   }
   try {
-    const { execSync } = require("node:child_process");
-    // Get files with single author (high bus factor risk)
-    const singleOwnerFiles = execSync(
-      `git ls-files | xargs -I{} sh -c 'count=$(git log --format="%aE" -- "{}" | sort -u | wc -l); if [ "$count" -eq 1 ]; then echo "$(git log -1 --format="%aE|%aI" -- "{}")|{}"; fi'`,
-      { cwd: repoPath, encoding: "utf-8", timeout: 30000 }
-    ).trim().split("\n").filter(Boolean);
+    const sourceExt = /\.(ts|tsx|js|jsx|py|go|rs|java)$/;
+    const allFiles = execFileSync("git", ["ls-files"], { cwd: repoPath, encoding: "utf-8", timeout: 10000 })
+      .trim().split("\n").filter(Boolean);
 
     let busScore = 100;
-    for (const line of singleOwnerFiles.slice(0, 20)) {
-      const parts = line.split("|");
-      if (parts.length >= 3) {
-        const [email, date, ...fileParts] = parts;
-        const file = fileParts.join("|");
-        // Only flag source files, not configs
-        if (file.match(/\.(ts|tsx|js|jsx|py|go|rs|java)$/)) {
+    for (const file of allFiles) {
+      if (items.length >= 20) break;
+      if (!sourceExt.test(file)) continue;
+      try {
+        const authorOutput = execFileSync("git", ["log", "--format=%aE", "--", file], { cwd: repoPath, encoding: "utf-8", timeout: 5000 });
+        const authors = [...new Set(authorOutput.trim().split("\n").filter(Boolean))];
+        if (authors.length === 1) {
+          const dateOutput = execFileSync("git", ["log", "-1", "--format=%aI", "--", file], { cwd: repoPath, encoding: "utf-8", timeout: 5000 });
+          const date = dateOutput.trim();
           const monthsOld = monthsSince(date);
           const risk = monthsOld > 6 ? "critical" : monthsOld > 3 ? "high" : "medium";
-          items.push({ file, owner: email, lastModified: date, risk, rationale: `Single author (${email}), last modified ${monthsOld} months ago` });
+          items.push({ file, owner: authors[0], lastModified: date, risk, rationale: `Single author (${authors[0]}), last modified ${monthsOld} months ago` });
           busScore -= risk === "critical" ? 5 : risk === "high" ? 3 : 1;
         }
+      } catch {
+        // skip files that error during git log
       }
     }
     return { items, score: Math.max(0, busScore), summary: `${items.length} single-owner source files found. Bus factor is 1 for ${items.length} files.` };
@@ -165,21 +167,23 @@ export function analyzeChangeCoupling(repoPath?: string): { pairs: CoChangePair[
     return { pairs: [], summary: "Change coupling analysis requires a local git repository." };
   }
   try {
-    const { execSync } = require("node:child_process");
-    // Find files that frequently appear together in commits
-    const output = execSync(
-      `git log --name-only --format="commit %H" HEAD~200..HEAD 2>/dev/null | awk '/^commit/ { if (count > 1) for (f in files) print files[f]; for (f in files) delete files[f]; count=0; next } { if (!files[$0]++) count++ }' | sort | uniq -c | sort -rn | head -20`,
-      { cwd: repoPath, encoding: "utf-8", timeout: 15000 }
-    );
+    const output = execFileSync("git", ["log", "--name-only", "--format=commit %H", "HEAD~200..HEAD"], { cwd: repoPath, encoding: "utf-8", timeout: 15000 });
 
     const pairs: CoChangePair[] = [];
-    const lines = output.trim().split("\n").filter(Boolean);
-    for (const line of lines.slice(0, 10)) {
-      pairs.push({
-        fileA: line.replace(/^\s*\d+\s+/, ""),
-        fileB: "", sharedCommits: parseInt(line) || 0,
-        rationale: `Frequently changed together — consider decoupling`,
-      });
+    const blocks = output.split("commit ");
+    const fileCounts = new Map<string, number>();
+
+    for (const block of blocks) {
+      const lines = block.trim().split("\n").filter(l => l && !l.startsWith("commit"));
+      if (lines.length < 2) continue;
+      for (const file of [...new Set(lines)]) {
+        fileCounts.set(file, (fileCounts.get(file) || 0) + 1);
+      }
+    }
+
+    const sorted = [...fileCounts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 20);
+    for (const [file, count] of sorted) {
+      pairs.push({ fileA: file, fileB: "", sharedCommits: count, rationale: `Appeared in ${count} commits — frequently changed with other files` });
     }
     return { pairs, summary: `${pairs.length} co-change patterns detected.` };
   } catch {

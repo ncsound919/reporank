@@ -4,11 +4,20 @@ import { prisma } from "../db/client";
 import { authMiddleware, orgAccessMiddleware, AuthRequest } from "../middleware/auth";
 import { AppError } from "../middleware/errorHandler";
 import crypto from "node:crypto";
+import { z } from "zod";
+
+export const createOrgSchema = z.object({
+  name: z.string().min(1).max(100),
+  slug: z.string().regex(/^[a-z0-9-]+$/, "Slug must contain only lowercase letters, numbers, and hyphens").min(3).max(50),
+});
 
 const router: ExpressRouter = Router();
 
 router.post("/", authMiddleware, async (req: AuthRequest, res) => {
-  const { name, slug } = req.body;
+  const parsed = createOrgSchema.safeParse(req.body);
+  if (!parsed.success) throw new AppError(400, parsed.error.errors[0].message, "VALIDATION_ERROR");
+
+  const { name, slug } = parsed.data;
   try {
     const org = await prisma.org.create({
       data: { name, slug, members: { create: { userId: req.userId!, role: "owner" } } },
@@ -28,7 +37,7 @@ router.get("/", authMiddleware, async (req: AuthRequest, res) => {
     include: { org: true },
   });
   res.json({
-    data: memberships.map(m => ({
+    data: memberships.map((m: any) => ({
       id: m.org.id, name: m.org.name, slug: m.org.slug, role: m.role, plan: m.org.plan,
     })),
   });
@@ -51,8 +60,10 @@ router.post("/:id/api-keys", authMiddleware, async (req: AuthRequest, res) => {
 
   const key = `gr_${crypto.randomBytes(32).toString("hex")}`;
   const keyHash = crypto.createHash("sha256").update(key).digest("hex");
+  const user = await prisma.user.findUnique({ where: { id: req.userId! } });
+  const tier = user?.tier || "free";
   await prisma.apiKey.create({
-    data: { keyPrefix: key.slice(0, 8), keyHash, name: req.body.name || "default", tier: "free", userId: req.userId! },
+    data: { keyPrefix: key.slice(0, 8), keyHash, name: req.body.name || "default", tier, userId: req.userId! },
   });
   res.status(201).json({ data: { key, keyPrefix: key.slice(0, 8) } });
 });

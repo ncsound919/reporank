@@ -12,6 +12,11 @@ function getStripe(): Stripe {
   return new Stripe(config.stripe.secretKey);
 }
 
+function getWebhookSecret(): string {
+  if (!config.stripe.webhookSecret) throw new AppError(503, "Stripe webhook secret not configured", "STRIPE_WEBHOOK_NOT_CONFIGURED");
+  return config.stripe.webhookSecret;
+}
+
 router.post("/checkout", authMiddleware, async (req: AuthRequest, res) => {
   try {
     const stripe = getStripe();
@@ -43,10 +48,11 @@ router.post("/checkout", authMiddleware, async (req: AuthRequest, res) => {
 
 router.post("/webhook", async (req, res) => {
   const stripe = getStripe();
+  const webhookSecret = getWebhookSecret();
   const sig = req.headers["stripe-signature"] as string;
   let event: Stripe.Event;
   try {
-    event = stripe.webhooks.constructEvent(req.body, sig, config.stripe.webhookSecret);
+    event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
   } catch {
     return res.status(400).json({ error: "Invalid signature" });
   }

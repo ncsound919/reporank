@@ -8,14 +8,17 @@ import { z } from "zod";
 
 const router: Router = Router();
 
-const createScanSchema = z.object({
+export const createScanSchema = z.object({
   repoUrl: z.string().url().regex(/github\.com\//),
   branch: z.string().default("main"),
 });
 
-const createLocalScanSchema = z.object({
+export const createLocalScanSchema = z.object({
   files: z.array(z.object({
-    path: z.string().regex(/^[a-zA-Z0-9_\/\.\-\\]+$/, "Invalid file path characters").max(500).refine(p => !p.includes(".."), "Path traversal not allowed"),
+    path: z.string()
+      .max(500)
+      .refine(p => !p.includes("..") && !p.startsWith("/") && !p.startsWith("\\") && !/^[A-Za-z]:[\\/]/.test(p), "Path traversal not allowed")
+      .refine(p => !/[\x00-\x1F\x7F-\x9F]/.test(p), "Control characters in path not allowed"),
     content: z.string().max(500000),
   })).min(1).max(500),
   privateMode: z.boolean().default(false),

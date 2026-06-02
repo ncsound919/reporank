@@ -64,3 +64,50 @@ export class GradingService {
 export { buildGradingPrompt } from "./promptBuilder";
 export { parseHealthReport } from "./responseParser";
 export { runDeepAnalysis } from "./analyzers/index";
+export { calculateVibeCodingIndex } from "./analyzers/contamination";
+export {
+  predictImpact,
+  calculateSoftware20Score,
+  breakdownImpact,
+  generateRecommendations,
+  EFFORT_LABELS,
+  type FileChange,
+  type FileChangeKind,
+  type FileImpact,
+  type ImpactReport,
+  type Software20Score,
+  type ImpactBreakdown,
+  type CategoryContribution,
+  type ImpactCategory,
+  type FixRecommendation,
+  type FixEffort,
+  type FixType,
+  type RecommendationReport,
+} from "./analyzers/impact";
+export {
+  auditSubmission,
+  analyzeSession,
+  type AuditReport,
+  type ChatTurn,
+  type CourseGuideline,
+  type DisclosureLayer,
+  type Layer1Report,
+  type Layer2Report,
+  type Layer3Report,
+  type Layer4Report,
+  type SessionAnalysis,
+  type SessionInput,
+  type SubmissionInput,
+} from "./analyzers/education";
+export {
+  calculateTrustScore,
+  type TrustScoreInput,
+  type TrustScoreResult,
+} from "./analyzers/trust";
+export {
+  BENCHMARK_DATASET,
+  getBenchmarksByKind,
+  calibrate,
+  type BenchmarkEntry,
+  type CalibrationResult,
+} from "./analyzers/benchmark";

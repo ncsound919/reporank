@@ -11,6 +11,7 @@ export default function ScanDetailPage() {
   const { id } = useParams<{ id: string }>();
   const [scan, setScan] = useState<ScanResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [timeseries, setTimeseries] = useState<any[]>([]);
   const report = scan?.result;
   const fixPacks = scan?.fixPacks;
   const trending = scan?.trending;
@@ -27,6 +28,17 @@ export default function ScanDetailPage() {
       } catch (err: any) { setError(err.message); clearInterval(poll); }
     }, 2000);
     return () => clearInterval(poll);
+  }, [id]);
+
+  // Load timeseries data for trendline
+  useEffect(() => {
+    if (!id) return;
+    fetch(`/api/v1/scans/${id}/timeseries`, {
+      headers: { Authorization: `Bearer ${localStorage.getItem("reporank_token")}` },
+    })
+      .then((res) => res.json())
+      .then((data) => setTimeseries(data.data?.timeseries || []))
+      .catch(console.error);
   }, [id]);
 
   if (error) return <div className="min-h-screen bg-gray-950 flex items-center justify-center"><p className="text-red-400">{error}</p></div>;
@@ -128,7 +140,31 @@ export default function ScanDetailPage() {
           </div>
         </div>
 
-        {/* Unstick Plan — What to fix first */}
+        {/* Health Trendline */}
+        {timeseries.length > 1 && (
+          <div className="bg-gray-900 rounded-xl p-6 border border-gray-800 mb-8">
+            <h3 className="text-lg font-semibold mb-4">📈 Health Trendline</h3>
+            <div className="flex items-end justify-between gap-2 h-40 bg-gray-800/30 p-4 rounded-lg">
+              {timeseries.slice(-10).map((scan, i) => (
+                <div key={i} className="flex-1 flex flex-col items-center gap-2">
+                  <div className="relative w-full flex items-end justify-center h-32">
+                    <div
+                      className="w-full bg-gradient-to-t from-emerald-500 to-emerald-400 rounded-t opacity-80 hover:opacity-100 transition-opacity"
+                      style={{ height: `${(scan.overallScore / 100) * 100}%` }}
+                    />
+                  </div>
+                  <div className="text-xs text-gray-500 text-center">
+                    <p className="font-semibold text-gray-300">{scan.overallScore}</p>
+                    <p className="text-xs">{new Date(scan.scannedAt).toLocaleDateString()}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="mt-4 text-xs text-gray-500">
+              <p>Last 10 scans • Score range: {Math.min(...timeseries.map((s) => s.overallScore))}—{Math.max(...timeseries.map((s) => s.overallScore))}</p>
+            </div>
+          </div>
+        )}
         {scan.clawFindings?.unstick?.blockers?.length > 0 && (
           <div className="bg-gray-900 rounded-xl p-6 border border-gray-800 mb-8">
             <h3 className="text-lg font-semibold mb-4">🎯 What to Fix First — Priority Sequence</h3>

@@ -21,7 +21,7 @@ export async function scanLimitMiddleware(req: AuthRequest, _res: Response, next
   if (limits.scansPerMonth === -1) return next();
 
   // Atomic increment-and-check using Prisma transactions to prevent TOCTOU
-  const result = await prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx: any) => {
     const count = await tx.scan.count({
       where: {
         userId: req.userId!,
