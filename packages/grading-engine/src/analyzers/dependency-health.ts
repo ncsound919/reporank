@@ -39,6 +39,23 @@ const MAJOR_DEP_VERSION_GAPS = {
   "jest": 30, "vitest": 3,
 };
 
+const REPLACEMENTS: Record<string, string> = {
+  "request": " && npm install node-fetch",
+  "moment": " && npm install date-fns",
+  "underscore": "",
+  "chalk": "",
+  "express-validator": " && npm install zod",
+  "body-parser": "",
+  "jade": " && npm install pug",
+  "node-sass": " && npm install sass",
+  "react-helmet": "",
+  "recompose": "",
+};
+
+function getReplacement(name: string): string {
+  return REPLACEMENTS[name] || ""; // If no replacement, just uninstalling is enough
+}
+
 export function analyzeDependencies(
   packageJsonContent: string,
   sourceFiles: { path: string; content: string }[]
@@ -61,7 +78,7 @@ export function analyzeDependencies(
     if (depNames.includes(name)) {
       findings.push({
         type: "deprecated", packageName: name, version: allDeps[name],
-        severity: "high", detail: reason,
+        severity: "high", detail: `${reason} Run: npm uninstall ${name}${getReplacement(name)}`,
       });
     }
   }
@@ -78,12 +95,12 @@ export function analyzeDependencies(
           findings.push({
             type: "outdated", packageName: name, version: versionStr,
             severity: gap >= 3 ? "critical" : "high",
-            detail: `Version ${versionStr} is ${gap} major versions behind latest v${latestMajor}`,
+            detail: `Version ${versionStr} is ${gap} major versions behind latest v${latestMajor}. Run: npm install ${name}@${latestMajor}`,
           });
         } else if (gap >= 1) {
           findings.push({
             type: "outdated", packageName: name, version: versionStr,
-            severity: "medium", detail: `v${currentMajor} available — upgrade from ${versionStr}`,
+            severity: "medium", detail: `v${latestMajor} available — upgrade from ${versionStr}. Run: npm install ${name}@${latestMajor}`,
           });
         }
       }

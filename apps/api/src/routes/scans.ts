@@ -50,7 +50,7 @@ router.get("/:id", authMiddleware, async (req: AuthRequest, res) => {
   res.json({
     data: {
       id: scan.id, status: scan.status, progress: scan.progress, message: scan.message,
-      result: scan.report, error: scan.errorMessage,
+      result: scan.report, fixPacks: scan.fixPack, error: scan.errorMessage,
       createdAt: scan.createdAt, completedAt: scan.completedAt, duration: scan.duration,
     },
   });

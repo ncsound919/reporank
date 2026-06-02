@@ -21,6 +21,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 export interface ScanResult {
   id: string; status: string; progress: number; message: string;
   result?: import("@reporank/shared-types").HealthReport;
+  fixPacks?: { filePath: string; title: string; type: string; content?: string; description: string }[];
   error?: string; createdAt: string; completedAt?: string; duration?: number;
 }
 

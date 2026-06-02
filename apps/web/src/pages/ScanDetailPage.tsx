@@ -12,6 +12,8 @@ export default function ScanDetailPage() {
   const [scan, setScan] = useState<ScanResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const report = scan?.result;
+  const fixPacks = scan?.fixPacks;
+  const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -39,6 +41,12 @@ export default function ScanDetailPage() {
     </div>
   );
 
+  const copyToClipboard = async (text: string, idx: number) => {
+    await navigator.clipboard.writeText(text);
+    setCopiedIdx(idx);
+    setTimeout(() => setCopiedIdx(null), 2000);
+  };
+
   return (
     <div className="min-h-screen bg-gray-950">
       <header className="border-b border-gray-800/50">
@@ -49,7 +57,7 @@ export default function ScanDetailPage() {
       </header>
 
       <main className="max-w-6xl mx-auto px-6 py-8">
-        {/* Top section: score gauge + maturity + grade */}
+        {/* Score header */}
         <div className="flex flex-col md:flex-row gap-8 mb-8">
           <div className="relative flex items-center justify-center">
             <ScoreGauge score={report.overallScore} size={200} />
@@ -73,7 +81,7 @@ export default function ScanDetailPage() {
           </div>
         </div>
 
-        {/* Dimension breakdown */}
+        {/* Dimension grid */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
           <div className="bg-gray-900 rounded-xl p-6 border border-gray-800">
             <h3 className="text-lg font-semibold mb-4">Score Breakdown</h3>
@@ -107,22 +115,87 @@ export default function ScanDetailPage() {
           </div>
         </div>
 
-        {/* Quick Wins */}
+        {/* Implementation Plan — THE KEY NEW SECTION */}
+        {report.implementationPlan && report.implementationPlan.length > 0 && (
+          <div className="bg-gray-900 rounded-xl p-6 border border-gray-800 mb-8">
+            <h3 className="text-lg font-semibold mb-4 text-emerald-400">📋 Fix Plan — Step by Step</h3>
+            <div className="space-y-4">
+              {report.implementationPlan.map((step, i) => (
+                <div key={i} className="bg-gray-800/50 rounded-lg p-4 border border-gray-700/50">
+                  <div className="flex items-start justify-between mb-2">
+                    <h4 className="font-medium text-white">{i + 1}. {step.title}</h4>
+                    <button onClick={() => copyToClipboard(step.promptInstruction, i)}
+                      className="text-xs text-emerald-400 hover:text-emerald-300 shrink-0 ml-4">
+                      {copiedIdx === i ? "Copied!" : "Copy Prompt"}
+                    </button>
+                  </div>
+                  <p className="text-sm text-gray-400 mb-2">{step.description}</p>
+                  {step.targetFiles && step.targetFiles.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mb-2">
+                      {step.targetFiles.map((f, j) => (
+                        <span key={j} className="text-xs bg-gray-700 text-gray-300 px-2 py-1 rounded font-mono">{f}</span>
+                      ))}
+                    </div>
+                  )}
+                  <div className="bg-gray-950 rounded p-3 mt-2">
+                    <pre className="text-xs text-gray-400 whitespace-pre-wrap font-mono leading-relaxed">{step.promptInstruction}</pre>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Fix Packs */}
+        {fixPacks && fixPacks.length > 0 && (
+          <div className="bg-gray-900 rounded-xl p-6 border border-gray-800 mb-8">
+            <h3 className="text-lg font-semibold mb-4 text-blue-400">📦 Auto-Generated Fix Patches</h3>
+            <div className="space-y-4">
+              {fixPacks.map((fp, i) => (
+                <div key={i} className="bg-gray-800/50 rounded-lg p-4 border border-gray-700/50">
+                  <div className="flex items-start justify-between mb-2">
+                    <div>
+                      <span className="text-xs text-gray-500 font-mono">{fp.filePath}</span>
+                      <h4 className="font-medium text-white">{fp.title}</h4>
+                    </div>
+                    <button onClick={() => copyToClipboard(fp.content || "", i + 100)}
+                      className="text-xs text-blue-400 hover:text-blue-300 shrink-0 ml-4">
+                      {copiedIdx === i + 100 ? "Copied!" : "Copy Patch"}
+                    </button>
+                  </div>
+                  <p className="text-sm text-gray-400 mb-2">{fp.description}</p>
+                  {fp.content && (
+                    <pre className="bg-gray-950 rounded p-3 text-xs text-gray-300 font-mono whitespace-pre-wrap overflow-x-auto max-h-48">
+                      {fp.content}
+                    </pre>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Quick Wins with Action + FilePath */}
         {report.quickWins.length > 0 && (
           <div className="bg-gray-900 rounded-xl p-6 border border-gray-800 mb-8">
             <h3 className="text-lg font-semibold mb-4">⚡ Quick Wins</h3>
             <div className="space-y-3">
               {report.quickWins.map((w, i) => (
                 <div key={i} className="flex items-start gap-3 p-3 bg-gray-800/50 rounded-lg">
-                  <span className={`px-2 py-0.5 rounded text-xs font-medium border ${
+                  <span className={`px-2 py-0.5 rounded text-xs font-medium border shrink-0 ${
                     w.severity === "critical" ? "bg-red-500/20 text-red-400 border-red-500/30" :
                     w.severity === "high" ? "bg-orange-500/20 text-orange-400 border-orange-500/30" :
                     w.severity === "medium" ? "bg-yellow-500/20 text-yellow-400 border-yellow-500/30" :
                     "bg-blue-500/20 text-blue-400 border-blue-500/30"}`}>{w.severity.toUpperCase()}</span>
-                  <div className="flex-1">
+                  <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium">{w.title}</p>
                     <p className="text-xs text-gray-500 mt-1">{w.description}</p>
-                    <p className="text-xs text-gray-600 mt-1">Effort: {w.effort} | Category: {w.category}</p>
+                    {w.action && <p className="text-xs text-emerald-400 mt-1 font-mono">{w.action}</p>}
+                    <div className="flex flex-wrap gap-2 mt-1 text-xs text-gray-600">
+                      <span>Effort: {w.effort}</span>
+                      <span>Category: {w.category}</span>
+                      {w.filePath && <span className="font-mono">File: {w.filePath}</span>}
+                    </div>
                   </div>
                 </div>
               ))}
@@ -156,7 +229,7 @@ export default function ScanDetailPage() {
           </div>
         )}
 
-        {/* Hallucinated features + bugs */}
+        {/* Hallucinated features */}
         {report.hallucinatedFeatures.length > 0 && (
           <div className="bg-gray-900 rounded-xl p-6 border border-gray-800 mb-8">
             <h3 className="text-lg font-semibold mb-4 text-orange-400">🌀 Hallucinated Features</h3>
@@ -166,11 +239,22 @@ export default function ScanDetailPage() {
           </div>
         )}
 
+        {/* Structural smells */}
+        {report.structuralSmells.length > 0 && (
+          <div className="bg-gray-900 rounded-xl p-6 border border-gray-800 mb-8">
+            <h3 className="text-lg font-semibold mb-4 text-yellow-400">👃 Structural Smells</h3>
+            {report.structuralSmells.map((s, i) => (
+              <p key={i} className="text-sm text-gray-400 mb-1">• {s}</p>
+            ))}
+          </div>
+        )}
+
+        {/* Bugs & Leaks */}
         {report.bugsAndLeaks.length > 0 && (
           <div className="bg-gray-900 rounded-xl p-6 border border-gray-800 mb-8">
             <h3 className="text-lg font-semibold mb-4 text-red-400">🐛 Bugs & Leaks</h3>
             {report.bugsAndLeaks.map((b, i) => (
-              <p key={i} className="text-sm text-gray-400 mb-1">• {b}</p>
+              <p key={i} className="text-sm text-gray-400 mb-1 font-mono">• {b}</p>
             ))}
           </div>
         )}
