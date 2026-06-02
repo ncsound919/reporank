@@ -24,7 +24,7 @@ export interface ScanResult {
   fixPacks?: { filePath: string; title: string; type: string; content?: string; description: string }[];
   clawFindings?: any;
   error?: string; createdAt: string; completedAt?: string; duration?: number;
-  trending?: { previousScore: number; delta: number; direction: "up" | "down" | "same" };
+  trending?: { previousScore: number; previousScanId?: string; delta: number; direction: "up" | "down" | "same" };
 }
 
 export interface ScanSummary {
@@ -45,4 +45,5 @@ export const api = {
     get: (id: string) => request<ScanResult>(`/scans/${id}`),
     list: () => request<ScanSummary[]>("/scans"),
   },
+  compare: (id1: string, id2: string) => request<any>(`/compare/${id1}/${id2}`),
 };

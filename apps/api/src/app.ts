@@ -9,6 +9,7 @@ import scanRoutes from "./routes/scans";
 import billingRoutes from "./routes/billing";
 import orgRoutes from "./routes/orgs";
 import badgeRoutes from "./routes/badges";
+import compareRoutes from "./routes/compare";
 
 const app: express.Express = express();
 app.use(helmet());
@@ -26,6 +27,7 @@ app.use("/api/v1/scans", scanRoutes);
 app.use("/api/v1/billing", billingRoutes);
 app.use("/api/v1/orgs", orgRoutes);
 app.use("/api/v1/badges", badgeRoutes);
+app.use("/api/v1/compare", compareRoutes);
 
 app.use(errorHandler);
 export default app;

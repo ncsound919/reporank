@@ -1,1 +1,17 @@
 @import "tailwindcss";
+
+@media print {
+  body { background: white !important; color: black !important; }
+  .bg-gray-950, .bg-gray-900, .bg-gray-800, .bg-gray-800\/50 { background: #f5f5f5 !important; }
+  .border-gray-800, .border-gray-700\/50 { border-color: #ddd !important; }
+  .text-white, .text-gray-300, .text-gray-400 { color: #333 !important; }
+  .text-emerald-400 { color: #059669 !important; }
+  .text-red-400 { color: #dc2626 !important; }
+  .text-yellow-400 { color: #d97706 !important; }
+  .text-purple-400 { color: #7c3aed !important; }
+  button, nav, header a:not([href]) { display: none !important; }
+  header { border-bottom: 1px solid #ddd !important; }
+  @page { margin: 1.5cm; }
+  .max-w-6xl { max-width: 100% !important; }
+  pre { white-space: pre-wrap !important; word-break: break-word !important; }
+}

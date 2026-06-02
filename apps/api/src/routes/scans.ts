@@ -82,6 +82,7 @@ router.get("/:id", authMiddleware, async (req: AuthRequest, res) => {
 
   // Score trending: find previous scan for the same repo
   let previousScore: number | null = null;
+  let previousScanId: string | null = null;
   let trending: "up" | "down" | "same" | null = null;
   if (scan.overallScore != null && scan.repoUrl && scan.repoUrl !== "local") {
     const prevScan = await prisma.scan.findFirst({
@@ -90,6 +91,7 @@ router.get("/:id", authMiddleware, async (req: AuthRequest, res) => {
     });
     if (prevScan?.overallScore != null) {
       previousScore = prevScan.overallScore;
+      previousScanId = prevScan.id;
       trending = scan.overallScore > prevScan.overallScore ? "up" : scan.overallScore < prevScan.overallScore ? "down" : "same";
     }
   }
@@ -99,7 +101,7 @@ router.get("/:id", authMiddleware, async (req: AuthRequest, res) => {
       id: scan.id, status: scan.status, progress: scan.progress, message: scan.message,
       result: scan.report, fixPacks: scan.fixPack, clawFindings: scan.clawFindings, error: scan.errorMessage,
       createdAt: scan.createdAt, completedAt: scan.completedAt, duration: scan.duration,
-      trending: trending ? { previousScore, delta: scan.overallScore! - previousScore!, direction: trending } : null,
+      trending: trending ? { previousScore, previousScanId, delta: scan.overallScore! - previousScore!, direction: trending } : null,
     },
   });
 });
