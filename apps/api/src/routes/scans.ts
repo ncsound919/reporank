@@ -79,11 +79,27 @@ router.post("/local", authMiddleware, scanLimitMiddleware, orgAccessMiddleware, 
 router.get("/:id", authMiddleware, async (req: AuthRequest, res) => {
   const scan = await prisma.scan.findUnique({ where: { id: req.params.id } });
   if (!scan) throw new AppError(404, "Scan not found", "NOT_FOUND");
+
+  // Score trending: find previous scan for the same repo
+  let previousScore: number | null = null;
+  let trending: "up" | "down" | "same" | null = null;
+  if (scan.overallScore != null && scan.repoUrl && scan.repoUrl !== "local") {
+    const prevScan = await prisma.scan.findFirst({
+      where: { repoUrl: scan.repoUrl, id: { not: scan.id }, status: "complete", overallScore: { not: null } },
+      orderBy: { createdAt: "desc" },
+    });
+    if (prevScan?.overallScore != null) {
+      previousScore = prevScan.overallScore;
+      trending = scan.overallScore > prevScan.overallScore ? "up" : scan.overallScore < prevScan.overallScore ? "down" : "same";
+    }
+  }
+
   res.json({
     data: {
       id: scan.id, status: scan.status, progress: scan.progress, message: scan.message,
       result: scan.report, fixPacks: scan.fixPack, error: scan.errorMessage,
       createdAt: scan.createdAt, completedAt: scan.completedAt, duration: scan.duration,
+      trending: trending ? { previousScore, delta: scan.overallScore! - previousScore!, direction: trending } : null,
     },
   });
 });

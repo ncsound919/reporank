@@ -13,6 +13,7 @@ export default function ScanDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const report = scan?.result;
   const fixPacks = scan?.fixPacks;
+  const trending = scan?.trending;
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
 
   useEffect(() => {
@@ -77,6 +78,11 @@ export default function ScanDetailPage() {
               <span>📁 {report.architecture.fileCount} files</span>
               <span>⭐ {report.starsCount} stars</span>
               <span>🔀 {report.forksCount} forks</span>
+              {trending && (
+                <span className={trending.direction === "up" ? "text-emerald-400" : trending.direction === "down" ? "text-red-400" : "text-gray-500"}>
+                  {trending.direction === "up" ? "▲" : trending.direction === "down" ? "▼" : "◆"} {trending.delta > 0 ? "+" : ""}{trending.delta} from previous scan
+                </span>
+              )}
             </div>
           </div>
         </div>

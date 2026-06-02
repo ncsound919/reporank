@@ -1,0 +1,22 @@
+{
+  "name": "@reporank/cli",
+  "version": "0.1.0",
+  "private": false,
+  "type": "module",
+  "bin": {
+    "reporank": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "prepublish": "tsc"
+  },
+  "dependencies": {
+    "commander": "^13.1.0",
+    "chalk": "^5.4.1",
+    "cli-progress": "^3.12.0"
+  },
+  "devDependencies": {
+    "@types/cli-progress": "^3.11.6",
+    "typescript": "^5.8.0"
+  }
+}

@@ -1,0 +1,43 @@
+name: RepoRank Scan
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+    branches: [master, main]
+  workflow_dispatch:
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run RepoRank scan
+        uses: anomalyco/reporank-action@v1
+        with:
+          github-token: ${{ github.token }}
+          api-key: ${{ secrets.REPORANK_API_KEY }}
+          deep-scan: false
+
+      - name: Post results as PR comment
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const report = JSON.parse(fs.readFileSync('reporank-report.json', 'utf8'));
+            const body = `## RepoRank Scan Results
+            **Score:** ${report.score}/100
+            **Files:** ${report.files}
+            **Secrets found:** ${report.secrets.secretsFound}
+            ${report.vibe.recommendations.map(r => `- ${r}`).join('\n')}
+            `;
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body
+            });
