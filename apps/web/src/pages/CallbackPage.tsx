@@ -19,7 +19,11 @@ export default function CallbackPage() {
       localStorage.setItem("reporank_token", data.token);
       window.location.href = "/dashboard";
     }).catch((err) => {
-      setStatus(`Authentication failed: ${err.message}`);
+      if (err.message?.includes("Failed to fetch") || err.message?.includes("Unexpected end")) {
+        setStatus("Could not reach the API server. Make sure it's running on port 3001.");
+      } else {
+        setStatus(`Authentication failed: ${err.message}`);
+      }
     });
   }, [code, state]);
 

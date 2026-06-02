@@ -30,7 +30,7 @@ if ($mode -eq "prod" -or $mode -eq "production") {
     pnpm build
     Write-Host "Starting in production mode..." -ForegroundColor Green
     Set-Location apps/api
-    node dist/index.js
+    tsx src/index.ts
 } else {
     # Development mode with hot reload
     Write-Host "Starting in development mode (hot reload)..." -ForegroundColor Green

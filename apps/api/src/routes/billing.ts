@@ -3,12 +3,18 @@ import Stripe from "stripe";
 import { config } from "../config";
 import { prisma } from "../db/client";
 import { authMiddleware, AuthRequest } from "../middleware/auth";
+import { AppError } from "../middleware/errorHandler";
 
 const router = Router() as Router;
-const stripe = new Stripe(config.stripe.secretKey);
+
+function getStripe(): Stripe {
+  if (!config.stripe.secretKey) throw new AppError(503, "Stripe not configured", "STRIPE_NOT_CONFIGURED");
+  return new Stripe(config.stripe.secretKey);
+}
 
 router.post("/checkout", authMiddleware, async (req: AuthRequest, res) => {
   try {
+    const stripe = getStripe();
     const { plan, orgId } = req.body;
     if (!["pro", "enterprise"].includes(plan)) return res.status(400).json({ error: "Invalid plan" });
 
@@ -36,6 +42,7 @@ router.post("/checkout", authMiddleware, async (req: AuthRequest, res) => {
 });
 
 router.post("/webhook", async (req, res) => {
+  const stripe = getStripe();
   const sig = req.headers["stripe-signature"] as string;
   let event: Stripe.Event;
   try {
@@ -140,6 +147,7 @@ router.post("/webhook", async (req, res) => {
 
 router.post("/portal", authMiddleware, async (req: AuthRequest, res) => {
   try {
+    const stripe = getStripe();
     const user = await prisma.user.findUnique({ where: { id: req.userId! } });
     if (!user?.stripeCustomerId) return res.status(400).json({ error: "No active subscription" });
 
