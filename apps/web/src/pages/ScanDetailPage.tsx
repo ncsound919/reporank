@@ -265,6 +265,89 @@ export default function ScanDetailPage() {
           </div>
         )}
 
+        {/* Novel: Architecture Diagram */}
+        {scan.clawFindings?.novel?.architectureDiagram?.mermaidCode && (
+          <div className="bg-gray-900 rounded-xl p-6 border border-gray-800 mb-8">
+            <h3 className="text-lg font-semibold mb-4">🏗️ Architecture Map</h3>
+            <p className="text-sm text-gray-400 mb-4">
+              {scan.clawFindings.novel.architectureDiagram.moduleCount} modules, {scan.clawFindings.novel.architectureDiagram.dependencyCount} inter-module dependencies.
+              Copy the Mermaid code below into any Mermaid viewer (mermaid.live, GitHub markdown) to see the diagram.
+            </p>
+            <button onClick={() => navigator.clipboard.writeText(scan.clawFindings.novel.architectureDiagram.mermaidCode)}
+              className="text-xs text-emerald-400 hover:text-emerald-300 mb-4 block">Copy Mermaid Code</button>
+            <pre className="bg-gray-950 rounded p-3 text-xs text-gray-300 font-mono whitespace-pre-wrap overflow-x-auto max-h-64">
+              {scan.clawFindings.novel.architectureDiagram.mermaidCode.slice(0, 2000)}
+            </pre>
+          </div>
+        )}
+
+        {/* Novel: Tech Debt Interest */}
+        {scan.clawFindings?.novel?.techDebt?.items?.length > 0 && (
+          <div className="bg-gray-900 rounded-xl p-6 border border-gray-800 mb-8">
+            <h3 className="text-lg font-semibold mb-4">💰 Tech Debt Interest</h3>
+            <p className="text-sm text-gray-400 mb-4">
+              Estimated cost of leaving these issues unfixed. These are conservative estimates based on incident response patterns.
+            </p>
+            <div className="bg-gray-800/50 rounded-lg p-4 mb-4">
+              <div className="flex items-center justify-between">
+                <span className="text-gray-300 font-medium">Monthly Interest</span>
+                <span className="text-xl font-bold text-orange-400">~{scan.clawFindings.novel.techDebt.totalMonthlyInterest}h</span>
+              </div>
+              <div className="flex items-center justify-between mt-2">
+                <span className="text-gray-300 font-medium">Yearly Cost</span>
+                <span className="text-xl font-bold text-red-400">${scan.clawFindings.novel.techDebt.totalYearlyCost?.toLocaleString?.() || scan.clawFindings.novel.techDebt.totalYearlyCost}/yr</span>
+              </div>
+            </div>
+            <div className="space-y-2">
+              {scan.clawFindings.novel.techDebt.items.slice(0, 5).map((item: any, i: number) => (
+                <div key={i} className="flex items-start gap-3 p-3 bg-gray-800/50 rounded-lg">
+                  <span className={`px-2 py-0.5 rounded text-xs font-medium ${item.severity === "critical" ? "bg-red-500/20 text-red-400" : item.severity === "high" ? "bg-orange-500/20 text-orange-400" : "bg-yellow-500/20 text-yellow-400"}`}>{item.severity.toUpperCase()}</span>
+                  <div className="flex-1">
+                    <p className="text-sm">{item.issue}</p>
+                    <p className="text-xs text-gray-500 mt-1">{item.rationale}</p>
+                    <p className="text-xs text-gray-600 mt-1">Fix: {item.fixEffort} · Cost: ~{item.interestHoursPerMonth}h/month · ${item.interestCostPerYear}/yr</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Novel: Dead Code Elimination Plan */}
+        {scan.clawFindings?.novel?.deadCode?.steps?.length > 0 && (
+          <div className="bg-gray-900 rounded-xl p-6 border border-gray-800 mb-8">
+            <h3 className="text-lg font-semibold mb-4 text-yellow-400">🗑️ Dead Code Elimination Plan</h3>
+            <p className="text-sm text-gray-400 mb-4">
+              {scan.clawFindings.novel.deadCode.summary}
+            </p>
+            <div className="space-y-2">
+              {scan.clawFindings.novel.deadCode.steps.map((step: any, i: number) => (
+                <div key={i} className="flex items-start gap-3 p-3 bg-gray-800/50 rounded-lg">
+                  <span className={`px-2 py-0.5 rounded text-xs font-medium ${step.riskLevel === "safe" ? "bg-emerald-500/20 text-emerald-400" : step.riskLevel === "moderate" ? "bg-yellow-500/20 text-yellow-400" : "bg-red-500/20 text-red-400"}`}>{step.riskLevel.toUpperCase()}</span>
+                  <div className="flex-1">
+                    <p className="text-sm font-mono">{step.symbol} in {step.file}</p>
+                    <p className="text-xs text-gray-500 mt-1">{step.reason}</p>
+                    <p className="text-xs text-gray-600 mt-1">Plan: {step.removalPlan}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Novel: Generated README */}
+        {scan.clawFindings?.novel?.readme?.markdown && (
+          <div className="bg-gray-900 rounded-xl p-6 border border-gray-800 mb-8">
+            <h3 className="text-lg font-semibold mb-4 text-blue-400">📄 Generated README.md</h3>
+            <p className="text-sm text-gray-400 mb-4">Auto-generated README with badges, architecture, and contribution guide.</p>
+            <button onClick={() => navigator.clipboard.writeText(scan.clawFindings.novel.readme.markdown)}
+              className="text-xs text-blue-400 hover:text-blue-300 mb-4 block">Copy README.md</button>
+            <pre className="bg-gray-950 rounded p-3 text-xs text-gray-300 font-mono whitespace-pre-wrap overflow-x-auto max-h-96">
+              {scan.clawFindings.novel.readme.markdown}
+            </pre>
+          </div>
+        )}
+
         {scan.duration && (
           <p className="text-center text-sm text-gray-600">Scan completed in {scan.duration}s</p>
         )}

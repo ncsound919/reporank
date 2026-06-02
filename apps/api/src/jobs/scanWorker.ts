@@ -3,6 +3,7 @@ import { prisma } from "../db/client";
 import { logger } from "../logger";
 import { fetchRepoData, repoDataToGradeInput } from "@reporank/grading-engine/scanners/github";
 import { GradingService, runDeepAnalysis } from "@reporank/grading-engine";
+import { runNovelAnalysis } from "@reporank/grading-engine/novel";
 import { createProvider } from "@reporank/grading-engine/providers";
 import { analyzeVibe } from "@reporank/vibe-analyzer";
 import { generateFixPacks } from "@reporank/fix-pack-generator";
@@ -129,6 +130,18 @@ export function startWorker() {
         }
       }
 
+      // Novel analysis: architecture diagrams, tech debt, dead code, README
+      const novel = runNovelAnalysis(
+        repoData.sourceFiles, repoData.fileTree,
+        deep.codeHygiene?.findings || [],
+        deep.production?.findings || [],
+        clawResults.secretsFound,
+        vibe.overall,
+        input.repoName, input.repoOwner, "", "",
+        input.mainLanguage, input.mainLanguage,
+        [], [],
+      );
+
       // Phase 3: AI grading (skipped in private mode, supports multiple providers)
       let report: any;
       const isPrivate = privateMode === true;
@@ -189,7 +202,7 @@ export function startWorker() {
           overallScore: report.overallScore, gradeCategory: report.gradeCategory,
           maturityLevel: report.maturityLevel, vibeScore: vibe.overall,
           report: report as any, fixPack: fixPacks as any,
-          clawFindings: { secrets: clawResults, scanners: scannerResults, private: isPrivate } as any,
+          clawFindings: { secrets: clawResults, scanners: scannerResults, private: isPrivate, novel } as any,
           completedAt: new Date(), duration: Math.floor((Date.now() - startTime) / 1000),
         },
       });

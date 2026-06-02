@@ -22,6 +22,7 @@ export interface ScanResult {
   id: string; status: string; progress: number; message: string;
   result?: import("@reporank/shared-types").HealthReport;
   fixPacks?: { filePath: string; title: string; type: string; content?: string; description: string }[];
+  clawFindings?: any;
   error?: string; createdAt: string; completedAt?: string; duration?: number;
   trending?: { previousScore: number; delta: number; direction: "up" | "down" | "same" };
 }
