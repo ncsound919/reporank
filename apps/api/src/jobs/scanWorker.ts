@@ -5,6 +5,7 @@ import { fetchRepoData, repoDataToGradeInput } from "@reporank/grading-engine/sc
 import { GradingService, runDeepAnalysis } from "@reporank/grading-engine";
 import { runNovelAnalysis } from "@reporank/grading-engine/novel";
 import { generateUnstickPlan } from "@reporank/grading-engine/unstick";
+import { detectInvisibleBugs } from "@reporank/grading-engine/invisible-bugs";
 import { createProvider } from "@reporank/grading-engine/providers";
 import { analyzeVibe } from "@reporank/vibe-analyzer";
 import { generateFixPacks } from "@reporank/fix-pack-generator";
@@ -207,6 +208,9 @@ export function startWorker() {
         true,
       );
 
+      // Invisible bugs — patterns even senior devs miss
+      const invisible = detectInvisibleBugs(repoData.sourceFiles || []);
+
       await prisma.scan.update({
         where: { id: scanId },
         data: {
@@ -214,7 +218,7 @@ export function startWorker() {
           overallScore: report.overallScore, gradeCategory: report.gradeCategory,
           maturityLevel: report.maturityLevel, vibeScore: vibe.overall,
           report: report as any, fixPack: fixPacks as any,
-          clawFindings: { secrets: clawResults, scanners: scannerResults, private: isPrivate, novel, unstick } as any,
+          clawFindings: { secrets: clawResults, scanners: scannerResults, private: isPrivate, novel, unstick, invisible } as any,
           completedAt: new Date(), duration: Math.floor((Date.now() - startTime) / 1000),
         },
       });

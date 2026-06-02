@@ -195,6 +195,45 @@ export default function ScanDetailPage() {
           </div>
         )}
 
+        {/* Invisible Bugs — patterns senior devs miss */}
+        {scan.clawFindings?.invisible?.findings?.length > 0 && (
+          <div className="bg-gray-900 rounded-xl p-6 border border-gray-800 mb-8">
+            <h3 className="text-lg font-semibold mb-4 text-red-400">👻 Invisible Bugs — Even Senior Devs Miss These</h3>
+            <p className="text-sm text-gray-400 mb-4">
+              {scan.clawFindings.invisible.summary}
+            </p>
+            <div className="space-y-3">
+              {scan.clawFindings.invisible.findings.slice(0, 10).map((b: any, i: number) => (
+                <div key={i} className={`flex gap-4 p-4 rounded-lg border-l-4 ${
+                  b.severity === "critical" ? "bg-red-500/5 border-l-red-500" :
+                  b.severity === "high" ? "bg-orange-500/5 border-l-orange-500" :
+                  "bg-yellow-500/5 border-l-yellow-500"}`}>
+                  <div className="flex flex-col items-center gap-1 min-w-[50px]">
+                    <span className={`text-xs font-bold ${
+                      b.confidence >= 80 ? "text-emerald-400" : b.confidence >= 60 ? "text-yellow-400" : "text-gray-500"}`}>
+                      {b.confidence}%
+                    </span>
+                    <span className="text-[10px] text-gray-600">conf</span>
+                    <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${
+                      b.severity === "critical" ? "bg-red-500/20 text-red-400" :
+                      b.severity === "high" ? "bg-orange-500/20 text-orange-400" :
+                      "bg-yellow-500/20 text-yellow-400"}`}>{b.severity[0].toUpperCase()}</span>
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium">{b.detail}</p>
+                    <p className="text-xs text-gray-500 mt-1 italic">{b.seniorNote}</p>
+                    <div className="bg-gray-800/50 rounded p-2 mt-2">
+                      <p className="text-xs text-red-400/70 font-medium mb-0.5">💥 How it breaks:</p>
+                      <p className="text-xs text-gray-400">{b.reproductionScenario}</p>
+                    </div>
+                    <p className="text-xs text-gray-600 mt-1 font-mono">{b.file}{b.line ? `:${b.line}` : ""}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Dimension grid */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
           <div className="bg-gray-900 rounded-xl p-6 border border-gray-800">
