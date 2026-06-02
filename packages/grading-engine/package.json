@@ -8,7 +8,8 @@
     ".": "./dist/index.js",
     "./scanners/*": "./dist/scanners/*.js",
     "./providers": "./dist/providers/index.js",
-    "./novel": "./dist/analyzers/novel.js"
+    "./novel": "./dist/analyzers/novel.js",
+    "./unstick": "./dist/analyzers/unstick.js"
   },
   "scripts": { "build": "tsc", "test": "vitest run", "lint": "tsc --noEmit" },
   "dependencies": {

@@ -4,6 +4,7 @@ import { logger } from "../logger";
 import { fetchRepoData, repoDataToGradeInput } from "@reporank/grading-engine/scanners/github";
 import { GradingService, runDeepAnalysis } from "@reporank/grading-engine";
 import { runNovelAnalysis } from "@reporank/grading-engine/novel";
+import { generateUnstickPlan } from "@reporank/grading-engine/unstick";
 import { createProvider } from "@reporank/grading-engine/providers";
 import { analyzeVibe } from "@reporank/vibe-analyzer";
 import { generateFixPacks } from "@reporank/fix-pack-generator";
@@ -197,6 +198,15 @@ export function startWorker() {
       report.roadmap = buildRoadmap(report.quickWins, report.overallScore);
       report.overallScore = calcOverall(report, vibe.overall);
 
+      // Generate unstick plan from full report data
+      const unstick = generateUnstickPlan(
+        report.overallScore, report.dimensionScores, report.quickWins,
+        report.bugsAndLeaks || [], report.structuralSmells || [],
+        report.hallucinatedFeatures || [], report.vibe,
+        report.deployment, report.license, report.security,
+        true,
+      );
+
       await prisma.scan.update({
         where: { id: scanId },
         data: {
@@ -204,7 +214,7 @@ export function startWorker() {
           overallScore: report.overallScore, gradeCategory: report.gradeCategory,
           maturityLevel: report.maturityLevel, vibeScore: vibe.overall,
           report: report as any, fixPack: fixPacks as any,
-          clawFindings: { secrets: clawResults, scanners: scannerResults, private: isPrivate, novel } as any,
+          clawFindings: { secrets: clawResults, scanners: scannerResults, private: isPrivate, novel, unstick } as any,
           completedAt: new Date(), duration: Math.floor((Date.now() - startTime) / 1000),
         },
       });

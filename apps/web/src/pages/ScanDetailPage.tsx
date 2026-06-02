@@ -128,6 +128,73 @@ export default function ScanDetailPage() {
           </div>
         </div>
 
+        {/* Unstick Plan — What to fix first */}
+        {scan.clawFindings?.unstick?.blockers?.length > 0 && (
+          <div className="bg-gray-900 rounded-xl p-6 border border-gray-800 mb-8">
+            <h3 className="text-lg font-semibold mb-4">🎯 What to Fix First — Priority Sequence</h3>
+            <p className="text-sm text-gray-400 mb-4">
+              {scan.clawFindings.unstick.summary}
+            </p>
+
+            {/* Top 3 summary cards */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+              <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4">
+                <p className="text-xs text-red-400 font-semibold uppercase mb-1">Top Priority</p>
+                <p className="text-sm text-gray-300">{scan.clawFindings.unstick.topPriority}</p>
+              </div>
+              <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-lg p-4">
+                <p className="text-xs text-emerald-400 font-semibold uppercase mb-1">Quickest Win</p>
+                <p className="text-sm text-gray-300">{scan.clawFindings.unstick.quickestWin}</p>
+              </div>
+              <div className="bg-orange-500/10 border border-orange-500/20 rounded-lg p-4">
+                <p className="text-xs text-orange-400 font-semibold uppercase mb-1">Biggest Risk</p>
+                <p className="text-sm text-gray-300">{scan.clawFindings.unstick.biggestRisk}</p>
+              </div>
+            </div>
+
+            {/* Full sequence */}
+            <div className="space-y-3">
+              {scan.clawFindings.unstick.blockers.map((b: any, i: number) => (
+                <div key={i} className="flex gap-4 p-4 bg-gray-800/50 rounded-lg border-l-4 border-l-transparent hover:border-l-emerald-500/50 transition-colors">
+                  <div className="flex flex-col items-center gap-1 min-w-[40px]">
+                    <span className={`text-lg ${b.priority === 1 ? "text-red-400" : b.priority === 2 ? "text-orange-400" : b.priority === 3 ? "text-yellow-400" : "text-gray-500"}`}>
+                      {b.priority === 1 ? "🔴" : b.priority === 2 ? "⚠️" : b.priority === 3 ? "🔶" : "💡"}
+                    </span>
+                    <span className="text-xs text-gray-600">P{b.priority}</span>
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-start justify-between gap-2">
+                      <h4 className="font-medium text-sm">{b.title}</h4>
+                      <span className={`text-xs px-2 py-0.5 rounded font-medium shrink-0 ${
+                        b.effort === "minutes" ? "bg-emerald-500/20 text-emerald-400" :
+                        b.effort === "hours" ? "bg-blue-500/20 text-blue-400" :
+                        b.effort === "days" ? "bg-yellow-500/20 text-yellow-400" :
+                        "bg-red-500/20 text-red-400"}`}>{b.effort}</span>
+                    </div>
+                    <div className="mt-2 grid grid-cols-2 gap-4 text-xs">
+                      <div>
+                        <p className="text-red-400 font-medium mb-0.5">If ignored:</p>
+                        <p className="text-gray-500">{b.impact}</p>
+                      </div>
+                      <div>
+                        <p className="text-emerald-400 font-medium mb-0.5">When fixed:</p>
+                        <p className="text-gray-500">{b.payoff}</p>
+                      </div>
+                    </div>
+                    {b.file && <p className="text-xs text-gray-600 mt-2 font-mono">{b.file}</p>}
+                    {b.dependsOn?.length > 0 && (
+                      <p className="text-xs text-gray-600 mt-1">Depends on: {b.dependsOn.join(", ")}</p>
+                    )}
+                    {b.unlocks?.length > 0 && (
+                      <p className="text-xs text-emerald-500/70 mt-1">Unlocks: {b.unlocks.join(", ")}</p>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Dimension grid */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
           <div className="bg-gray-900 rounded-xl p-6 border border-gray-800">
