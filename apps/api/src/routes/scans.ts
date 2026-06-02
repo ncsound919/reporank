@@ -11,6 +11,8 @@ const router: Router = Router();
 export const createScanSchema = z.object({
   repoUrl: z.string().url().regex(/github\.com\//),
   branch: z.string().default("main"),
+  projectBriefId: z.string().optional(),
+  buildSource: z.enum(["github", "bolt", "lovable", "manual-upload", "other"]).default("github"),
 });
 
 export const createLocalScanSchema = z.object({
@@ -26,6 +28,8 @@ export const createLocalScanSchema = z.object({
   aiModel: z.string().optional(),
   aiEndpoint: z.string().optional(),
   repoName: z.string().default("local-project"),
+  projectBriefId: z.string().optional(),
+  buildSource: z.enum(["github", "bolt", "lovable", "manual-upload", "other"]).default("manual-upload"),
 });
 
 // Standard GitHub scan
@@ -41,6 +45,8 @@ router.post("/", authMiddleware, scanLimitMiddleware, orgAccessMiddleware, async
       repoUrl: parsed.data.repoUrl, repoName: match[2].replace(/\.git$/, ""),
       repoOwner: match[1], branch: parsed.data.branch, status: "queued",
       userId: req.userId!, orgId: req.orgId,
+      projectBriefId: parsed.data.projectBriefId || null,
+      builderMetadata: { buildSource: parsed.data.buildSource } as any,
     },
   });
 
@@ -63,6 +69,8 @@ router.post("/local", authMiddleware, scanLimitMiddleware, orgAccessMiddleware, 
       repoUrl: "local", repoName: parsed.data.repoName,
       repoOwner: req.userId!, branch: "local", status: "queued",
       userId: req.userId!, orgId: req.orgId,
+      projectBriefId: parsed.data.projectBriefId || null,
+      builderMetadata: { buildSource: parsed.data.buildSource } as any,
     },
   });
 
@@ -82,6 +90,11 @@ router.post("/local", authMiddleware, scanLimitMiddleware, orgAccessMiddleware, 
 router.get("/:id", authMiddleware, async (req: AuthRequest, res) => {
   const scan = await prisma.scan.findUnique({ where: { id: req.params.id } });
   if (!scan) throw new AppError(404, "Scan not found", "NOT_FOUND");
+
+  // Authorization: user must own the scan or belong to the same org
+  if (scan.userId !== req.userId && scan.orgId !== req.orgId) {
+    throw new AppError(403, "Access denied", "FORBIDDEN");
+  }
 
   // Score trending: find previous scan for the same repo
   let previousScore: number | null = null;

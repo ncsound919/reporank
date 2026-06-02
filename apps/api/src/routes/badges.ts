@@ -13,7 +13,7 @@ const badgeRateLimit = rateLimit({
 
 router.get("/:owner/:repo", badgeRateLimit, async (req, res) => {
   const scan = await prisma.scan.findFirst({
-    where: { repoOwner: req.params.owner, repoName: req.params.repo, status: "complete" },
+    where: { repoOwner: req.params.owner, repoName: req.params.repo, status: "complete", repoUrl: { not: "local" } },
     orderBy: { createdAt: "desc" },
   });
 

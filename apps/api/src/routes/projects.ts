@@ -1,0 +1,156 @@
+import { Router } from "express";
+import { z } from "zod";
+import { prisma } from "../db/client";
+import { authMiddleware, orgAccessMiddleware, AuthRequest } from "../middleware/auth";
+import { AppError } from "../middleware/errorHandler";
+import { asyncHandler } from "../middleware/asyncHandler";
+
+const router: Router = Router();
+
+const briefSchema = z.object({
+  name: z.string().min(1).max(200),
+  repoUrl: z.string().url().optional().or(z.literal("")),
+  buildSource: z.enum(["github", "bolt", "lovable", "manual-upload", "other"]).default("github"),
+  objective: z.string().min(1).max(2000),
+  targetUsers: z.string().max(500).optional(),
+  deliverables: z.array(z.string().min(1).max(500)).min(1, "At least one deliverable is required"),
+  exclusions: z.array(z.string().min(1).max(500)).min(1, "At least one exclusion is required"),
+  constraints: z.array(z.string().min(1).max(500)).default([]),
+  assumptions: z.array(z.string().min(1).max(500)).default([]),
+  acceptanceCriteria: z.array(z.string().min(1).max(500)).min(1, "At least one acceptance criterion is required"),
+  deadline: z.string().datetime().optional(),
+  timebox: z.string().max(100).optional(),
+});
+
+const patchBriefSchema = briefSchema.partial();
+
+// POST /api/v1/projects — create a new project brief
+router.post("/", authMiddleware, orgAccessMiddleware, asyncHandler<AuthRequest>(async (req, res) => {
+  const parsed = briefSchema.safeParse(req.body);
+  if (!parsed.success) throw new AppError(400, parsed.error.errors[0].message, "VALIDATION_ERROR");
+
+  const brief = await prisma.projectBrief.create({
+    data: {
+      ...parsed.data,
+      repoUrl: parsed.data.repoUrl || null,
+      deadline: parsed.data.deadline ? new Date(parsed.data.deadline) : null,
+      userId: req.userId!,
+      orgId: req.orgId || null,
+    },
+  });
+
+  res.status(201).json({ data: brief });
+}));
+
+// GET /api/v1/projects — list projects for user/org
+router.get("/", authMiddleware, orgAccessMiddleware, asyncHandler<AuthRequest>(async (req, res) => {
+  const briefs = await prisma.projectBrief.findMany({
+    where: req.orgId ? { orgId: req.orgId } : { userId: req.userId! },
+    orderBy: { createdAt: "desc" },
+    take: 50,
+    include: {
+      approvals: { orderBy: { approvedAt: "desc" }, take: 1 },
+      milestones: { select: { id: true, name: true, status: true, type: true, targetDate: true } },
+      _count: { select: { scans: true } },
+    },
+  });
+  res.json({ data: briefs });
+}));
+
+// GET /api/v1/projects/:id — get full brief
+router.get("/:id", authMiddleware, asyncHandler<AuthRequest>(async (req, res) => {
+  const brief = await prisma.projectBrief.findUnique({
+    where: { id: req.params.id },
+    include: {
+      approvals: { orderBy: { approvedAt: "desc" } },
+      milestones: {
+        include: { gates: true },
+        orderBy: { createdAt: "asc" },
+      },
+      changeRequests: { orderBy: { createdAt: "desc" }, take: 20 },
+      scans: {
+        select: { id: true, status: true, overallScore: true, createdAt: true, repoName: true },
+        orderBy: { createdAt: "desc" },
+        take: 10,
+      },
+    },
+  });
+
+  if (!brief) throw new AppError(404, "Project not found", "NOT_FOUND");
+  if (brief.userId !== req.userId && brief.orgId !== req.orgId) {
+    throw new AppError(403, "Access denied", "FORBIDDEN");
+  }
+
+  res.json({ data: brief });
+}));
+
+// PATCH /api/v1/projects/:id — update brief (blocked if approved without change request)
+router.patch("/:id", authMiddleware, asyncHandler<AuthRequest>(async (req, res) => {
+  const brief = await prisma.projectBrief.findUnique({ where: { id: req.params.id } });
+  if (!brief) throw new AppError(404, "Project not found", "NOT_FOUND");
+  if (brief.userId !== req.userId) throw new AppError(403, "Access denied", "FORBIDDEN");
+
+  const parsed = patchBriefSchema.safeParse(req.body);
+  if (!parsed.success) throw new AppError(400, parsed.error.errors[0].message, "VALIDATION_ERROR");
+
+  // If brief is approved, create a scope change request instead of silent edit
+  if (brief.status === "approved" && Object.keys(parsed.data).length > 0) {
+    const changeRequest = await prisma.scopeChangeRequest.create({
+      data: {
+        projectId: brief.id,
+        title: req.body.changeTitle || "Brief update after approval",
+        description: req.body.changeDescription || "",
+        reason: req.body.changeReason || "",
+        requestedBy: req.userId!,
+        oldScope: brief as any,
+        newScope: parsed.data as any,
+        status: "pending",
+      },
+    });
+    return res.status(202).json({
+      data: { changeRequestId: changeRequest.id },
+      message: "Brief is approved. A scope change request has been created.",
+    });
+  }
+
+  const updated = await prisma.projectBrief.update({
+    where: { id: req.params.id },
+    data: {
+      ...parsed.data,
+      deadline: parsed.data.deadline ? new Date(parsed.data.deadline) : undefined,
+    },
+  });
+
+  res.json({ data: updated });
+}));
+
+// POST /api/v1/projects/:id/approve — approve the brief
+router.post("/:id/approve", authMiddleware, asyncHandler<AuthRequest>(async (req, res) => {
+  const brief = await prisma.projectBrief.findUnique({ where: { id: req.params.id } });
+  if (!brief) throw new AppError(404, "Project not found", "NOT_FOUND");
+  if (brief.userId !== req.userId) throw new AppError(403, "Access denied", "FORBIDDEN");
+
+  // Validate minimum requirements before approval
+  if (brief.deliverables.length === 0) throw new AppError(400, "At least one deliverable required", "VALIDATION_ERROR");
+  if (brief.exclusions.length === 0) throw new AppError(400, "At least one exclusion required", "VALIDATION_ERROR");
+  if (brief.acceptanceCriteria.length === 0) throw new AppError(400, "At least one acceptance criterion required", "VALIDATION_ERROR");
+
+  const existingApprovals = await prisma.briefApproval.findMany({ where: { projectBriefId: brief.id } });
+  const version = existingApprovals.length + 1;
+
+  const [updated, approval] = await prisma.$transaction([
+    prisma.projectBrief.update({ where: { id: brief.id }, data: { status: "approved" } }),
+    prisma.briefApproval.create({
+      data: {
+        projectBriefId: brief.id,
+        approvedBy: req.userId!,
+        version,
+        notes: req.body.notes || null,
+      },
+    }),
+  ]);
+
+  res.json({ data: { brief: updated, approval } });
+}));
+
+export default router;

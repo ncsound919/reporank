@@ -18,10 +18,10 @@ export const config = {
   appUrl: process.env.APP_URL || "http://localhost:5173",
   nodeEnv: process.env.NODE_ENV || "development",
 
-  jwt: {
-    secret: process.env.JWT_SECRET!,
-    expiresIn: "7d",
-  },
+   jwt: {
+     secret: process.env.JWT_SECRET!,
+     expiresIn: process.env.JWT_EXPIRES_IN || "7d",
+   },
 
   github: {
     clientId: process.env.GITHUB_CLIENT_ID || "",
@@ -40,10 +40,12 @@ export const config = {
     endpoint: process.env.LOCAL_AI_ENDPOINT || "http://localhost:11434",
   },
 
-  stripe: {
-    secretKey: process.env.STRIPE_SECRET_KEY || "",
-    webhookSecret: process.env.STRIPE_WEBHOOK_SECRET || "",
-  },
+   stripe: {
+     secretKey: process.env.STRIPE_SECRET_KEY || "",
+     webhookSecret: process.env.STRIPE_WEBHOOK_SECRET || "",
+     priceIdPro: process.env.STRIPE_PRICE_PRO || "price_pro_monthly",
+     priceIdEnterprise: process.env.STRIPE_PRICE_ENTERPRISE || "price_enterprise_monthly",
+   },
 
   redis: {
     url: process.env.REDIS_URL || "redis://localhost:6379",

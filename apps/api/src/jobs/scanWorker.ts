@@ -17,6 +17,10 @@ import { execFileSync } from "node:child_process";
 import { mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { parseBuilderContext } from "../services/builderContextParser";
+import { checkPortability } from "../services/portabilityChecker";
+import { runScopeMatcher } from "../services/scopeMatcher";
+import { labelFindings } from "../services/evidenceLabeler";
 
 const gradingService = new GradingService(config.gemini.apiKey, config.gemini.model);
 
@@ -93,6 +97,14 @@ export function startWorker() {
     const startTime = Date.now();
 
     try {
+      // Load full scan row to get projectBriefId + builderMetadata
+      const scanRow = await prisma.scan.findUnique({
+        where: { id: scanId },
+        select: { projectBriefId: true, builderMetadata: true, branch: true },
+      });
+      const projectBriefId = scanRow?.projectBriefId || null;
+      const existingBuilderMeta = (scanRow?.builderMetadata as any) || {};
+      const branch = scanRow?.branch || "main";
       // Phase 1: Fetch or receive data
       let repoData: any;
       let input: any;
@@ -243,6 +255,49 @@ export function startWorker() {
       // Invisible bugs — patterns even senior devs miss
       const invisible = detectInvisibleBugs(repoData.sourceFiles || []);
 
+      // Builder context + portability (Phase 2/4)
+      const builderContext = parseBuilderContext(
+        repoData.fileTree || [],
+        repoData.sourceFiles || [],
+        branch,
+        existingBuilderMeta.buildSource || (isLocal ? "manual-upload" : "github"),
+      );
+      const portability = checkPortability(repoData.fileTree || [], repoData.sourceFiles || []);
+
+      // Scope drift (if linked to a project)
+      let drift = null;
+      let brief = null;
+      if (projectBriefId) {
+        try {
+          const fullBrief = await prisma.projectBrief.findUnique({ where: { id: projectBriefId } });
+          if (fullBrief) {
+            brief = fullBrief;
+            const briefInput = {
+              deliverables: fullBrief.deliverables,
+              exclusions: fullBrief.exclusions,
+              constraints: fullBrief.constraints,
+              assumptions: fullBrief.assumptions,
+              intentDocument: typeof fullBrief.intentDocument === 'object' && fullBrief.intentDocument !== null ? (fullBrief.intentDocument as Record<string, unknown>) : null,
+            };
+            drift = runScopeMatcher({
+              brief: briefInput,
+              report,
+              fileTree: repoData.fileTree || [],
+              builderMetadata: builderContext as any,
+            });
+          }
+        } catch (e: any) {
+          logger.warn({ err: e.message }, "Scope matcher failed — skipping");
+        }
+      }
+
+      // Evidence labeling
+      const evidenceLabels = labelFindings({
+        report,
+        clawFindings: { secrets: clawResults, unstick, invisible, novel, drift },
+        brief: brief ? { deliverables: brief.deliverables, acceptanceCriteria: brief.acceptanceCriteria } : null,
+      });
+
       await prisma.scan.updateMany({
         where: { id: scanId, status: { notIn: ["complete", "error"] } },
         data: {
@@ -250,7 +305,8 @@ export function startWorker() {
           overallScore: report.overallScore, gradeCategory: report.gradeCategory,
           maturityLevel: report.maturityLevel, vibeScore: vibe.overall,
           report: report as any, fixPack: fixPacks as any,
-          clawFindings: { secrets: clawResults, scanners: scannerResults, private: isPrivate, novel, unstick, invisible } as any,
+          builderMetadata: { ...existingBuilderMeta, ...builderContext } as any,
+          clawFindings: { secrets: clawResults, scanners: scannerResults, private: isPrivate, novel, unstick, invisible, drift, portability, evidenceLabels } as any,
           completedAt: new Date(), duration: Math.floor((Date.now() - startTime) / 1000),
         },
       });

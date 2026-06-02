@@ -2,6 +2,7 @@ import { Router } from "express";
 import Stripe from "stripe";
 import { config } from "../config";
 import { prisma } from "../db/client";
+import { logger } from "../logger";
 import { authMiddleware, AuthRequest } from "../middleware/auth";
 import { AppError } from "../middleware/errorHandler";
 
@@ -22,18 +23,20 @@ router.post("/checkout", authMiddleware, async (req: AuthRequest, res) => {
     const stripe = getStripe();
     const { plan, orgId } = req.body;
     if (!["pro", "enterprise"].includes(plan)) return res.status(400).json({ error: "Invalid plan" });
+    if (!orgId) throw new AppError(400, "Organization ID is required", "ORG_REQUIRED");
 
-    const org = orgId
-      ? await prisma.org.findUnique({ where: { id: orgId } })
-      : await prisma.org.create({
-          data: { name: `${req.userId}'s Org`, slug: `org-${req.userId!.slice(0, 8)}` },
-        });
+    const org = await prisma.org.findUnique({ where: { id: orgId } });
+    if (!org) throw new AppError(404, "Organization not found", "NOT_FOUND");
 
-    if (!org) return res.status(404).json({ error: "Organization not found" });
+    // Verify user is member of this org
+    const membership = await prisma.orgMember.findUnique({
+      where: { orgId_userId: { orgId: org.id, userId: req.userId! } },
+    });
+    if (!membership) throw new AppError(403, "Not a member of this organization", "FORBIDDEN");
 
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",
-      line_items: [{ price: plan === "pro" ? "price_pro_monthly" : "price_enterprise_monthly", quantity: 1 }],
+      line_items: [{ price: plan === "pro" ? config.stripe.priceIdPro : config.stripe.priceIdEnterprise, quantity: 1 }],
       success_url: `${config.appUrl}/dashboard?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${config.appUrl}/pricing`,
       metadata: { orgId: org.id, userId: req.userId! },
@@ -41,7 +44,8 @@ router.post("/checkout", authMiddleware, async (req: AuthRequest, res) => {
 
     res.json({ data: { url: session.url } });
   } catch (err) {
-    console.error("Stripe error:", err);
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    logger.error({ error: errorMessage }, "Stripe error in checkout");
     res.status(502).json({ error: "Payment service unavailable" });
   }
 });
@@ -107,7 +111,7 @@ router.post("/webhook", async (req, res) => {
 
   if (event.type === "invoice.payment_failed") {
     const invoice = event.data.object as Stripe.Invoice;
-    console.warn("Invoice payment failed:", invoice.id, invoice.subscription);
+    logger.warn({ invoiceId: invoice.id, subscriptionId: invoice.subscription }, "Invoice payment failed");
   }
 
   if (event.type === "customer.subscription.updated") {
@@ -163,7 +167,8 @@ router.post("/portal", authMiddleware, async (req: AuthRequest, res) => {
     });
     res.json({ data: { url: session.url } });
   } catch (err) {
-    console.error("Stripe error:", err);
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    logger.error({ error: errorMessage }, "Stripe error in portal");
     res.status(502).json({ error: "Payment service unavailable" });
   }
 });
