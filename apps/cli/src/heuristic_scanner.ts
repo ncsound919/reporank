@@ -343,6 +343,34 @@ const RULES: HeuristicRule[] = [
     recommendation: "Wrap user content in a clear delimiter and instruct the model to ignore instructions within the content",
     confidence: 0.6,
   },
+  // ── React / modern JS patterns ──────────────────────────────
+  {
+    type: "xss",
+    category: "security",
+    severity: "critical",
+    pattern: /dangerouslySetInnerHTML/g,
+    description: "dangerouslySetInnerHTML used — unsanitized content enables XSS",
+    recommendation: "Use a sanitizer like DOMPurify, or prefer React's built-in JSX rendering which auto-escapes",
+    confidence: 0.85,
+  },
+  {
+    type: "resource-leak",
+    category: "quality",
+    severity: "high",
+    pattern: /\bsetInterval\s*\(/g,
+    description: "setInterval used without clearInterval — memory leak if component unmounts",
+    recommendation: "Store the interval ID and call clearInterval() in a cleanup function",
+    confidence: 0.7,
+  },
+  {
+    type: "no-error-handling",
+    category: "quality",
+    severity: "high",
+    pattern: /\bawait\s+(?!.*\btry\b)/g,
+    description: "await used without try/catch — unhandled rejection will crash the process",
+    recommendation: "Wrap awaits in try/catch, log the error, and handle failures gracefully",
+    confidence: 0.6,
+  },
 ];
 
 /**

@@ -26,11 +26,11 @@
     "code": "import express from 'express';\nconst app = express();\napp.get('/data', async (req, res) => {\n  const result = await fetchData(req.params.id);\n  res.json(result);\n});",
     "ground_truth": [
       {
-        "category": "error-handling",
+        "category": "quality",
         "severity": "high",
         "line": 3,
-        "type": "unhandled-rejection",
-        "description": "Async route handler missing try/catch will cause unhandled promise rejection on error"
+        "type": "no-error-handling",
+        "description": "Async function without try/catch — unhandled promise rejection crashes process"
       }
     ],
     "expected_recommendation_keywords": ["try/catch", "error handling", "catch"]
@@ -65,7 +65,7 @@
         "category": "security",
         "severity": "critical",
         "line": 2,
-        "type": "eval-usage",
+        "type": "code-injection",
         "description": "eval() allows arbitrary code execution from untrusted input"
       }
     ],
@@ -80,10 +80,10 @@
     "code": "import { useEffect } from 'react';\nfunction PollingComponent() {\n  useEffect(() => {\n    setInterval(() => {\n      console.log('Polling...');\n    }, 1000);\n  }, []);\n  return <div>Polling</div>;\n}",
     "ground_truth": [
       {
-        "category": "memory",
+        "category": "quality",
         "severity": "high",
         "line": 5,
-        "type": "missing-cleanup",
+        "type": "resource-leak",
         "description": "setInterval in useEffect without clearInterval causes memory leak"
       }
     ],
@@ -101,7 +101,7 @@
         "category": "security",
         "severity": "critical",
         "line": 5,
-        "type": "dangerouslySetInnerHTML",
+        "type": "xss",
         "description": "dangerouslySetInnerHTML with unsanitized content enables XSS attacks"
       }
     ],

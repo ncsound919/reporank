@@ -233,12 +233,45 @@ Output:
 
 ## Example J: Quality (mutation-side-effect — function modifies its input)
 Input:
-   1 | export function updateName(user: { name: string }, newName: string): { name: string } {
-   2 |   user.name = newName;
-   3 |   return user;
-   4 | }
+    1 | export function updateName(user: { name: string }, newName: string): { name: string } {
+    2 |   user.name = newName;
+    3 |   return user;
+    4 | }
 Output:
 {"reasoning":"Function mutates the input object directly instead of returning a new object — surprising for callers who expect immutability.","findings":[{"category":"quality","severity":"medium","line":2,"type":"mutation-side-effect","description":"Function modifies its input parameter instead of returning a new object","recommendation":"Return a new object: return { ...user, name: newName }","confidence":0.85}]}
+
+## Example K: Security (xss — dangerouslySetInnerHTML in React)
+Input:
+    1 | import React from 'react';
+    2 | interface Props { content: string }
+    3 | export const RichDisplay: React.FC<Props> = ({ content }) => {
+    4 |   return <div dangerouslySetInnerHTML={{ __html: content }} />;
+    5 | };
+Output:
+{"reasoning":"dangerouslySetInnerHTML with unsanitized user content enables XSS attacks.","findings":[{"category":"security","severity":"critical","line":4,"type":"xss","description":"dangerouslySetInnerHTML with dynamic prop content enables XSS","recommendation":"Sanitize content with DOMPurify or use a safe rendering approach","confidence":0.95}]}
+
+## Example L: Quality (resource-leak — setInterval in useEffect without cleanup)
+Input:
+    1 | import { useEffect } from 'react';
+    2 | export function usePolling(url: string) {
+    3 |   useEffect(() => {
+    4 |     setInterval(async () => {
+    5 |       const res = await fetch(url);
+    6 |     }, 5000);
+    7 |   }, [url]);
+    8 | }
+Output:
+{"reasoning":"setInterval inside useEffect with no cleanup function — interval continues after unmount, causing memory leaks and stale closures.","findings":[{"category":"quality","severity":"high","line":4,"type":"resource-leak","description":"setInterval in useEffect without clearInterval cleanup","recommendation":"Return a cleanup function: () => clearInterval(id)","confidence":0.9}]}
+
+## Example M: Quality (no-error-handling — simple async without try/catch)
+Input:
+    1 | import { Request, Response } from 'express';
+    2 | export async function createUser(req: Request, res: Response) {
+    3 |   const user = await db.users.create({ data: req.body });
+    4 |   res.status(201).json(user);
+    5 | }
+Output:
+{"reasoning":"Async function uses await but has no try/catch — any DB error causes an unhandled promise rejection that crashes the process.","findings":[{"category":"quality","severity":"high","line":2,"type":"no-error-handling","description":"async function without try/catch — unhandled rejection crashes process","recommendation":"Wrap in try/catch, log the error, and return an appropriate error response","confidence":0.9}]}
 
 REMEMBER:
 - Use EXACT type tags from the vocabulary above (e.g. "sql-injection" not "sql-injection-vulnerability")

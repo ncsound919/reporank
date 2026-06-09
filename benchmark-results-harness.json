@@ -2,12 +2,12 @@
   "totalTasks": 6,
   "skippedTasks": 0,
   "aggregate": {
-    "truePositives": 1,
-    "falsePositives": 8,
-    "falseNegatives": 5,
-    "precision": 0.1111111111111111,
-    "recall": 0.16666666666666666,
-    "f1": 0.13333333333333333
+    "truePositives": 5,
+    "falsePositives": 7,
+    "falseNegatives": 1,
+    "precision": 0.4166666666666667,
+    "recall": 0.8333333333333334,
+    "f1": 0.5555555555555556
   },
   "perTask": [
     {
@@ -42,8 +42,28 @@
     {
       "id": "missing-error-handling",
       "groundTruthCount": 1,
-      "predictedCount": 1,
-      "truePositives": [],
+      "predictedCount": 2,
+      "truePositives": [
+        {
+          "predicted": {
+            "category": "quality",
+            "severity": "high",
+            "line": 4,
+            "type": "no-error-handling",
+            "description": "await used without try/catch — unhandled rejection will crash the process",
+            "recommendation": "Wrap awaits in try/catch, log the error, and handle failures gracefully",
+            "confidence": 0.6
+          },
+          "groundTruth": {
+            "category": "quality",
+            "severity": "high",
+            "line": 3,
+            "type": "no-error-handling",
+            "description": "Async function without try/catch — unhandled promise rejection crashes process"
+          },
+          "matchScore": 0.8400000000000001
+        }
+      ],
       "falsePositives": [
         {
           "category": "maintainability",
@@ -55,15 +75,7 @@
           "confidence": 0.5
         }
       ],
-      "falseNegatives": [
-        {
-          "category": "error-handling",
-          "severity": "high",
-          "line": 3,
-          "type": "unhandled-rejection",
-          "description": "Async route handler missing try/catch will cause unhandled promise rejection on error"
-        }
-      ],
+      "falseNegatives": [],
       "durationMs": 0,
       "tokens": 0,
       "warnings": []
@@ -113,17 +125,28 @@
       "id": "eval-usage",
       "groundTruthCount": 1,
       "predictedCount": 2,
-      "truePositives": [],
-      "falsePositives": [
+      "truePositives": [
         {
-          "category": "security",
-          "severity": "critical",
-          "line": 2,
-          "type": "code-injection",
-          "description": "eval() executes arbitrary code from a string",
-          "recommendation": "Replace with a safe parser; if dynamic evaluation is required, use a sandboxed VM",
-          "confidence": 0.99
-        },
+          "predicted": {
+            "category": "security",
+            "severity": "critical",
+            "line": 2,
+            "type": "code-injection",
+            "description": "eval() executes arbitrary code from a string",
+            "recommendation": "Replace with a safe parser; if dynamic evaluation is required, use a sandboxed VM",
+            "confidence": 0.99
+          },
+          "groundTruth": {
+            "category": "security",
+            "severity": "critical",
+            "line": 2,
+            "type": "code-injection",
+            "description": "eval() allows arbitrary code execution from untrusted input"
+          },
+          "matchScore": 0.94
+        }
+      ],
+      "falsePositives": [
         {
           "category": "maintainability",
           "severity": "low",
@@ -134,15 +157,7 @@
           "confidence": 0.5
         }
       ],
-      "falseNegatives": [
-        {
-          "category": "security",
-          "severity": "critical",
-          "line": 2,
-          "type": "eval-usage",
-          "description": "eval() allows arbitrary code execution from untrusted input"
-        }
-      ],
+      "falseNegatives": [],
       "durationMs": 0,
       "tokens": 0,
       "warnings": []
@@ -150,8 +165,28 @@
     {
       "id": "memory-leak-interval",
       "groundTruthCount": 1,
-      "predictedCount": 2,
-      "truePositives": [],
+      "predictedCount": 3,
+      "truePositives": [
+        {
+          "predicted": {
+            "category": "quality",
+            "severity": "high",
+            "line": 4,
+            "type": "resource-leak",
+            "description": "setInterval used without clearInterval — memory leak if component unmounts",
+            "recommendation": "Store the interval ID and call clearInterval() in a cleanup function",
+            "confidence": 0.7
+          },
+          "groundTruth": {
+            "category": "quality",
+            "severity": "high",
+            "line": 5,
+            "type": "resource-leak",
+            "description": "setInterval in useEffect without clearInterval causes memory leak"
+          },
+          "matchScore": 0.8500000000000001
+        }
+      ],
       "falsePositives": [
         {
           "category": "quality",
@@ -172,15 +207,7 @@
           "confidence": 0.5
         }
       ],
-      "falseNegatives": [
-        {
-          "category": "memory",
-          "severity": "high",
-          "line": 5,
-          "type": "missing-cleanup",
-          "description": "setInterval in useEffect without clearInterval causes memory leak"
-        }
-      ],
+      "falseNegatives": [],
       "durationMs": 0,
       "tokens": 0,
       "warnings": []
@@ -188,8 +215,28 @@
     {
       "id": "xss-vulnerability",
       "groundTruthCount": 1,
-      "predictedCount": 1,
-      "truePositives": [],
+      "predictedCount": 2,
+      "truePositives": [
+        {
+          "predicted": {
+            "category": "security",
+            "severity": "critical",
+            "line": 5,
+            "type": "xss",
+            "description": "dangerouslySetInnerHTML used — unsanitized content enables XSS",
+            "recommendation": "Use a sanitizer like DOMPurify, or prefer React's built-in JSX rendering which auto-escapes",
+            "confidence": 0.85
+          },
+          "groundTruth": {
+            "category": "security",
+            "severity": "critical",
+            "line": 5,
+            "type": "xss",
+            "description": "dangerouslySetInnerHTML with unsanitized content enables XSS attacks"
+          },
+          "matchScore": 0.9624999999999999
+        }
+      ],
       "falsePositives": [
         {
           "category": "maintainability",
@@ -201,15 +248,7 @@
           "confidence": 0.5
         }
       ],
-      "falseNegatives": [
-        {
-          "category": "security",
-          "severity": "critical",
-          "line": 5,
-          "type": "dangerouslySetInnerHTML",
-          "description": "dangerouslySetInnerHTML with unsanitized content enables XSS attacks"
-        }
-      ],
+      "falseNegatives": [],
       "durationMs": 0,
       "tokens": 0,
       "warnings": []
@@ -223,28 +262,16 @@
       "support": 0
     },
     "security": {
-      "precision": 0.5,
-      "recall": 0.25,
-      "f1": 0.3333333333333333,
+      "precision": 1,
+      "recall": 0.75,
+      "f1": 0.8571428571428571,
       "support": 4
     },
-    "error-handling": {
-      "precision": 0,
-      "recall": 0,
-      "f1": 0,
-      "support": 1
-    },
     "quality": {
-      "precision": 0,
-      "recall": 0,
-      "f1": 0,
-      "support": 0
-    },
-    "memory": {
-      "precision": 0,
-      "recall": 0,
-      "f1": 0,
-      "support": 1
+      "precision": 0.6666666666666666,
+      "recall": 1,
+      "f1": 0.8,
+      "support": 2
     }
   },
   "bySeverity": {
@@ -255,15 +282,15 @@
       "support": 0
     },
     "critical": {
-      "precision": 0.5,
-      "recall": 0.25,
-      "f1": 0.3333333333333333,
+      "precision": 1,
+      "recall": 0.75,
+      "f1": 0.8571428571428571,
       "support": 4
     },
     "high": {
-      "precision": 0,
-      "recall": 0,
-      "f1": 0,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1,
       "support": 2
     }
   },

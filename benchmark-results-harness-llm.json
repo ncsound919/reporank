@@ -3,11 +3,11 @@
   "skippedTasks": 0,
   "aggregate": {
     "truePositives": 2,
-    "falsePositives": 3,
+    "falsePositives": 2,
     "falseNegatives": 4,
-    "precision": 0.4,
+    "precision": 0.5,
     "recall": 0.3333333333333333,
-    "f1": 0.3636363636363636
+    "f1": 0.4
   },
   "perTask": [
     {
@@ -21,9 +21,9 @@
             "severity": "critical",
             "line": 5,
             "type": "sql-injection",
-            "description": "User input from `req.query.id` is directly concatenated into the SQL query string, making it vulnerable to SQL injection.",
-            "recommendation": "Use parameterized queries. Modify `db.query` to accept placeholders (e.g., `?` or `$1`) and pass `id` as a separate parameter to prevent injection.",
-            "confidence": 0.99
+            "description": "User input from `req.query.id` is directly embedded into the SQL query string without sanitization or parameterization.",
+            "recommendation": "Use parameterized queries provided by your database driver (e.g., `db.query('SELECT * FROM users WHERE id = ?', [id], ...)`) to prevent SQL injection.",
+            "confidence": 1
           },
           "groundTruth": {
             "category": "security",
@@ -32,7 +32,7 @@
             "type": "sql-injection",
             "description": "SQL injection vulnerability via raw string interpolation of user input"
           },
-          "matchScore": 0.9277777777777777
+          "matchScore": 0.9210526315789472
         }
       ],
       "falsePositives": [
@@ -41,104 +41,98 @@
           "severity": "high",
           "line": 7,
           "type": "no-error-handling",
-          "description": "The `throw err` inside the database query callback will cause the Node.js process to crash if a database error occurs, as it's not caught by Express's error handling middleware.",
-          "recommendation": "Instead of `throw err`, pass the error to Express's `next` function (e.g., `next(err)`) or send an appropriate error response to the client (e.g., `res.status(500).json({ error: 'Database error' })`).",
+          "description": "An error from `db.query` is thrown directly in the callback, which will crash the Node.js process if not caught by a global handler, instead of being handled gracefully or passed to Express's error middleware.",
+          "recommendation": "Instead of `throw err;`, pass the error to Express's `next` function (`return next(err);`) or handle it by sending an appropriate error response to the client (e.g., `res.status(500).json({ error: 'Database error' });`).",
           "confidence": 0.9
         }
       ],
       "falseNegatives": [],
-      "durationMs": 10407,
-      "tokens": 2963,
-      "warnings": []
-    },
-    {
-      "id": "hardcoded-secret",
-      "groundTruthCount": 1,
-      "predictedCount": 1,
-      "truePositives": [
-        {
-          "predicted": {
-            "category": "security",
-            "severity": "critical",
-            "line": 2,
-            "type": "hardcoded-secret",
-            "description": "API key is hardcoded directly in the source file.",
-            "recommendation": "Store API keys in environment variables, a secrets manager (e.g., AWS Secrets Manager, Azure Key Vault), or a secure configuration system, and load them at runtime.",
-            "confidence": 1
-          },
-          "groundTruth": {
-            "category": "security",
-            "severity": "critical",
-            "line": 2,
-            "type": "hardcoded-secret",
-            "description": "Hardcoded API secret key in source code"
-          },
-          "matchScore": 0.9444444444444443
-        }
-      ],
-      "falsePositives": [],
-      "falseNegatives": [],
-      "durationMs": 3649,
-      "tokens": 2730,
+      "durationMs": 8576,
+      "tokens": 3514,
       "warnings": []
     },
     {
       "id": "missing-error-handling",
       "groundTruthCount": 1,
-      "predictedCount": 1,
-      "truePositives": [],
+      "predictedCount": 2,
+      "truePositives": [
+        {
+          "predicted": {
+            "category": "quality",
+            "severity": "high",
+            "line": 3,
+            "type": "no-error-handling",
+            "description": "The async route handler for '/data' lacks a try/catch block around the await call, meaning any error from `fetchData` will result in an unhandled promise rejection.",
+            "recommendation": "Wrap the `await fetchData()` call in a try/catch block to gracefully handle errors and send an appropriate error response (e.g., res.status(500).json({ error: '...' })).",
+            "confidence": 0.95
+          },
+          "groundTruth": {
+            "category": "quality",
+            "severity": "high",
+            "line": 3,
+            "type": "no-error-handling",
+            "description": "Async function without try/catch — unhandled promise rejection crashes process"
+          },
+          "matchScore": 0.9222222222222222
+        }
+      ],
       "falsePositives": [
         {
           "category": "quality",
           "severity": "high",
-          "line": 3,
-          "type": "no-error-handling",
-          "description": "Async route handler for '/data' does not have error handling for the awaited fetchData call.",
-          "recommendation": "Wrap the await fetchData() call in a try/catch block to gracefully handle errors and send an appropriate error response (e.g., res.status(500).json({ error: 'Failed to fetch data' })).",
-          "confidence": 0.95
+          "line": 4,
+          "type": "missing-null-check",
+          "description": "For the route `app.get('/data', ...)`, `req.params.id` will always be `undefined`. Passing `undefined` to `fetchData` is likely an unintended bug.",
+          "recommendation": "If an ID is expected, either change the route to `app.get('/data/:id', ...)` or use `req.query.id` (e.g., `app.get('/data', async (req, res) => { const id = req.query.id; ... })`) and ensure `id` is validated before use.",
+          "confidence": 0.9
         }
       ],
+      "falseNegatives": [],
+      "durationMs": 11356,
+      "tokens": 3488,
+      "warnings": []
+    },
+    {
+      "id": "hardcoded-secret",
+      "groundTruthCount": 1,
+      "predictedCount": 0,
+      "truePositives": [],
+      "falsePositives": [],
       "falseNegatives": [
         {
-          "category": "error-handling",
-          "severity": "high",
-          "line": 3,
-          "type": "unhandled-rejection",
-          "description": "Async route handler missing try/catch will cause unhandled promise rejection on error"
+          "category": "security",
+          "severity": "critical",
+          "line": 2,
+          "type": "hardcoded-secret",
+          "description": "Hardcoded API secret key in source code"
         }
       ],
-      "durationMs": 16510,
-      "tokens": 2803,
-      "warnings": []
+      "durationMs": 15455,
+      "tokens": 0,
+      "warnings": [
+        "chunk 0: LLM call failed — Provider 'Gemini' returned no content"
+      ]
     },
     {
       "id": "eval-usage",
       "groundTruthCount": 1,
-      "predictedCount": 1,
+      "predictedCount": 0,
       "truePositives": [],
-      "falsePositives": [
+      "falsePositives": [],
+      "falseNegatives": [
         {
           "category": "security",
           "severity": "critical",
           "line": 2,
           "type": "code-injection",
-          "description": "The `eval()` function is used with the `expression` parameter, which can lead to arbitrary code execution if `expression` contains untrusted user input.",
-          "recommendation": "Avoid using `eval()`. If dynamic expression evaluation is necessary, use a dedicated, secure expression parser library that does not execute arbitrary JavaScript code, or ensure `expression` is strictly controlled and sanitized.",
-          "confidence": 0.99
-        }
-      ],
-      "falseNegatives": [
-        {
-          "category": "security",
-          "severity": "critical",
-          "line": 2,
-          "type": "eval-usage",
           "description": "eval() allows arbitrary code execution from untrusted input"
         }
       ],
-      "durationMs": 12677,
-      "tokens": 2781,
-      "warnings": []
+      "durationMs": 15800,
+      "tokens": 0,
+      "warnings": [
+        "chunk 0: LLM call failed — Provider 'Gemini' returned no content"
+      ]
     },
     {
       "id": "memory-leak-interval",
@@ -148,14 +142,14 @@
       "falsePositives": [],
       "falseNegatives": [
         {
-          "category": "memory",
+          "category": "quality",
           "severity": "high",
           "line": 5,
-          "type": "missing-cleanup",
+          "type": "resource-leak",
           "description": "setInterval in useEffect without clearInterval causes memory leak"
         }
       ],
-      "durationMs": 15266,
+      "durationMs": 15352,
       "tokens": 0,
       "warnings": [
         "chunk 0: LLM call failed — Provider 'Gemini' returned no content"
@@ -172,11 +166,11 @@
           "category": "security",
           "severity": "critical",
           "line": 5,
-          "type": "dangerouslySetInnerHTML",
+          "type": "xss",
           "description": "dangerouslySetInnerHTML with unsanitized content enables XSS attacks"
         }
       ],
-      "durationMs": 15168,
+      "durationMs": 15229,
       "tokens": 0,
       "warnings": [
         "chunk 0: LLM call failed — Provider 'Gemini' returned no content"
@@ -185,48 +179,36 @@
   ],
   "byCategory": {
     "security": {
-      "precision": 0.6666666666666666,
-      "recall": 0.5,
-      "f1": 0.5714285714285715,
+      "precision": 1,
+      "recall": 0.25,
+      "f1": 0.4,
       "support": 4
     },
     "quality": {
-      "precision": 0,
-      "recall": 0,
-      "f1": 0,
-      "support": 0
-    },
-    "error-handling": {
-      "precision": 0,
-      "recall": 0,
-      "f1": 0,
-      "support": 1
-    },
-    "memory": {
-      "precision": 0,
-      "recall": 0,
-      "f1": 0,
-      "support": 1
+      "precision": 0.3333333333333333,
+      "recall": 0.5,
+      "f1": 0.4,
+      "support": 2
     }
   },
   "bySeverity": {
     "critical": {
-      "precision": 0.6666666666666666,
-      "recall": 0.5,
-      "f1": 0.5714285714285715,
+      "precision": 1,
+      "recall": 0.25,
+      "f1": 0.4,
       "support": 4
     },
     "high": {
-      "precision": 0,
-      "recall": 0,
-      "f1": 0,
+      "precision": 0.3333333333333333,
+      "recall": 0.5,
+      "f1": 0.4,
       "support": 2
     }
   },
   "cost": {
-    "totalTokens": 11277,
-    "totalDurationMs": 73677,
-    "averageLatencyMs": 12279.5
+    "totalTokens": 7002,
+    "totalDurationMs": 81768,
+    "averageLatencyMs": 13628
   },
   "config": {
     "promptMode": "strict",

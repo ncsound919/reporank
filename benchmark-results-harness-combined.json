@@ -2,79 +2,20 @@
   "totalTasks": 6,
   "skippedTasks": 0,
   "aggregate": {
-    "truePositives": 2,
-    "falsePositives": 10,
-    "falseNegatives": 4,
-    "precision": 0.16666666666666666,
-    "recall": 0.3333333333333333,
-    "f1": 0.2222222222222222
+    "truePositives": 5,
+    "falsePositives": 7,
+    "falseNegatives": 1,
+    "precision": 0.4166666666666667,
+    "recall": 0.8333333333333334,
+    "f1": 0.5555555555555556
   },
   "perTask": [
     {
       "id": "sql-injection-express",
       "groundTruthCount": 1,
-      "predictedCount": 3,
-      "truePositives": [
-        {
-          "predicted": {
-            "category": "security",
-            "severity": "critical",
-            "line": 5,
-            "type": "sql-injection",
-            "description": "User input from `req.query.id` is directly concatenated into the SQL query string, making it vulnerable to SQL injection.",
-            "recommendation": "Use parameterized queries. Modify `db.query` to accept placeholders (e.g., `?` or `$1`) and pass `id` as a separate parameter to prevent injection.",
-            "confidence": 0.99
-          },
-          "groundTruth": {
-            "category": "security",
-            "severity": "critical",
-            "line": 5,
-            "type": "sql-injection",
-            "description": "SQL injection vulnerability via raw string interpolation of user input"
-          },
-          "matchScore": 0.9277777777777777
-        }
-      ],
-      "falsePositives": [
-        {
-          "category": "quality",
-          "severity": "high",
-          "line": 7,
-          "type": "no-error-handling",
-          "description": "The `throw err` inside the database query callback will cause the Node.js process to crash if a database error occurs, as it's not caught by Express's error handling middleware.",
-          "recommendation": "Instead of `throw err`, pass the error to Express's `next` function (e.g., `next(err)`) or send an appropriate error response to the client (e.g., `res.status(500).json({ error: 'Database error' })`).",
-          "confidence": 0.9
-        },
-        {
-          "category": "maintainability",
-          "severity": "low",
-          "line": 1,
-          "type": "deep-nesting",
-          "description": "Six or more levels of indentation — readability hit",
-          "recommendation": "Use early returns (guard clauses) or extract nested logic into named functions",
-          "confidence": 0.5
-        }
-      ],
-      "falseNegatives": [],
-      "durationMs": 1,
-      "tokens": 2963,
-      "warnings": []
-    },
-    {
-      "id": "missing-error-handling",
-      "groundTruthCount": 1,
-      "predictedCount": 2,
+      "predictedCount": 1,
       "truePositives": [],
       "falsePositives": [
-        {
-          "category": "quality",
-          "severity": "high",
-          "line": 3,
-          "type": "no-error-handling",
-          "description": "Async route handler for '/data' does not have error handling for the awaited fetchData call.",
-          "recommendation": "Wrap the await fetchData() call in a try/catch block to gracefully handle errors and send an appropriate error response (e.g., res.status(500).json({ error: 'Failed to fetch data' })).",
-          "confidence": 0.95
-        },
         {
           "category": "maintainability",
           "severity": "low",
@@ -87,16 +28,61 @@
       ],
       "falseNegatives": [
         {
-          "category": "error-handling",
-          "severity": "high",
-          "line": 3,
-          "type": "unhandled-rejection",
-          "description": "Async route handler missing try/catch will cause unhandled promise rejection on error"
+          "category": "security",
+          "severity": "critical",
+          "line": 5,
+          "type": "sql-injection",
+          "description": "SQL injection vulnerability via raw string interpolation of user input"
         }
       ],
-      "durationMs": 1,
-      "tokens": 2803,
-      "warnings": []
+      "durationMs": 32,
+      "tokens": 0,
+      "warnings": [
+        "chunk 0: LLM call failed — Invalid or missing API key"
+      ]
+    },
+    {
+      "id": "missing-error-handling",
+      "groundTruthCount": 1,
+      "predictedCount": 2,
+      "truePositives": [
+        {
+          "predicted": {
+            "category": "quality",
+            "severity": "high",
+            "line": 4,
+            "type": "no-error-handling",
+            "description": "await used without try/catch — unhandled rejection will crash the process",
+            "recommendation": "Wrap awaits in try/catch, log the error, and handle failures gracefully",
+            "confidence": 0.6
+          },
+          "groundTruth": {
+            "category": "quality",
+            "severity": "high",
+            "line": 3,
+            "type": "no-error-handling",
+            "description": "Async function without try/catch — unhandled promise rejection crashes process"
+          },
+          "matchScore": 0.8400000000000001
+        }
+      ],
+      "falsePositives": [
+        {
+          "category": "maintainability",
+          "severity": "low",
+          "line": 1,
+          "type": "deep-nesting",
+          "description": "Six or more levels of indentation — readability hit",
+          "recommendation": "Use early returns (guard clauses) or extract nested logic into named functions",
+          "confidence": 0.5
+        }
+      ],
+      "falseNegatives": [],
+      "durationMs": 34,
+      "tokens": 0,
+      "warnings": [
+        "chunk 0: LLM call failed — Invalid or missing API key"
+      ]
     },
     {
       "id": "hardcoded-secret",
@@ -106,12 +92,12 @@
         {
           "predicted": {
             "category": "security",
-            "severity": "critical",
+            "severity": "high",
             "line": 2,
             "type": "hardcoded-secret",
-            "description": "API key is hardcoded directly in the source file.",
-            "recommendation": "Store API keys in environment variables, a secrets manager (e.g., AWS Secrets Manager, Azure Key Vault), or a secure configuration system, and load them at runtime.",
-            "confidence": 1
+            "description": "Hardcoded API key or credential detected in source",
+            "recommendation": "Move secrets to environment variables; rotate the exposed credential immediately",
+            "confidence": 0.98
           },
           "groundTruth": {
             "category": "security",
@@ -120,7 +106,7 @@
             "type": "hardcoded-secret",
             "description": "Hardcoded API secret key in source code"
           },
-          "matchScore": 0.9444444444444443
+          "matchScore": 0.95
         }
       ],
       "falsePositives": [
@@ -135,25 +121,38 @@
         }
       ],
       "falseNegatives": [],
-      "durationMs": 1,
-      "tokens": 2730,
-      "warnings": []
+      "durationMs": 27,
+      "tokens": 0,
+      "warnings": [
+        "chunk 0: LLM call failed — Invalid or missing API key"
+      ]
     },
     {
       "id": "eval-usage",
       "groundTruthCount": 1,
       "predictedCount": 2,
-      "truePositives": [],
-      "falsePositives": [
+      "truePositives": [
         {
-          "category": "security",
-          "severity": "critical",
-          "line": 2,
-          "type": "code-injection",
-          "description": "eval() executes arbitrary code from a string",
-          "recommendation": "Replace with a safe parser; if dynamic evaluation is required, use a sandboxed VM",
-          "confidence": 0.99
-        },
+          "predicted": {
+            "category": "security",
+            "severity": "critical",
+            "line": 2,
+            "type": "code-injection",
+            "description": "eval() executes arbitrary code from a string",
+            "recommendation": "Replace with a safe parser; if dynamic evaluation is required, use a sandboxed VM",
+            "confidence": 0.99
+          },
+          "groundTruth": {
+            "category": "security",
+            "severity": "critical",
+            "line": 2,
+            "type": "code-injection",
+            "description": "eval() allows arbitrary code execution from untrusted input"
+          },
+          "matchScore": 0.94
+        }
+      ],
+      "falsePositives": [
         {
           "category": "maintainability",
           "severity": "low",
@@ -164,24 +163,38 @@
           "confidence": 0.5
         }
       ],
-      "falseNegatives": [
-        {
-          "category": "security",
-          "severity": "critical",
-          "line": 2,
-          "type": "eval-usage",
-          "description": "eval() allows arbitrary code execution from untrusted input"
-        }
-      ],
-      "durationMs": 1,
-      "tokens": 2781,
-      "warnings": []
+      "falseNegatives": [],
+      "durationMs": 37,
+      "tokens": 0,
+      "warnings": [
+        "chunk 0: LLM call failed — Invalid or missing API key"
+      ]
     },
     {
       "id": "memory-leak-interval",
       "groundTruthCount": 1,
-      "predictedCount": 2,
-      "truePositives": [],
+      "predictedCount": 3,
+      "truePositives": [
+        {
+          "predicted": {
+            "category": "quality",
+            "severity": "high",
+            "line": 4,
+            "type": "resource-leak",
+            "description": "setInterval used without clearInterval — memory leak if component unmounts",
+            "recommendation": "Store the interval ID and call clearInterval() in a cleanup function",
+            "confidence": 0.7
+          },
+          "groundTruth": {
+            "category": "quality",
+            "severity": "high",
+            "line": 5,
+            "type": "resource-leak",
+            "description": "setInterval in useEffect without clearInterval causes memory leak"
+          },
+          "matchScore": 0.8500000000000001
+        }
+      ],
       "falsePositives": [
         {
           "category": "quality",
@@ -202,16 +215,8 @@
           "confidence": 0.5
         }
       ],
-      "falseNegatives": [
-        {
-          "category": "memory",
-          "severity": "high",
-          "line": 5,
-          "type": "missing-cleanup",
-          "description": "setInterval in useEffect without clearInterval causes memory leak"
-        }
-      ],
-      "durationMs": 35,
+      "falseNegatives": [],
+      "durationMs": 25,
       "tokens": 0,
       "warnings": [
         "chunk 0: LLM call failed — Invalid or missing API key"
@@ -220,8 +225,28 @@
     {
       "id": "xss-vulnerability",
       "groundTruthCount": 1,
-      "predictedCount": 1,
-      "truePositives": [],
+      "predictedCount": 2,
+      "truePositives": [
+        {
+          "predicted": {
+            "category": "security",
+            "severity": "critical",
+            "line": 5,
+            "type": "xss",
+            "description": "dangerouslySetInnerHTML used — unsanitized content enables XSS",
+            "recommendation": "Use a sanitizer like DOMPurify, or prefer React's built-in JSX rendering which auto-escapes",
+            "confidence": 0.85
+          },
+          "groundTruth": {
+            "category": "security",
+            "severity": "critical",
+            "line": 5,
+            "type": "xss",
+            "description": "dangerouslySetInnerHTML with unsanitized content enables XSS attacks"
+          },
+          "matchScore": 0.9624999999999999
+        }
+      ],
       "falsePositives": [
         {
           "category": "maintainability",
@@ -233,16 +258,8 @@
           "confidence": 0.5
         }
       ],
-      "falseNegatives": [
-        {
-          "category": "security",
-          "severity": "critical",
-          "line": 5,
-          "type": "dangerouslySetInnerHTML",
-          "description": "dangerouslySetInnerHTML with unsanitized content enables XSS attacks"
-        }
-      ],
-      "durationMs": 35,
+      "falseNegatives": [],
+      "durationMs": 17,
       "tokens": 0,
       "warnings": [
         "chunk 0: LLM call failed — Invalid or missing API key"
@@ -250,61 +267,49 @@
     }
   ],
   "byCategory": {
-    "security": {
-      "precision": 0.6666666666666666,
-      "recall": 0.5,
-      "f1": 0.5714285714285715,
-      "support": 4
-    },
-    "quality": {
-      "precision": 0,
-      "recall": 0,
-      "f1": 0,
-      "support": 0
-    },
     "maintainability": {
       "precision": 0,
       "recall": 0,
       "f1": 0,
       "support": 0
     },
-    "error-handling": {
-      "precision": 0,
-      "recall": 0,
-      "f1": 0,
-      "support": 1
+    "security": {
+      "precision": 1,
+      "recall": 0.75,
+      "f1": 0.8571428571428571,
+      "support": 4
     },
-    "memory": {
-      "precision": 0,
-      "recall": 0,
-      "f1": 0,
-      "support": 1
+    "quality": {
+      "precision": 0.6666666666666666,
+      "recall": 1,
+      "f1": 0.8,
+      "support": 2
     }
   },
   "bySeverity": {
-    "critical": {
-      "precision": 0.6666666666666666,
-      "recall": 0.5,
-      "f1": 0.5714285714285715,
-      "support": 4
-    },
-    "high": {
-      "precision": 0,
-      "recall": 0,
-      "f1": 0,
-      "support": 2
-    },
     "low": {
       "precision": 0,
       "recall": 0,
       "f1": 0,
       "support": 0
+    },
+    "critical": {
+      "precision": 1,
+      "recall": 0.75,
+      "f1": 0.8571428571428571,
+      "support": 4
+    },
+    "high": {
+      "precision": 1,
+      "recall": 1,
+      "f1": 1,
+      "support": 2
     }
   },
   "cost": {
-    "totalTokens": 11277,
-    "totalDurationMs": 74,
-    "averageLatencyMs": 12.333333333333334
+    "totalTokens": 0,
+    "totalDurationMs": 172,
+    "averageLatencyMs": 28.666666666666668
   },
   "config": {
     "promptMode": "strict",
