@@ -22,6 +22,7 @@ import { resolve, join, extname, relative, isAbsolute } from "node:path";
 import { heuristicScan } from "./heuristic_scanner";
 import { llmScan, type Finding } from "./review_scanner";
 import { dedupeFindings, capFindings } from "./util/dedupe";
+import { IncrementalCache } from "./util/incremental-cache";
 
 const SOURCE_EXTS = new Set([".ts", ".tsx", ".js", ".jsx", ".py", ".go", ".rs", ".java", ".rb"]);
 const SKIP_DIRS = new Set(["node_modules", ".git", "dist", "build", "coverage", ".next", "target", "vendor", ".aether_prime_cache"]);
@@ -152,12 +153,27 @@ export async function runVerify(opts: VerifyOptions): Promise<{ report: VerifyRe
     });
   }
 
-  // Analyze each file
+  // Analyze each file (with content-hash incremental cache)
+  const cache = new IncrementalCache(".reporank-cache.json");
   const fileReports: FileReport[] = [];
   for (const file of filesToAnalyze) {
+    const cached = cache.get(file);
+    if (cached) {
+      fileReports.push({
+        path: relative(rootForRelative, file).replace(/\\/g, "/"),
+        findings: cached,
+        heuristicFindingCount: cached.length,
+        llmFindingCount: 0,
+        durationMs: 0,
+        errors: [],
+      });
+      continue;
+    }
     const report = await analyzeFile(file, rootForRelative, projectContext, opts);
+    cache.set(file, report.findings);
     fileReports.push(report);
   }
+  cache.flush();
 
   // Aggregate
   const allFindings = fileReports.flatMap((f) => f.findings);
