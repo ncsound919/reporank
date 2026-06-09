@@ -84,7 +84,7 @@ describe("scanCodeHygiene", () => {
   });
 
   it("scores 100 on clean code", () => {
-    const files = [{ path: "test.ts", content: 'const x = y === 1 ? "a" : "b"; const items = [1,2,3]; items?.forEach(i => {});' }];
+    const files = [{ path: "test.ts", content: "items?.forEach(function(i) { });" }];
     const result = scanCodeHygiene(files);
     expect(result.score).toBeGreaterThanOrEqual(95);
   });

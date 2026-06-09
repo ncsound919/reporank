@@ -351,13 +351,16 @@ export function scanCodeHygiene(sourceFiles: { path: string; content: string }[]
   const mediumCount = uniqueFindings.filter(f => f.severity === "medium").length;
   const lowCount = uniqueFindings.filter(f => f.severity === "low").length;
 
-  const score = Math.max(0, 100 - criticalCount * 15 - highCount * 5 - mediumCount * 2 - lowCount * 1);
+  const totalCount = uniqueFindings.length;
+  const totalLines = sourceFiles.reduce((sum, f) => sum + f.content.split('\n').length, 0) || 1;
+  const findingsPer100Lines = (totalCount / totalLines) * 100;
+  const score = Math.round(Math.max(0, Math.min(100, 100 - findingsPer100Lines * 10)));
 
   return {
     findings: uniqueFindings,
-    totalCount: uniqueFindings.length,
+    totalCount,
     categoriesFound: [...categoryCounts],
     score,
-    summary: `${uniqueFindings.length} code hygiene issues: ${criticalCount} critical, ${highCount} high, ${mediumCount} medium, ${lowCount} low. Score: ${score}/100.`,
+    summary: `${totalCount} code hygiene issues: ${criticalCount} critical, ${highCount} high, ${mediumCount} medium, ${lowCount} low. Score: ${score}/100.`,
   };
 }
