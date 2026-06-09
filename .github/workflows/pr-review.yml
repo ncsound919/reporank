@@ -1,0 +1,47 @@
+name: PR Review
+
+on:
+  pull_request:
+    branches: [master]
+
+jobs:
+  reporank-review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.8.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+
+      - run: pnpm install
+
+      - name: Run RepoRank on changed files
+        id: reporank
+        run: |
+          npx tsx apps/cli/src/index.ts verify . \
+            --diff \
+            --gh-markdown \
+            --no-llm \
+            --output reporank-review.md
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Post PR comment via ReviewDog
+        if: always()
+        uses: reviewdog/action-reviewdog@v1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          reporter: github-pr-review
+          level: warning
+          filter_mode: diff_context
+          fail_on_error: false
+          tool_name: reporank
+        env:
+          REVIEWDOG_GITHUB_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
