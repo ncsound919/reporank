@@ -2,16 +2,27 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Transform the Mutly × VibeServe × RepoRank stack from a 5/10 competitive position to 9/10 by replacing weak components with best-in-class tools, organized in 3 tiers from highest-ROI to transformative.
+**Goal:** Close remaining competitive gaps by replacing weak components with best-in-class tools, organized in 3 tiers from highest-ROI to transformative. Each task includes a before/after benchmark snapshot to attribute gains.
 
-**Architecture:** Each tier is a self-contained phase that produces working, measurable improvements. Tier 1 is foundation (no external dependencies). Tier 2 replaces core infrastructure. Tier 3 adds ecosystem integration. Each tier has its own commit and can be deployed independently.
+**Architecture:** Each tier is a self-contained phase that produces working, measurable improvements. Every task begins with a baseline benchmark run and ends with a regression check against that baseline. Tier 3 includes a decision gate: ReviewDog is go, Hono is optional pending evaluation of current backend friction.
 
-**Tech Stack:** Semgrep 12K★ (SAST), Vitest (testing), Hono 20K★ (HTTP server), promptfoo 15K★ (prompt eval), chokidar 11K★ (file watching), ReviewDog 8K★ (PR integration), CrewAI 30K★ (multi-agent).
+**Tech Stack:** Semgrep 12K★ (SAST), Vitest (testing), Hono 20K★ (HTTP server — decision gate), promptfoo 15K★ (prompt eval), ReviewDog 8K★ (PR integration).
 
 **Prerequisites:**
 - RepoRank builds clean (`npx tsc --noEmit -p apps/cli/tsconfig.json` passes)
 - Python 3.12 available for Semgrep integration
 - Node 22+ for Vitest and Hono
+
+## Common Baseline Steps
+
+Every task follows this pattern:
+
+1. **Snapshot baseline:** Run `npx tsx apps/cli/src/index.ts harness --dataset apps/cli/src/__tests__/fixtures/code-review-dataset.json --heuristic-only` and save the output. This captures the F1/precision/recall before the change.
+2. **Implement the change.**
+3. **Regression check:** Re-run the same harness command and compare. Any precision drop is a red flag — investigate before committing.
+4. **Commit with snapshot data.**
+
+These steps are folded into each task below as explicit `[SNR]` (Snapshot) and `[REG]` (Regression) steps.
 
 ---
 
@@ -68,7 +79,14 @@
 
 The heuristic scanner has 22 regex rules with 0 tests. Each pattern is a potential source of false positives. This task adds a test file that validates each pattern against known-good and known-bad inputs.
 
-- [ ] **Step 1: Enable coverage in vitest config**
+- [ ] **Step 1: Snapshot baseline heuristic F1**
+
+```bash
+npx tsx apps/cli/src/index.ts harness --dataset apps/cli/src/__tests__/fixtures/code-review-dataset.json --heuristic-only --output /tmp/baseline-before-tests.json
+cat /tmp/baseline-before-tests.json | node -e "const r=JSON.parse(require('fs').readFileSync('/dev/stdin','utf-8')); console.log('Baseline F1:', (r.aggregate.f1*100).toFixed(1)+'%');"
+```
+
+- [ ] **Step 2: Enable coverage in vitest config**
 
 In `apps/cli/vitest.config.ts`, replace the existing config with:
 
@@ -244,7 +262,15 @@ describe("heuristic_scanner — known dataset entries", () => {
 Run: `npx vitest run apps/cli/src/__tests__/heuristic_scanner.test.ts --reporter=verbose`
 Expected: All tests pass. If any fail, the heuristic scanner has a bug that needs fixing.
 
-- [ ] **Step 4: Run coverage report**
+- [ ] **Step 4: Regression check — verify F1 hasn't changed**
+
+```bash
+npx tsx apps/cli/src/index.ts harness --dataset apps/cli/src/__tests__/fixtures/code-review-dataset.json --heuristic-only --output /tmp/regression-after-tests.json
+diff <(cat /tmp/baseline-before-tests.json | node -e "const r=JSON.parse(require('fs').readFileSync('/dev/stdin','utf-8')); console.log(r.aggregate.f1);") <(echo "0.556")
+```
+Expected: F1 should be 55.6% (unchanged). Tests don't change scanner behavior, only verify it.
+
+- [ ] **Step 5: Run coverage report**
 
 Run: `npx vitest run apps/cli/src/__tests__/heuristic_scanner.test.ts --coverage`
 Expected: 100% line coverage on `heuristic_scanner.ts`
@@ -1059,7 +1085,21 @@ git commit -m "feat(reviewdog): integrate automated PR review comments via Revie
 
 ---
 
-### Task 3.2: Add Hono-based HTTP server (TypeScript-native bridge)
+### Task 3.2: Add Hono-based HTTP server (TypeScript-native bridge) — DECISION GATE
+
+**⚠️ GATE:** Do this only after:
+- ReviewDog (3.1) is deployed and working
+- The current Python bridge causes measurable friction (flaky tests, startup failures)
+- At least one team member advocates for the migration
+
+**Decision criteria:**
+- Python bridge has failed N times in the last 7 days (track in issue)
+- Startup latency > 5s is causing CI timeouts
+- A team member explicitly requests it for maintainability
+
+**If gated OUT:** Skip this task. The Python bridge is functional for all current use cases.
+
+**If gated IN:** Implement as follows.
 
 **Files:**
 - Create: `apps/cli/src/server/index.ts`
@@ -1176,11 +1216,15 @@ git commit -m "feat(server): add Hono-based HTTP server for Mutly-specific endpo
 
 **Total:** ~14-20 hours of work across 3 tiers
 
-**Competitive position projection:**
+## Competitive Position Projections (Goal Ranges)
 
-| Phase | Heuristic F1 | LLM F1 | Test Coverage | Competitive vs Cursor/Antigravity |
-|-------|--------------|--------|---------------|----------------------------------|
-| Current | 55.6% | 72.7% (DeepSeek) | 0% | Within 3-5 pts of Antigravity |
-| After Tier 1 | 70%+ | 75%+ | 80%+ heuristic | Within 2 pts of Antigravity |
-| After Tier 2 | 70%+ | 78%+ (with prompt optimization) | 80%+ | At or above Antigravity |
-| After Tier 3 | 75%+ | 80%+ | 85%+ | Surpass Antigravity + better PR workflow |
+These are targets, not guarantees. Actual results depend on Semgrep rule fit and dataset coverage.
+
+| Phase | Heuristic F1 Target | LLM F1 Target | Test Coverage Target | Position vs Antigravity (76.2%) |
+|-------|--------------|--------|----------|----------------------------------|
+| **Current (measured)** | 55.6% | 72.7% (DeepSeek) | 0% | 3-5 pts behind |
+| **After Tier 1** | 60-75% | 72-78% | 80%+ heuristic | Within 0-4 pts |
+| **After Tier 2** | 60-75% | 74-80% (with prompt tuning) | 80%+ | Potential parity |
+| **After Tier 3** | 60-80% | 75-82% | 85%+ | Potential surpass + workflow wins |
+
+All projections will be updated with real numbers after each task's regression check.
