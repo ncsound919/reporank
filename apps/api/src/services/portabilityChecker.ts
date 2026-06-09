@@ -30,10 +30,30 @@ export function checkPortability(
   // 1. Secrets externalized
   const hasEnvExample = fileTree.some(f => f.includes(".env.example") || f.includes(".env.sample"));
   const hasEnvActual = fileTree.some(f => f === ".env" || f.endsWith("/.env"));
-  const hardcodedSecretPattern = /(?:api_key|apikey|secret|password|token)\s*=\s*['"][^'"]{8,}['"]/i;
-  const hasHardcodedSecrets = sourceFiles.slice(0, 150).some(sf =>
-    !sf.path.includes(".env") && hardcodedSecretPattern.test(sf.content)
-  );
+  const hardcodedSecretPattern = /(?:api[_-]?key|apikey|secret[_-]?key|password|token|auth[_-]?token|bearer)\s*[:=]\s*["'`][^"'`\s]{8,}["'`]/i;
+  
+  // Scan ALL files up to a total content budget (5MB), skip obviously safe files
+  const MAX_CONTENT_BYTES = 5 * 1024 * 1024; // 5MB
+  const SKIP_EXTENSIONS = /\.(png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot|mp4|zip|lock)$/i;
+  const SKIP_PATHS = /(node_modules|\.git|dist|build|\.next)\//;
+  
+  let bytesScanned = 0;
+  let secretsFound = false;
+
+  for (const sf of sourceFiles) {
+    if (SKIP_EXTENSIONS.test(sf.path) || SKIP_PATHS.test(sf.path)) continue;
+    if (sf.path.includes(".env") && !sf.path.includes(".env.example")) continue;
+
+    bytesScanned += sf.content.length;
+    if (bytesScanned > MAX_CONTENT_BYTES) break;
+
+    if (hardcodedSecretPattern.test(sf.content)) {
+      secretsFound = true;
+      break;
+    }
+  }
+
+  const hasHardcodedSecrets = secretsFound;
   const secretsExternalized = hasEnvExample && !hasHardcodedSecrets;
   issues.push({
     check: "Secrets externalized",

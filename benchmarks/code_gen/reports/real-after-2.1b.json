@@ -1,0 +1,179 @@
+{
+  "total": 6,
+  "passed": 4,
+  "passRate": 0.6666666666666666,
+  "results": [
+    {
+      "taskId": "counter-component",
+      "passed": false,
+      "durationMs": 10314,
+      "files": [
+        {
+          "path": "index.tsx",
+          "content": "import React, { useState } from 'react';\nimport styles from './Counter.module.css';\n\nconst Counter: React.FC = () => {\n  const [count, setCount] = useState(0);\n\n  const increment = () => {\n    setCount(count + 1);\n  };\n\n  const decrement = () => {\n    setCount(count - 1);\n  };\n\n  const reset = () => {\n    setCount(0);\n  };\n\n  return (\n    <div className={styles.container}>\n      <p className={styles.count}>{count}</p>\n      <div className={styles.buttons}>\n        <button className={styles.button} onClick={increment}>Increment</button>\n        <button className={styles.button} onClick={decrement}>Decrement</button>\n        <button className={styles.button} onClick={reset}>Reset</button>\n      </div>\n    </div>\n  );\n};\n\nexport default Counter;",
+          "language": "tsx"
+        },
+        {
+          "path": "Counter.module.css",
+          "content": ".container {\n  text-align: center;\n  padding: 20px;\n  border: 1px solid #ccc;\n  border-radius: 5px;\n}\n\n.count {\n  font-size: 2em;\n  margin-bottom: 10px;\n}\n\n.buttons {\n  display: flex;\n  justify-content: center;\n  gap: 10px;\n}\n\n.button {\n  padding: 10px 20px;\n  background-color: #007bff;\n  color: white;\n  border: none;\n  border-radius: 5px;\n  cursor: pointer;\n}\n\n.button:hover {\n  background-color: #0056b3;\n}",
+          "language": "css"
+        }
+      ],
+      "checks": {
+        "validSyntax": true,
+        "hasExport": true,
+        "typedProperly": false,
+        "errorHandling": true,
+        "requiredKeywords": true,
+        "bannedKeywords": true,
+        "requiredNames": true
+      },
+      "errors": [],
+      "llmTokens": 518
+    },
+    {
+      "taskId": "login-form",
+      "passed": false,
+      "durationMs": 25395,
+      "files": [],
+      "checks": {
+        "validSyntax": true,
+        "hasExport": false,
+        "typedProperly": false,
+        "errorHandling": true,
+        "requiredKeywords": false,
+        "bannedKeywords": true,
+        "requiredNames": false
+      },
+      "errors": [
+        "LLM call (attempt 1): Bad escaped character in JSON at position 642 (line 3 column 616)",
+        "LLM call (attempt 2): Bad escaped character in JSON at position 1300 (line 5 column 1245)"
+      ],
+      "llmTokens": 1572
+    },
+    {
+      "taskId": "data-fetcher-hook",
+      "passed": true,
+      "durationMs": 10635,
+      "files": [
+        {
+          "path": "index.tsx",
+          "content": "import { useState, useEffect, useRef, useCallback } from 'react';\n\n/**\n * Custom React hook for fetching data from a URL.\n * @param url The URL to fetch data from.\n * @returns An object containing the data, loading state, and error state.\n */\nexport function useFetch<T>(url: string | null): { data: T | undefined; loading: boolean; error: Error | undefined } {\n  const [data, setData] = useState<T | undefined>(undefined);\n  const [loading, setLoading] = useState<boolean>(false);\n  const [error, setError] = useState<Error | undefined>(undefined);\n  const abortControllerRef = useRef<AbortController | null>(null);\n\n  const fetchData = useCallback(async () => {\n    if (!url) return;\n\n    abortControllerRef.current = new AbortController();\n    const signal = abortControllerRef.current.signal;\n\n    setLoading(true);\n    setError(undefined);\n\n    try {\n      const response = await fetch(url, { signal });\n\n      if (!response.ok) {\n        throw new Error(`HTTP error! Status: ${response.status}`);\n      }\n\n      const jsonData: T = await response.json();\n      setData(jsonData);\n    } catch (e: any) {\n      if (e.name === 'AbortError') {\n        // Request was aborted, which is expected on unmount\n        console.log('Fetch aborted');\n      } else {\n        setError(e instanceof Error ? e : new Error(String(e)));\n      }\n    } finally {\n      setLoading(false);\n    }\n  }, [url, useCallback]);\n\n  useEffect(() => {\n    if (url) {\n      fetchData();\n    }\n\n    return () => {\n      if (abortControllerRef.current) {\n        abortControllerRef.current.abort();\n      }\n    };\n  }, [url, fetchData]);\n\n  return { data, loading, error };\n}",
+          "language": "tsx"
+        }
+      ],
+      "checks": {
+        "validSyntax": true,
+        "hasExport": true,
+        "typedProperly": true,
+        "errorHandling": true,
+        "requiredKeywords": true,
+        "bannedKeywords": true,
+        "requiredNames": true
+      },
+      "errors": [],
+      "llmTokens": 628
+    },
+    {
+      "taskId": "todo-manager",
+      "passed": true,
+      "durationMs": 19211,
+      "files": [
+        {
+          "path": "index.tsx",
+          "content": "import React, { useReducer } from 'react';\nimport './App.css';\n\ninterface Todo {\n  id: number;\n  text: string;\n  completed: boolean;\n}\n\ninterface State {\n  todos: Todo[];\n  filter: 'all' | 'active' | 'completed';\n}\n\nconst todoReducer = (state: State, action: {\n  type: string;\n  payload?: any;\n}) => {\n  switch (action.type) {\n    case 'ADD':\n      return {\n        ...state,\n        todos: [...state.todos, { id: Date.now(), text: action.payload, completed: false }],\n        filter: state.filter,\n      };\n    case 'TOGGLE':\n      return {\n        ...state,\n        todos: state.todos.map(todo =>\n          todo.id === action.payload ? { ...todo, completed: !todo.completed } : todo\n        ),\n        filter: state.filter,\n      };\n    case 'DELETE':\n      return {\n        ...state,\n        todos: state.todos.filter(todo => todo.id !== action.payload),\n        filter: state.filter,\n      };\n    case 'SET_FILTER':\n      return {\n        ...state,\n        filter: action.payload,\n      };\n    default:\n      return state;\n  }\n};\n\nconst TodoApp = () => {\n  const initialState: State = {\n    todos: [],\n    filter: 'all',\n  };\n\n  const [state, dispatch] = useReducer(todoReducer, initialState);\n\n  const handleAddTodo = (text: string) => {\n    dispatch({ type: 'ADD', payload: text });\n  };\n\n  const handleToggleTodo = (id: number) => {\n    dispatch({ type: 'TOGGLE', payload: id });\n  };\n\n  const handleDeleteTodo = (id: number) => {\n    dispatch({ type: 'DELETE', payload: id });\n  };\n\n  const handleSetFilter = (filter: 'all' | 'active' | 'completed') => {\n    dispatch({ type: 'SET_FILTER', payload: filter });\n  };\n\n  const visibleTodos = (\n    state.filter === 'active'\n      ? state.todos.filter(todo => !todo.completed)\n      : state.filter === 'completed'\n        ? state.todos.filter(todo => todo.completed)\n        : state.todos\n  );\n\n  return (\n    <div className=\"App\">\n      <h1>Todo App</h1>\n      <input\n        type=\"text\"\n        placeholder=\"Add todo\"\n        onKeyDown={(e) => {\n          if (e.key === 'Enter') {\n            handleAddTodo(e.target.value);\n            e.target.value = '';\n          }\n        }}\n      />\n      <div className=\"filter-buttons\">\n        <button onClick={() => handleSetFilter('all')}>All</button>\n        <button onClick={() => handleSetFilter('active')}>Active</button>\n        <button onClick={() => handleSetFilter('completed')}>Completed</button>\n      </div>\n      <ul>\n        {visibleTodos.map(todo => (\n          <li key={todo.id}>\n            <input\n              type=\"checkbox\"\n              checked={todo.completed}\n              onChange={() => handleToggleTodo(todo.id)}\n            />\n            <span className={todo.completed ? 'completed' : ''}>{todo.text}</span>\n            <button onClick={() => handleDeleteTodo(todo.id)}>Delete</button>\n          </li>\n        ))}\n      </ul>\n    </div>\n  );\n};\n\nexport default TodoApp;",
+          "language": "tsx"
+        }
+      ],
+      "checks": {
+        "validSyntax": true,
+        "hasExport": true,
+        "typedProperly": true,
+        "errorHandling": true,
+        "requiredKeywords": true,
+        "bannedKeywords": true,
+        "requiredNames": true
+      },
+      "errors": [],
+      "llmTokens": 951
+    },
+    {
+      "taskId": "api-middleware",
+      "passed": true,
+      "durationMs": 7123,
+      "files": [
+        {
+          "path": "index.tsx",
+          "content": "import { Request, Response, NextFunction } from 'express';\n\n// In a real-world scenario, this would likely come from a database or configuration.\nconst validApiKeys = ['my-super-secret-api-key', 'another-valid-key'];\n\n/**\n * Middleware to validate an API key from the Authorization header.\n */\nexport const authMiddleware = (req: Request, res: Response, next: NextFunction): void => {\n  const authHeader = req.headers[\"Authorization\"];\n\n  if (!authHeader) {\n    return res.status(401).json({\n      error: \"Authorization header missing\",\n    });\n  }\n\n  if (!authHeader.startsWith('Bearer ')) {\n    return res.status(401).json({\n      error: \"Invalid authorization header format.  Expected 'Bearer <API_KEY>'\",\n    });\n  }\n\n  const apiKey = authHeader.substring('Bearer '.length);\n\n  if (!validApiKeys.includes(apiKey)) {\n    return res.status(401).json({\n      error: \"Invalid API key\",\n    });\n  }\n\n  // API key is valid, proceed to the next middleware or route handler\n  next();\n};\n",
+          "language": "tsx"
+        }
+      ],
+      "checks": {
+        "validSyntax": true,
+        "hasExport": true,
+        "typedProperly": true,
+        "errorHandling": true,
+        "requiredKeywords": true,
+        "bannedKeywords": true,
+        "requiredNames": true
+      },
+      "errors": [],
+      "llmTokens": 470
+    },
+    {
+      "taskId": "debounce-function",
+      "passed": true,
+      "durationMs": 10169,
+      "files": [
+        {
+          "path": "index.tsx",
+          "content": "import { setTimeout, clearTimeout } from 'timers/promises';\n\ninterface DebounceOptions<T extends unknown[]> {\n  leading?: boolean;\n  trailing?: boolean;\n  wait?: number;\n}\n\ninterface DebouncedFunction<T extends unknown[]> {\n  (...args: T):\n    void;\n  cancel(): void;\n}\n\n/**\n * Creates a debounced function that delays invoking a function until after\n * `wait` milliseconds have elapsed since the last time the debounced function was invoked.\n *\n * @param func The function to debounce.\n * @param wait The time in milliseconds to wait before invoking the function.\n * @param options Optional configuration object.\n * @returns A debounced version of the function with a `cancel()` method.\n */\nexport function debounce<T extends unknown[]>(func: (...args: T) => void, wait: number, options: DebounceOptions<T> = {}): DebouncedFunction<T> {\n  let timeout: NodeJS.Timeout | null = null;\n  let lastArgs: T | null = null;\n  let lastThis: any = null;\n\n  const debounced = function (this: any, ...args: T) {\n    lastArgs = args;\n    lastThis = this;\n\n    if (options.leading && !timeout) {\n      func.apply(this, args);\n    }\n\n    if (timeout) {\n      clearTimeout(timeout);\n    }\n\n    timeout = setTimeout(() => {\n      timeout = null;\n      if (options.trailing && lastArgs) {\n        func.apply(lastThis, lastArgs);\n      }\n    }, wait);\n  } as DebouncedFunction<T>;\n\n  debounced.cancel = function () {\n    if (timeout) {\n      clearTimeout(timeout);\n      timeout = null;\n    }\n    lastArgs = null;\n    lastThis = null;\n  };\n\n  return debounced;\n}\n",
+          "language": "tsx"
+        }
+      ],
+      "checks": {
+        "validSyntax": true,
+        "hasExport": true,
+        "typedProperly": true,
+        "errorHandling": true,
+        "requiredKeywords": true,
+        "bannedKeywords": true,
+        "requiredNames": true
+      },
+      "errors": [],
+      "llmTokens": 598
+    }
+  ],
+  "aggregateChecks": {
+    "validSyntax": {
+      "passed": 6,
+      "total": 6
+    },
+    "hasExport": {
+      "passed": 5,
+      "total": 6
+    },
+    "typedProperly": {
+      "passed": 4,
+      "total": 6
+    },
+    "errorHandling": {
+      "passed": 6,
+      "total": 6
+    },
+    "requiredKeywords": {
+      "passed": 5,
+      "total": 6
+    },
+    "bannedKeywords": {
+      "passed": 6,
+      "total": 6
+    },
+    "requiredNames": {
+      "passed": 5,
+      "total": 6
+    }
+  },
+  "totalTokens": 4737,
+  "totalDurationMs": 82847
+}

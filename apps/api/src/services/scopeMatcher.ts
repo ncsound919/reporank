@@ -40,6 +40,8 @@ interface ScopeMatchInput {
   };
   report: Record<string, unknown> | null;
   fileTree: string[];
+  /** Optional: supply source file contents for deeper checks (e.g. dep-count analysis) */
+  sourceFiles?: { path: string; content: string }[];
   builderMetadata?: Record<string, unknown> | null;
 }
 
@@ -119,7 +121,7 @@ function detectOutOfScopeFeatures(
 }
 
 export function runScopeMatcher(input: ScopeMatchInput): ScopeMatchResult {
-  const { brief, report, fileTree } = input;
+  const { brief, report, fileTree, sourceFiles } = input;
   const safeReport = report || {};
 
   const inScope: string[] = [];
@@ -146,17 +148,37 @@ export function runScopeMatcher(input: ScopeMatchInput): ScopeMatchResult {
   if (outOfScope.length > 0) driftCategories.push("feature-creep");
   if (missingPlanned.length > 2) driftCategories.push("missing-planned");
 
-  // Dependency creep: check for large dep counts not mentioned in constraints
-  const pkgFile = fileTree.filter(f => f === "package.json" || f.endsWith("/package.json"));
-  if (pkgFile.length > 0 && brief.constraints.join(" ").length < 50) {
-    driftCategories.push("dependency-creep");
+  // Dependency creep: read package.json content from sourceFiles (not fileTree) to count real deps.
+  // Only flag when dep count is anomalously high (>80) AND constraints don't mention deps.
+  if (sourceFiles && sourceFiles.length > 0) {
+    const pkgSource = sourceFiles.find(
+      f => f.path === "package.json" || f.path.endsWith("/package.json")
+    );
+    if (pkgSource) {
+      try {
+        const pkg = JSON.parse(pkgSource.content) as Record<string, unknown>;
+        const depCount =
+          Object.keys((pkg.dependencies as Record<string, unknown>) ?? {}).length +
+          Object.keys((pkg.devDependencies as Record<string, unknown>) ?? {}).length;
+        const hasConstraintOnDeps = brief.constraints.some(c =>
+          /dep|librar|package|bundle|size/i.test(c)
+        );
+        if (depCount > 80 && !hasConstraintOnDeps) {
+          driftCategories.push("dependency-creep");
+        }
+      } catch {
+        // Invalid package.json — skip silently
+      }
+    }
   }
 
   // Intent gap analysis
   const intentGaps: IntentGap[] = [];
   if (brief.intentDocument && typeof brief.intentDocument === "object") {
     const intent = brief.intentDocument as Record<string, unknown>;
-    const promisedFeatures = Array.isArray(intent.promisedFeatures) ? intent.promisedFeatures as string[] : [];
+    const promisedFeatures = Array.isArray(intent.promisedFeatures)
+      ? (intent.promisedFeatures as string[])
+      : [];
     for (const feature of promisedFeatures) {
       const evidenced = matchDeliverable(feature, fileTree, safeReport);
       intentGaps.push({
@@ -169,16 +191,16 @@ export function runScopeMatcher(input: ScopeMatchInput): ScopeMatchResult {
     }
   }
 
-  // Determine status
+  // Determine status — check "blocked" first (nothing evidenced at all), then more specific states.
+  // The blocked check must come before drifting/at-risk or it is unreachable.
   let status: DriftStatus;
-  if (missingPlanned.length === 0 && outOfScope.length === 0) {
+  if (missingPlanned.length > 0 && inScope.length === 0 && uncertain.length === 0) {
+    // Nothing at all matches — completely blocked
+    status = "blocked";
+  } else if (missingPlanned.length === 0 && outOfScope.length === 0) {
     status = "on-scope";
-  } else if (outOfScope.length === 0 && missingPlanned.length <= 2) {
-    status = "at-risk";
   } else if (outOfScope.length > 2 || missingPlanned.length > 3) {
     status = "drifting";
-  } else if (missingPlanned.length > 0 && inScope.length === 0) {
-    status = "blocked";
   } else {
     status = "at-risk";
   }

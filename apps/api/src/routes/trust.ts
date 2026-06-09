@@ -3,7 +3,7 @@ import { z } from "zod";
 import { calculateTrustScore } from "@reporank/grading-engine";
 import { prisma } from "../db/client";
 import { authMiddleware, AuthRequest } from "../middleware/auth";
-import { AppError } from "../middleware/errorHandler";
+import { AppError, ErrorCodes } from "../middleware/errorHandler";
 import { asyncHandler } from "../middleware/asyncHandler";
 import { renderTrustBadge, renderVibeBadge, renderSoftware20Badge } from "../services/badges";
 import { extractScanTrustInputs } from "../services/trustHelper";
@@ -32,7 +32,7 @@ const trustRequestSchema = z.object({
 // POST /api/v1/trust — compute trust score for any repo
 router.post("/", authMiddleware, asyncHandler<AuthRequest>(async (req, res) => {
   const parsed = trustRequestSchema.safeParse(req.body);
-  if (!parsed.success) throw new AppError(400, parsed.error.errors[0].message, "VALIDATION_ERROR");
+  if (!parsed.success) throw new AppError(400, parsed.error.errors[0].message, ErrorCodes.VALIDATION_ERROR);
 
   const trustInput: Parameters<typeof calculateTrustScore>[0] = {
     overallScore: parsed.data.overallScore ?? 0,
@@ -44,7 +44,7 @@ router.post("/", authMiddleware, asyncHandler<AuthRequest>(async (req, res) => {
     const scan = await prisma.scan.findFirst({
       where: { id: parsed.data.scanId, userId: req.userId! },
     });
-    if (!scan) throw new AppError(404, "Scan not found", "NOT_FOUND");
+    if (!scan) throw new AppError(404, "Scan not found", ErrorCodes.NOT_FOUND);
     const extracted = extractScanTrustInputs(scan);
     // Only override what the caller didn't supply
     trustInput.overallScore = parsed.data.overallScore ?? extracted.overallScore;

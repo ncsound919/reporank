@@ -48,9 +48,10 @@ export const config = {
    },
 
   redis: {
-    url: process.env.REDIS_URL || "redis://localhost:6379",
+    url: process.env.REDIS_URL!,
   },
 
   deepScan: process.env.DEEP_SCAN === "true",
   logLevel: process.env.LOG_LEVEL || "info",
+  mutlyApiKey: process.env.MUTLY_API_KEY || "",
 };

@@ -2,6 +2,7 @@ import { Router } from "express";
 import jwt from "jsonwebtoken";
 import { prisma } from "../db/client";
 import { config } from "../config";
+import { logger } from "../logger";
 import { authMiddleware, AuthRequest } from "../middleware/auth";
 
 const router: Router = Router();
@@ -52,7 +53,7 @@ router.post("/github", async (req, res) => {
     const jwtToken = jwt.sign({ userId: user.id }, config.jwt.secret, { expiresIn: config.jwt.expiresIn as any });
     res.json({ data: { token: jwtToken, user: { id: user.id, email: user.email, displayName: user.displayName } } });
   } catch (err) {
-    console.error("GitHub OAuth error:", err);
+    logger.error(err, "GitHub OAuth error");
     return res.status(502).json({ error: "GitHub API unavailable" });
   }
 });

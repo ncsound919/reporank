@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 import { config } from "../config";
-import { AppError } from "./errorHandler";
+import { AppError, ErrorCodes } from "./errorHandler";
 import { prisma } from "../db/client";
 import crypto from "node:crypto";
 

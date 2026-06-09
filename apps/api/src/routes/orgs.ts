@@ -2,7 +2,7 @@ import { Router } from "express";
 import type { Router as ExpressRouter } from "express";
 import { prisma } from "../db/client";
 import { authMiddleware, orgAccessMiddleware, AuthRequest } from "../middleware/auth";
-import { AppError } from "../middleware/errorHandler";
+import { AppError, ErrorCodes } from "../middleware/errorHandler";
 import crypto from "node:crypto";
 import { z } from "zod";
 
@@ -15,7 +15,7 @@ const router: ExpressRouter = Router();
 
 router.post("/", authMiddleware, async (req: AuthRequest, res) => {
   const parsed = createOrgSchema.safeParse(req.body);
-  if (!parsed.success) throw new AppError(400, parsed.error.errors[0].message, "VALIDATION_ERROR");
+  if (!parsed.success) throw new AppError(400, parsed.error.errors[0].message, ErrorCodes.VALIDATION_ERROR);
 
   const { name, slug } = parsed.data;
   try {
@@ -56,7 +56,7 @@ router.post("/:id/api-keys", authMiddleware, async (req: AuthRequest, res) => {
   const membership = await prisma.orgMember.findUnique({
     where: { orgId_userId: { orgId: req.params.id, userId: req.userId! } },
   });
-  if (!membership) throw new AppError(403, "Not a member of this organization", "FORBIDDEN");
+  if (!membership) throw new AppError(403, "Not a member of this organization", ErrorCodes.FORBIDDEN);
 
   const key = `gr_${crypto.randomBytes(32).toString("hex")}`;
   const keyHash = crypto.createHash("sha256").update(key).digest("hex");

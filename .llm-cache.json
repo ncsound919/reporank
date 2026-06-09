@@ -1,0 +1,72 @@
+{
+  "version": 1,
+  "entries": {
+    "2ef67bcb67d716d29f9cdfa466256d233c5788bc5824e4fb445be187c42fce8a": {
+      "promptHash": "2ef67bcb67d716d29f9cdfa466256d233c5788bc5824e4fb445be187c42fce8a",
+      "content": "1\n2\n3\n4\n5\n",
+      "provider": "OllamaCloud",
+      "model": "gemma3:12b",
+      "usage": {
+        "prompt_tokens": 9,
+        "completion_tokens": 2,
+        "total_tokens": 11
+      },
+      "latencyMs": 1800.6,
+      "timestamp": 1781000382543
+    },
+    "aff203e1f0bf126594279ad8f79739c489a9893d377de011b19fb7473a2cd667": {
+      "promptHash": "aff203e1f0bf126594279ad8f79739c489a9893d377de011b19fb7473a2cd667",
+      "content": "{\n  \"reasoning\": \"The code directly interpolates user input into an SQL query, leading to a critical SQL injection vulnerability. Additionally, the error handling for the database query is insufficient, potentially crashing the application.\",\n  \"findings\": [\n    {\n      \"category\": \"security\",\n      \"severity\": \"critical\",\n      \"line\": 5,\n      \"type\": \"sql-injection\",\n      \"description\": \"User input from `req.query.id` is directly concatenated into the SQL query string, making it vulnerable to SQL injection.\",\n      \"recommendation\": \"Use parameterized queries. Modify `db.query` to accept placeholders (e.g., `?` or `$1`) and pass `id` as a separate parameter to prevent injection.\",\n      \"confidence\": 0.99\n    },\n    {\n      \"category\": \"quality\",\n      \"severity\": \"high\",\n      \"line\": 7,\n      \"type\": \"no-error-handling\",\n      \"description\": \"The `throw err` inside the database query callback will cause the Node.js process to crash if a database error occurs, as it's not caught by Express's error handling middleware.\",\n      \"recommendation\": \"Instead of `throw err`, pass the error to Express's `next` function (e.g., `next(err)`) or send an appropriate error response to the client (e.g., `res.status(500).json({ error: 'Database error' })`).\",\n      \"confidence\": 0.9\n    }\n  ]\n}",
+      "provider": "Gemini",
+      "model": "default",
+      "usage": {
+        "prompt_tokens": 2637,
+        "completion_tokens": 326,
+        "total_tokens": 2963
+      },
+      "latencyMs": 9024.6,
+      "timestamp": 1781020627733
+    },
+    "004bdda5efc17c7d4cf9ced68b51a9a25ac9ea35bc99f52035f9c77b05f34673": {
+      "promptHash": "004bdda5efc17c7d4cf9ced68b51a9a25ac9ea35bc99f52035f9c77b05f34673",
+      "content": "{\n  \"reasoning\": \"The async route handler lacks a try/catch block around the awaited fetchData call, meaning any error during data fetching will result in an unhandled promise rejection, potentially crashing the application instead of sending an appropriate error response to the client.\",\n  \"findings\": [\n    {\n      \"category\": \"quality\",\n      \"severity\": \"high\",\n      \"line\": 3,\n      \"type\": \"no-error-handling\",\n      \"description\": \"Async route handler for '/data' does not have error handling for the awaited fetchData call.\",\n      \"recommendation\": \"Wrap the await fetchData() call in a try/catch block to gracefully handle errors and send an appropriate error response (e.g., res.status(500).json({ error: 'Failed to fetch data' })).\",\n      \"confidence\": 0.95\n    }\n  ]\n}",
+      "provider": "Gemini",
+      "model": "default",
+      "usage": {
+        "prompt_tokens": 2607,
+        "completion_tokens": 196,
+        "total_tokens": 2803
+      },
+      "latencyMs": 14743.4,
+      "timestamp": 1781020633837
+    },
+    "e2d36991019fd7caddfdcb5e34ce6136db2d6e4910bf7c3db57009db3576a636": {
+      "promptHash": "e2d36991019fd7caddfdcb5e34ce6136db2d6e4910bf7c3db57009db3576a636",
+      "content": "{\n  \"reasoning\": \"The API key is hardcoded directly in the source file, which is a significant security risk.\",\n  \"findings\": [\n    {\n      \"category\": \"security\",\n      \"severity\": \"critical\",\n      \"line\": 2,\n      \"type\": \"hardcoded-secret\",\n      \"description\": \"API key is hardcoded directly in the source file.\",\n      \"recommendation\": \"Store API keys in environment variables, a secrets manager (e.g., AWS Secrets Manager, Azure Key Vault), or a secure configuration system, and load them at runtime.\",\n      \"confidence\": 1.0\n    }\n  ]\n}",
+      "provider": "Gemini",
+      "model": "default",
+      "usage": {
+        "prompt_tokens": 2594,
+        "completion_tokens": 136,
+        "total_tokens": 2730
+      },
+      "latencyMs": 3640.5,
+      "timestamp": 1781020631384
+    },
+    "bac9f80d7da190c6e8d861209a0b8b9ab4a5c6115887d4cb6ea6a79f4e69ceec": {
+      "promptHash": "bac9f80d7da190c6e8d861209a0b8b9ab4a5c6115887d4cb6ea6a79f4e69ceec",
+      "content": "{\n  \"reasoning\": \"The use of `eval()` with a dynamic string parameter is a severe security risk, allowing arbitrary code execution if the input is not properly sanitized or comes from an untrusted source.\",\n  \"findings\": [\n    {\n      \"category\": \"security\",\n      \"severity\": \"critical\",\n      \"line\": 2,\n      \"type\": \"code-injection\",\n      \"description\": \"The `eval()` function is used with the `expression` parameter, which can lead to arbitrary code execution if `expression` contains untrusted user input.\",\n      \"recommendation\": \"Avoid using `eval()`. If dynamic expression evaluation is necessary, use a dedicated, secure expression parser library that does not execute arbitrary JavaScript code, or ensure `expression` is strictly controlled and sanitized.\",\n      \"confidence\": 0.99\n    }\n  ]\n}",
+      "provider": "Gemini",
+      "model": "default",
+      "usage": {
+        "prompt_tokens": 2580,
+        "completion_tokens": 201,
+        "total_tokens": 2781
+      },
+      "latencyMs": 12670.2,
+      "timestamp": 1781020644061
+    }
+  },
+  "hits": 6,
+  "misses": 14
+}

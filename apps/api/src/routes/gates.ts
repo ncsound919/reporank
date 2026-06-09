@@ -2,9 +2,10 @@ import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../db/client";
 import { authMiddleware, AuthRequest } from "../middleware/auth";
-import { AppError } from "../middleware/errorHandler";
+import { AppError, ErrorCodes } from "../middleware/errorHandler";
 import { asyncHandler } from "../middleware/asyncHandler";
 import { evaluateGate } from "../services/gatesEngine";
+import { GateStatus, GateStatusValue, ErrorCodes as ConstErrorCodes } from "../constants";
 
 const router: Router = Router();
 
@@ -28,14 +29,14 @@ const patchGateSchema = z.object({
 // POST /api/v1/gates — create a gate on a milestone
 router.post("/", authMiddleware, asyncHandler<AuthRequest>(async (req, res) => {
   const parsed = gateSchema.safeParse(req.body);
-  if (!parsed.success) throw new AppError(400, parsed.error.errors[0].message, "VALIDATION_ERROR");
+  if (!parsed.success) throw new AppError(400, parsed.error.errors[0].message, ErrorCodes.VALIDATION_ERROR);
 
   const milestone = await prisma.milestone.findUnique({
     where: { id: parsed.data.milestoneId },
     include: { brief: { select: { userId: true } } },
   });
-  if (!milestone) throw new AppError(404, "Milestone not found", "NOT_FOUND");
-  if (milestone.brief.userId !== req.userId) throw new AppError(403, "Access denied", "FORBIDDEN");
+  if (!milestone) throw new AppError(404, "Milestone not found", ErrorCodes.NOT_FOUND);
+  if (milestone.brief.userId !== req.userId) throw new AppError(403, "Access denied", ErrorCodes.FORBIDDEN);
 
   const gate = await prisma.acceptanceGate.create({ data: { ...parsed.data } });
   res.status(201).json({ data: gate });
@@ -47,8 +48,8 @@ router.get("/milestone/:milestoneId", authMiddleware, asyncHandler<AuthRequest>(
     where: { id: req.params.milestoneId },
     include: { brief: { select: { userId: true } } },
   });
-  if (!milestone) throw new AppError(404, "Milestone not found", "NOT_FOUND");
-  if (milestone.brief.userId !== req.userId) throw new AppError(403, "Access denied", "FORBIDDEN");
+  if (!milestone) throw new AppError(404, "Milestone not found", ErrorCodes.NOT_FOUND);
+  if (milestone.brief.userId !== req.userId) throw new AppError(403, "Access denied", ErrorCodes.FORBIDDEN);
 
   const gates = await prisma.acceptanceGate.findMany({
     where: { milestoneId: req.params.milestoneId },
@@ -56,7 +57,7 @@ router.get("/milestone/:milestoneId", authMiddleware, asyncHandler<AuthRequest>(
   });
 
   const completionScore = gates.length === 0 ? 0 :
-    Math.round((gates.filter(g => g.status === "passed" || g.status === "overridden").length / gates.length) * 100);
+    Math.round((gates.filter((g: any) => g.status === GateStatus.PASSED || g.status === GateStatus.OVERRIDDEN).length / gates.length) * 100);
 
   res.json({ data: { gates, completionScore } });
 }));
@@ -67,21 +68,22 @@ router.patch("/:id", authMiddleware, asyncHandler<AuthRequest>(async (req, res) 
     where: { id: req.params.id },
     include: { milestone: { include: { brief: { select: { userId: true } } } } },
   });
-  if (!gate) throw new AppError(404, "Gate not found", "NOT_FOUND");
-  if (gate.milestone?.brief.userId !== req.userId) throw new AppError(403, "Access denied", "FORBIDDEN");
+  if (!gate) throw new AppError(404, "Gate not found", ErrorCodes.NOT_FOUND);
+  if (gate.milestone?.brief.userId !== req.userId) throw new AppError(403, "Access denied", ErrorCodes.FORBIDDEN);
 
   const parsed = patchGateSchema.safeParse(req.body);
-  if (!parsed.success) throw new AppError(400, parsed.error.errors[0].message, "VALIDATION_ERROR");
+  if (!parsed.success) throw new AppError(400, parsed.error.errors[0].message, ErrorCodes.VALIDATION_ERROR);
 
-  if (parsed.data.status === "overridden" && !parsed.data.overrideReason) {
-    throw new AppError(400, "Override reason is required", "VALIDATION_ERROR");
+  if (parsed.data.status === GateStatus.OVERRIDDEN && !parsed.data.overrideReason) {
+    throw new AppError(400, "Override reason is required", ConstErrorCodes.VALIDATION_ERROR);
   }
 
+  const isApprovedStatus = parsed.data.status === GateStatus.PASSED || parsed.data.status === GateStatus.OVERRIDDEN;
   const updated = await prisma.acceptanceGate.update({
     where: { id: req.params.id },
     data: {
       ...parsed.data,
-      approvedBy: ["passed", "overridden"].includes(parsed.data.status || "") ? req.userId! : undefined,
+      approvedBy: isApprovedStatus ? req.userId! : undefined,
     },
   });
 
@@ -94,24 +96,24 @@ router.post("/:id/evaluate", authMiddleware, asyncHandler<AuthRequest>(async (re
     where: { id: req.params.id },
     include: { milestone: { include: { brief: { select: { userId: true } } } } },
   });
-  if (!gate) throw new AppError(404, "Gate not found", "NOT_FOUND");
-  if (gate.milestone?.brief.userId !== req.userId) throw new AppError(403, "Access denied", "FORBIDDEN");
+  if (!gate) throw new AppError(404, "Gate not found", ErrorCodes.NOT_FOUND);
+  if (gate.milestone?.brief.userId !== req.userId) throw new AppError(403, "Access denied", ErrorCodes.FORBIDDEN);
 
   const scanId = req.body.scanId as string;
-  if (!scanId) throw new AppError(400, "scanId is required", "VALIDATION_ERROR");
+  if (!scanId) throw new AppError(400, "scanId is required", ErrorCodes.VALIDATION_ERROR);
 
   const scan = await prisma.scan.findFirst({
     where: { id: scanId, userId: req.userId! },
     select: { report: true, clawFindings: true, repoUrl: true },
   });
-  if (!scan) throw new AppError(404, "Scan not found", "NOT_FOUND");
+  if (!scan) throw new AppError(404, "Scan not found", ErrorCodes.NOT_FOUND);
 
   const result = evaluateGate(gate, scan.report as any, scan.clawFindings as any);
 
   const updated = await prisma.acceptanceGate.update({
     where: { id: req.params.id },
     data: {
-      status: result.passed ? "passed" : "failed",
+      status: result.passed ? GateStatus.PASSED : GateStatus.FAILED,
       evidence: result.evidence,
     },
   });

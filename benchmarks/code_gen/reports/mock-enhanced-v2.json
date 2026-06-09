@@ -1,0 +1,167 @@
+{
+  "total": 6,
+  "passed": 5,
+  "passRate": 0.8333333333333334,
+  "results": [
+    {
+      "taskId": "counter-component",
+      "passed": true,
+      "durationMs": 50,
+      "files": [
+        {
+          "path": "Counter.tsx",
+          "content": "import React, { useState } from 'react';\n\ninterface CounterProps {\n  initialValue?: number;\n  min?: number;\n  max?: number;\n}\n\nconst Counter: React.FC<CounterProps> = ({\n  initialValue = 0,\n  min = -Infinity,\n  max = Infinity,\n}) => {\n  const [count, setCount] = useState<number>(initialValue);\n\n  const increment = (): void => {\n    setCount((prev) => Math.min(prev + 1, max));\n  };\n\n  const decrement = (): void => {\n    setCount((prev) => Math.max(prev - 1, min));\n  };\n\n  const reset = (): void => {\n    setCount(initialValue);\n  };\n\n  return (\n    <div className=\"counter\" role=\"group\" aria-label=\"counter controls\">\n      <h2>Count: {count}</h2>\n      <button onClick={increment} aria-label=\"increment\">+</button>\n      <button onClick={decrement} aria-label=\"decrement\">-</button>\n      <button onClick={reset} aria-label=\"reset\">Reset</button>\n    </div>\n  );\n};\n\nexport default Counter;",
+          "language": "tsx"
+        }
+      ],
+      "checks": {
+        "validSyntax": true,
+        "hasExport": true,
+        "typedProperly": true,
+        "errorHandling": true,
+        "requiredKeywords": true,
+        "bannedKeywords": true
+      },
+      "errors": [],
+      "llmTokens": 373
+    },
+    {
+      "taskId": "login-form",
+      "passed": true,
+      "durationMs": 9,
+      "files": [
+        {
+          "path": "LoginForm.tsx",
+          "content": "import React, { useState, useCallback } from 'react';\n\ninterface FormErrors {\n  email?: string;\n  password?: string;\n}\n\nconst EMAIL_REGEX = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;\n\nconst LoginForm: React.FC = () => {\n  const [email, setEmail] = useState<string>('');\n  const [password, setPassword] = useState<string>('');\n  const [errors, setErrors] = useState<FormErrors>({});\n  const [submitting, setSubmitting] = useState<boolean>(false);\n\n  const validate = useCallback((): boolean => {\n    const e: FormErrors = {};\n    if (!EMAIL_REGEX.test(email)) e.email = 'Invalid email format';\n    if (password.length < 8) e.password = 'Password must be at least 8 characters';\n    setErrors(e);\n    return Object.keys(e).length === 0;\n  }, [email, password]);\n\n  const handleSubmit = async (e: React.FormEvent): Promise<void> => {\n    e.preventDefault();\n    if (!validate() || submitting) return;\n    setSubmitting(true);\n    try {\n      // API call would go here\n      await new Promise((r) => setTimeout(r, 500));\n    } catch {\n      setErrors({ email: 'Login failed. Please try again.' });\n    } finally {\n      setSubmitting(false);\n    }\n  };\n\n  return (\n    <form onSubmit={handleSubmit} noValidate aria-label=\"login form\">\n      <div>\n        <label htmlFor=\"email\">Email</label>\n        <input\n          id=\"email\" type=\"email\" value={email}\n          onChange={(e) => setEmail(e.target.value)}\n          aria-invalid={!!errors.email}\n          aria-describedby={errors.email ? 'email-error' : undefined}\n        />\n        {errors.email && <span id=\"email-error\" role=\"alert\">{errors.email}</span>}\n      </div>\n      <div>\n        <label htmlFor=\"password\">Password</label>\n        <input\n          id=\"password\" type=\"password\" value={password}\n          onChange={(e) => setPassword(e.target.value)}\n          aria-invalid={!!errors.password}\n          aria-describedby={errors.password ? 'password-error' : undefined}\n        />\n        {errors.password && <span id=\"password-error\" role=\"alert\">{errors.password}</span>}\n      </div>\n      <button type=\"submit\" disabled={submitting}>\n        {submitting ? 'Signing in...' : 'Sign In'}\n      </button>\n    </form>\n  );\n};\n\nexport default LoginForm;",
+          "language": "tsx"
+        }
+      ],
+      "checks": {
+        "validSyntax": true,
+        "hasExport": true,
+        "typedProperly": true,
+        "errorHandling": true,
+        "requiredKeywords": true,
+        "bannedKeywords": true
+      },
+      "errors": [],
+      "llmTokens": 706
+    },
+    {
+      "taskId": "data-fetcher-hook",
+      "passed": true,
+      "durationMs": 5,
+      "files": [
+        {
+          "path": "useFetch.ts",
+          "content": "import { useState, useEffect, useRef } from 'react';\n\ninterface FetchState<T> {\n  data: T | null;\n  loading: boolean;\n  error: string | null;\n}\n\nfunction useFetch<T = unknown>(url: string, options?: RequestInit): FetchState<T> {\n  const [state, setState] = useState<FetchState<T>>({\n    data: null, loading: true, error: null,\n  });\n  const abortRef = useRef<AbortController | null>(null);\n\n  useEffect(() => {\n    const controller = new AbortController();\n    abortRef.current = controller;\n\n    const fetchData = async (): Promise<void> => {\n      setState((prev) => ({ ...prev, loading: true, error: null }));\n      try {\n        const res = await fetch(url, { ...options, signal: controller.signal });\n        if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);\n        const data = (await res.json()) as T;\n        if (!controller.signal.aborted) {\n          setState({ data, loading: false, error: null });\n        }\n      } catch (err) {\n        if (controller.signal.aborted) return;\n        const message = err instanceof Error ? err.message : 'Unknown error';\n        setState({ data: null, loading: false, error: message });\n      }\n    };\n\n    fetchData();\n    return () => controller.abort();\n  }, [url]);\n\n  return state;\n}\n\nexport { useFetch };",
+          "language": "ts"
+        }
+      ],
+      "checks": {
+        "validSyntax": true,
+        "hasExport": true,
+        "typedProperly": true,
+        "errorHandling": true,
+        "requiredKeywords": true,
+        "bannedKeywords": true
+      },
+      "errors": [],
+      "llmTokens": 459
+    },
+    {
+      "taskId": "todo-manager",
+      "passed": true,
+      "durationMs": 6,
+      "files": [
+        {
+          "path": "TodoApp.tsx",
+          "content": "import React, { useReducer, useState } from 'react';\n\ntype Filter = 'all' | 'active' | 'completed';\n\ninterface Todo {\n  id: number;\n  text: string;\n  completed: boolean;\n}\n\ntype Action =\n  | { type: 'ADD'; text: string }\n  | { type: 'TOGGLE'; id: number }\n  | { type: 'DELETE'; id: number };\n\nfunction todoReducer(state: Todo[], action: Action): Todo[] {\n  switch (action.type) {\n    case 'ADD':\n      return [...state, { id: Date.now(), text: action.text, completed: false }];\n    case 'TOGGLE':\n      return state.map((t) => t.id === action.id ? { ...t, completed: !t.completed } : t);\n    case 'DELETE':\n      return state.filter((t) => t.id !== action.id);\n    default:\n      return state;\n  }\n}\n\nconst TodoApp: React.FC = () => {\n  const [todos, dispatch] = useReducer(todoReducer, []);\n  const [text, setText] = useState('');\n  const [filter, setFilter] = useState<Filter>('all');\n\n  const addTodo = (): void => {\n    if (text.trim()) { dispatch({ type: 'ADD', text: text.trim() }); setText(''); }\n  };\n\n  const filtered = todos.filter((t) => filter === 'all' ? true : filter === 'active' ? !t.completed : t.completed);\n\n  return (\n    <div>\n      <input value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addTodo()} />\n      <button onClick={addTodo}>Add</button>\n      <div>\n        <button onClick={() => setFilter('all')}>All</button>\n        <button onClick={() => setFilter('active')}>Active</button>\n        <button onClick={() => setFilter('completed')}>Completed</button>\n      </div>\n      <ul>\n        {filtered.map((t) => (\n          <li key={t.id}>\n            <input type=\"checkbox\" checked={t.completed} onChange={() => dispatch({ type: 'TOGGLE', id: t.id })} />\n            <span style={{ textDecoration: t.completed ? 'line-through' : 'none' }}>{t.text}</span>\n            <button onClick={() => dispatch({ type: 'DELETE', id: t.id })}>Delete</button>\n          </li>\n        ))}\n      </ul>\n    </div>\n  );\n};\n\nexport default TodoApp;",
+          "language": "tsx"
+        }
+      ],
+      "checks": {
+        "validSyntax": true,
+        "hasExport": true,
+        "typedProperly": true,
+        "errorHandling": true,
+        "requiredKeywords": true,
+        "bannedKeywords": true
+      },
+      "errors": [],
+      "llmTokens": 648
+    },
+    {
+      "taskId": "api-middleware",
+      "passed": true,
+      "durationMs": 4,
+      "files": [
+        {
+          "path": "authMiddleware.ts",
+          "content": "import { Request, Response, NextFunction } from 'express';\n\ninterface AuthRequest extends Request {\n  apiKey?: string;\n}\n\nfunction authMiddleware(validKeys: string[] = []): (req: AuthRequest, res: Response, next: NextFunction) => void {\n  return (req: AuthRequest, res: Response, next: NextFunction): void => {\n    const authHeader = req.headers.authorization;\n    if (!authHeader || !authHeader.startsWith('Bearer ')) {\n      res.status(401).json({ error: 'Missing or invalid Authorization header' });\n      return;\n    }\n    const key = authHeader.slice(7);\n    if (!validKeys.includes(key)) {\n      res.status(401).json({ error: 'Invalid API key' });\n      return;\n    }\n    req.apiKey = key;\n    next();\n  };\n}\n\nexport { authMiddleware, AuthRequest };",
+          "language": "ts"
+        }
+      ],
+      "checks": {
+        "validSyntax": true,
+        "hasExport": true,
+        "typedProperly": true,
+        "errorHandling": true,
+        "requiredKeywords": true,
+        "bannedKeywords": true
+      },
+      "errors": [],
+      "llmTokens": 329
+    },
+    {
+      "taskId": "debounce-function",
+      "passed": false,
+      "durationMs": 5,
+      "files": [
+        {
+          "path": "debounce.ts",
+          "content": "type Fn<T extends unknown[]> = (...args: T) => void;\n\ninterface DebounceOptions {\n  leading?: boolean;\n  trailing?: boolean;\n}\n\nfunction debounce<T extends unknown[]>(\n  fn: Fn<T>,\n  delayMs: number,\n  options: DebounceOptions = {},\n): Fn<T> & { cancel: () => void } {\n  const { leading = false, trailing = true } = options;\n  let timer: ReturnType<typeof setTimeout> | null = null;\n  let lastArgs: T | null = null;\n\n  const cancel = (): void => {\n    if (timer !== null) { clearTimeout(timer); timer = null; lastArgs = null; }\n  };\n\n  const debounced = (...args: T): void => {\n    lastArgs = args;\n    if (leading && timer === null) {\n      fn(...args);\n    }\n    if (timer !== null) clearTimeout(timer);\n    timer = setTimeout(() => {\n      if (trailing && lastArgs) fn(...lastArgs);\n      timer = null;\n      lastArgs = null;\n    }, delayMs);\n  };\n\n  debounced.cancel = cancel;\n  return debounced;\n}\n\nexport { debounce };",
+          "language": "ts"
+        }
+      ],
+      "checks": {
+        "validSyntax": true,
+        "hasExport": true,
+        "typedProperly": true,
+        "errorHandling": true,
+        "requiredKeywords": false,
+        "bannedKeywords": true
+      },
+      "errors": [],
+      "llmTokens": 366
+    }
+  ],
+  "aggregateChecks": {
+    "validSyntax": {
+      "passed": 6,
+      "total": 6
+    },
+    "hasExport": {
+      "passed": 6,
+      "total": 6
+    },
+    "typedProperly": {
+      "passed": 6,
+      "total": 6
+    },
+    "errorHandling": {
+      "passed": 6,
+      "total": 6
+    },
+    "requiredKeywords": {
+      "passed": 5,
+      "total": 6
+    },
+    "bannedKeywords": {
+      "passed": 6,
+      "total": 6
+    }
+  },
+  "totalTokens": 2881,
+  "totalDurationMs": 79
+}

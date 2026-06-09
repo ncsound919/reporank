@@ -3,7 +3,7 @@ import { z } from "zod";
 import { auditSubmission, analyzeSession, type DisclosureLayer, type CourseGuideline } from "@reporank/grading-engine";
 import { prisma } from "../db/client";
 import { authMiddleware, AuthRequest } from "../middleware/auth";
-import { AppError } from "../middleware/errorHandler";
+import { AppError, ErrorCodes } from "../middleware/errorHandler";
 import { asyncHandler } from "../middleware/asyncHandler";
 
 const router: Router = Router();
@@ -59,7 +59,7 @@ const submitSchema = z.object({
 // POST /api/v1/education/courses — create a course
 router.post("/courses", authMiddleware, asyncHandler<AuthRequest>(async (req, res) => {
   const parsed = createCourseSchema.safeParse(req.body);
-  if (!parsed.success) throw new AppError(400, parsed.error.errors[0].message, "VALIDATION_ERROR");
+  if (!parsed.success) throw new AppError(400, parsed.error.errors[0].message, ErrorCodes.VALIDATION_ERROR);
   const { name, slug, description, lmsType, lmsCourseId } = parsed.data;
   const course = await prisma.course.create({
     data: { name, slug, description, lmsType, lmsCourseId, instructorId: req.userId! },
@@ -83,20 +83,20 @@ router.get("/courses/:id", authMiddleware, asyncHandler<AuthRequest>(async (req,
     where: { id: req.params.id, instructorId: req.userId! },
     include: { assignments: { orderBy: { createdAt: "desc" } } },
   });
-  if (!course) throw new AppError(404, "Course not found", "NOT_FOUND");
+  if (!course) throw new AppError(404, "Course not found", ErrorCodes.NOT_FOUND);
   res.json({ data: course });
 }));
 
 // POST /api/v1/education/assignments — create assignment
 router.post("/assignments", authMiddleware, asyncHandler<AuthRequest>(async (req, res) => {
   const parsed = createAssignmentSchema.safeParse(req.body);
-  if (!parsed.success) throw new AppError(400, parsed.error.errors[0].message, "VALIDATION_ERROR");
+  if (!parsed.success) throw new AppError(400, parsed.error.errors[0].message, ErrorCodes.VALIDATION_ERROR);
 
   // Verify course ownership
   const course = await prisma.course.findFirst({
     where: { id: parsed.data.courseId, instructorId: req.userId! },
   });
-  if (!course) throw new AppError(404, "Course not found", "NOT_FOUND");
+  if (!course) throw new AppError(404, "Course not found", ErrorCodes.NOT_FOUND);
 
   const assignment = await prisma.assignment.create({
     data: {
@@ -115,12 +115,12 @@ router.post("/assignments", authMiddleware, asyncHandler<AuthRequest>(async (req
 // POST /api/v1/education/submissions — submit work for audit
 router.post("/submissions", authMiddleware, asyncHandler<AuthRequest>(async (req, res) => {
   const parsed = submitSchema.safeParse(req.body);
-  if (!parsed.success) throw new AppError(400, parsed.error.errors[0].message, "VALIDATION_ERROR");
+  if (!parsed.success) throw new AppError(400, parsed.error.errors[0].message, ErrorCodes.VALIDATION_ERROR);
 
   const assignment = await prisma.assignment.findFirst({
     where: { id: parsed.data.assignmentId, course: { instructorId: req.userId! } },
   });
-  if (!assignment) throw new AppError(404, "Assignment not found", "NOT_FOUND");
+  if (!assignment) throw new AppError(404, "Assignment not found", ErrorCodes.NOT_FOUND);
 
   const guidelines = (assignment.guidelines as unknown) as CourseGuideline[] ?? [];
 
@@ -194,7 +194,7 @@ router.get("/submissions/:id", authMiddleware, asyncHandler<AuthRequest>(async (
       assignment: { course: { instructorId: req.userId! } },
     },
   });
-  if (!submission) throw new AppError(404, "Submission not found", "NOT_FOUND");
+  if (!submission) throw new AppError(404, "Submission not found", ErrorCodes.NOT_FOUND);
   res.json({ data: submission });
 }));
 
@@ -210,7 +210,7 @@ router.post("/generate-agents-md", authMiddleware, asyncHandler<AuthRequest>(asy
     where: { id: body.data.assignmentId, course: { instructorId: req.userId! } },
     include: { course: true },
   });
-  if (!assignment) throw new AppError(404, "Assignment not found", "NOT_FOUND");
+  if (!assignment) throw new AppError(404, "Assignment not found", ErrorCodes.NOT_FOUND);
 
   const guidelines = (assignment.guidelines as unknown) as CourseGuideline[] ?? [];
   const enforced = guidelines.filter(g => g.enforced).length;

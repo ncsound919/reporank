@@ -3,7 +3,7 @@ import { z } from "zod";
 import { predictImpact, generateRecommendations, type FileChange } from "@reporank/grading-engine";
 import { prisma } from "../db/client";
 import { authMiddleware, AuthRequest } from "../middleware/auth";
-import { AppError } from "../middleware/errorHandler";
+import { AppError, ErrorCodes } from "../middleware/errorHandler";
 import { asyncHandler } from "../middleware/asyncHandler";
 import { formatPrComment, commentSignature } from "../services/prCommenter";
 

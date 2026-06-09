@@ -2,7 +2,8 @@ import { Router } from "express";
 import type { Router as ExpressRouter } from "express";
 import { prisma } from "../db/client";
 import { authMiddleware, orgAccessMiddleware, AuthRequest } from "../middleware/auth";
-import { AppError } from "../middleware/errorHandler";
+import { AppError, ErrorCodes } from "../middleware/errorHandler";
+import { ScanStatus, GradeCategory, DriftStatus } from "../constants";
 
 const router: ExpressRouter = Router();
 
@@ -14,11 +15,11 @@ router.get("/org/:orgId/summary", authMiddleware, orgAccessMiddleware, async (re
   const member = await prisma.orgMember.findUnique({
     where: { orgId_userId: { orgId, userId: req.userId! } },
   });
-  if (!member) throw new AppError(403, "Access denied", "FORBIDDEN");
+  if (!member) throw new AppError(403, "Access denied", ErrorCodes.FORBIDDEN);
 
   // Get latest scan per repo
   const scans = await prisma.scan.findMany({
-    where: { orgId, status: "complete" },
+    where: { orgId, status: ScanStatus.COMPLETE },
     orderBy: [{ repoUrl: "asc" }, { createdAt: "desc" }],
     take: 500, // Enough for org with many repos
     select: {
@@ -80,10 +81,10 @@ router.get("/org/:orgId/summary", authMiddleware, orgAccessMiddleware, async (re
       F: repos.filter((r) => r.latestGrade === "F").length,
     },
     byDrift: {
-      "on-scope": repos.filter((r) => r.driftStatus === "on-scope").length,
-      "at-risk": repos.filter((r) => r.driftStatus === "at-risk").length,
-      drifting: repos.filter((r) => r.driftStatus === "drifting").length,
-      blocked: repos.filter((r) => r.driftStatus === "blocked").length,
+      "on-scope": repos.filter((r) => r.driftStatus === DriftStatus.ON_SCOPE).length,
+      "at-risk": repos.filter((r) => r.driftStatus === DriftStatus.AT_RISK).length,
+      drifting: repos.filter((r) => r.driftStatus === DriftStatus.DRIFTING).length,
+      blocked: repos.filter((r) => r.driftStatus === DriftStatus.BLOCKED).length,
     },
   };
 
@@ -99,11 +100,11 @@ router.get("/org/:orgId/health-trendline", authMiddleware, orgAccessMiddleware, 
   const member = await prisma.orgMember.findUnique({
     where: { orgId_userId: { orgId, userId: req.userId! } },
   });
-  if (!member) throw new AppError(403, "Access denied", "FORBIDDEN");
+  if (!member) throw new AppError(403, "Access denied", ErrorCodes.FORBIDDEN);
 
   // Get daily aggregated scores
   const scans = await prisma.scan.findMany({
-    where: { orgId, status: "complete", overallScore: { not: null } },
+    where: { orgId, status: ScanStatus.COMPLETE, overallScore: { not: null } },
     orderBy: { createdAt: "asc" },
     take: limit,
     select: {
@@ -145,11 +146,11 @@ router.get("/org/:orgId/risk-hotspots", authMiddleware, orgAccessMiddleware, asy
   const member = await prisma.orgMember.findUnique({
     where: { orgId_userId: { orgId, userId: req.userId! } },
   });
-  if (!member) throw new AppError(403, "Access denied", "FORBIDDEN");
+  if (!member) throw new AppError(403, "Access denied", ErrorCodes.FORBIDDEN);
 
   // Get latest scans
   const scans = await prisma.scan.findMany({
-    where: { orgId, status: "complete" },
+    where: { orgId, status: ScanStatus.COMPLETE },
     orderBy: [{ repoUrl: "asc" }, { createdAt: "desc" }],
     take: 500,
     select: {
@@ -178,7 +179,7 @@ router.get("/org/:orgId/risk-hotspots", authMiddleware, orgAccessMiddleware, asy
       const report = scan.report as any;
       const securityScore = report?.security?.overallScore || 0;
       const qualityScore = scan.overallScore || 0;
-      const driftPenalty = report?.drift?.status === "drifting" ? 30 : report?.drift?.status === "at-risk" ? 15 : 0;
+      const driftPenalty = report?.drift?.status === DriftStatus.DRIFTING ? 30 : report?.drift?.status === DriftStatus.AT_RISK ? 15 : 0;
       const riskScore = 100 - ((securityScore + qualityScore) / 2) + driftPenalty;
 
       return {

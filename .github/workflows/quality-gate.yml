@@ -1,0 +1,90 @@
+name: RepoRank Quality Gate
+
+on:
+  pull_request:
+    branches: [master, main]
+  push:
+    branches: [master, main]
+
+jobs:
+  quality-gate:
+    name: Code Quality Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.8.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Run RepoRank quality gate
+        id: gate
+        run: |
+          node scripts/quality-gate.mjs "${{ github.workspace }}" \
+            --threshold ${{ vars.REPORANK_THRESHOLD || 50 }} \
+            --max-secrets ${{ vars.REPORANK_MAX_SECRETS || 0 }} \
+            --json > reporank-gate-result.json
+          echo "score=$(node -e "console.log(JSON.parse(require('fs').readFileSync('reporank-gate-result.json','utf8')).analysis.score)")" >> $GITHUB_OUTPUT
+          echo "passed=$(node -e "console.log(JSON.parse(require('fs').readFileSync('reporank-gate-result.json','utf8')).passed)")" >> $GITHUB_OUTPUT
+
+      - name: Post PR comment with results
+        if: github.event_name == 'pull_request' && always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            let report;
+            try {
+              report = JSON.parse(fs.readFileSync('reporank-gate-result.json', 'utf8'));
+            } catch {
+              github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: '## RepoRank Quality Gate\n\n⚠ Could not read quality gate results.'
+              });
+              return;
+            }
+
+            const checks = report.checks.map(c =>
+              `- ${c.passed ? '✅' : '❌'} **${c.name}**: ${c.message}`
+            ).join('\n');
+
+            const body = `## RepoRank Quality Gate
+            **Result:** ${report.passed ? '✅ PASSED' : '❌ FAILED'}
+            **Score:** ${report.analysis.score}/100
+            **Files analyzed:** ${report.analysis.fileCount}
+            **Languages:** ${report.analysis.languages.join(', ') || 'unknown'}
+            **Security issues:** ${report.analysis.secrets}
+
+            ### Checks
+            ${checks}
+
+            ---
+            _Configure threshold via \`REPORANK_THRESHOLD\` repository variable._
+            `;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body
+            });
+
+      - name: Fail if quality gate did not pass
+        if: steps.gate.outputs.passed != 'true'
+        run: |
+          echo "❌ RepoRank quality gate failed!"
+          cat reporank-gate-result.json | node -e "const d=JSON.parse(require('fs').readFileSync('/dev/stdin','utf8')); d.checks.filter(c=>!c.passed).forEach(c=>console.log('  - '+c.name+': '+c.message))"
+          exit 1

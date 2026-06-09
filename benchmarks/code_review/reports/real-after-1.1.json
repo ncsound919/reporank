@@ -1,0 +1,1703 @@
+{
+  "totalTasks": 49,
+  "skippedTasks": 0,
+  "aggregate": {
+    "truePositives": 40,
+    "falsePositives": 19,
+    "falseNegatives": 12,
+    "precision": 0.6779661016949152,
+    "recall": 0.7692307692307693,
+    "f1": 0.7207207207207208
+  },
+  "perTask": [
+    {
+      "id": "sec-eval-001",
+      "groundTruthCount": 1,
+      "predictedCount": 1,
+      "truePositives": [
+        {
+          "predicted": {
+            "category": "security",
+            "severity": "critical",
+            "line": 6,
+            "type": "code-injection",
+            "description": "User-provided script executed with `new Function` without sanitization.",
+            "recommendation": "Avoid using `new Function` with user-provided code. If you must execute user code, use a safe sandbox environment or a restricted scripting language with limited capabilities. Validate and sanitize both scriptPath and userInput to prevent code injection.",
+            "confidence": 0.95
+          },
+          "groundTruth": {
+            "category": "security",
+            "severity": "critical",
+            "line": 5,
+            "type": "code-injection",
+            "description": "new Function() allows arbitrary code execution from a user-controlled script path"
+          },
+          "matchScore": 0.8250000000000001
+        }
+      ],
+      "falsePositives": [],
+      "falseNegatives": [],
+      "durationMs": 5558,
+      "tokens": 2844,
+      "warnings": []
+    },
+    {
+      "id": "sec-sql-injection-002",
+      "groundTruthCount": 1,
+      "predictedCount": 1,
+      "truePositives": [
+        {
+          "predicted": {
+            "category": "security",
+            "severity": "critical",
+            "line": 5,
+            "type": "sql-injection",
+            "description": "User input directly embedded in SQL query string, vulnerable to SQL injection.",
+            "recommendation": "Use parameterized queries with placeholders (e.g., `$1`) to prevent SQL injection.  The `query` function should be updated to support this.",
+            "confidence": 0.99
+          },
+          "groundTruth": {
+            "category": "security",
+            "severity": "critical",
+            "line": 5,
+            "type": "sql-injection",
+            "description": "User input interpolated directly into SQL string — classic SQL injection vulnerability"
+          },
+          "matchScore": 0.9461538461538461
+        }
+      ],
+      "falsePositives": [],
+      "falseNegatives": [],
+      "durationMs": 4545,
+      "tokens": 2800,
+      "warnings": []
+    },
+    {
+      "id": "sec-sql-injection-003-safe",
+      "groundTruthCount": 0,
+      "predictedCount": 1,
+      "truePositives": [],
+      "falsePositives": [
+        {
+          "category": "quality",
+          "severity": "high",
+          "line": 8,
+          "type": "missing-null-check",
+          "description": "Accessing result.rows[0] without checking if result.rows is empty can cause an error if no user is found.",
+          "recommendation": "Add a check to ensure result.rows is not empty before accessing result.rows[0]. For example: `if (result.rows.length > 0) { return result.rows[0]; } else { return null; }`",
+          "confidence": 0.95
+        }
+      ],
+      "falseNegatives": [],
+      "durationMs": 5685,
+      "tokens": 2812,
+      "warnings": []
+    },
+    {
+      "id": "sec-secret-004",
+      "groundTruthCount": 3,
+      "predictedCount": 1,
+      "truePositives": [
+        {
+          "predicted": {
+            "category": "security",
+            "severity": "critical",
+            "line": 3,
+            "type": "hardcoded-secret",
+            "description": "OpenAI API key is hardcoded directly in the configuration file.",
+            "recommendation": "Store API keys in environment variables or a secure configuration management system and access them at runtime.",
+            "confidence": 1
+          },
+          "groundTruth": {
+            "category": "security",
+            "severity": "high",
+            "line": 3,
+            "type": "hardcoded-secret",
+            "description": "OpenAI API key committed to source"
+          },
+          "matchScore": 0.9299999999999999
+        }
+      ],
+      "falsePositives": [],
+      "falseNegatives": [
+        {
+          "category": "security",
+          "severity": "high",
+          "line": 4,
+          "type": "hardcoded-secret",
+          "description": "Database connection string with password committed"
+        },
+        {
+          "category": "security",
+          "severity": "high",
+          "line": 5,
+          "type": "hardcoded-secret",
+          "description": "Live Stripe key committed"
+        }
+      ],
+      "durationMs": 8010,
+      "tokens": 3003,
+      "warnings": []
+    },
+    {
+      "id": "sec-xss-005",
+      "groundTruthCount": 1,
+      "predictedCount": 1,
+      "truePositives": [
+        {
+          "predicted": {
+            "category": "security",
+            "severity": "high",
+            "line": 6,
+            "type": "xss",
+            "description": "User-provided comment is directly rendered into HTML without escaping, leading to potential XSS vulnerability.",
+            "recommendation": "Escape the user comment before rendering it into HTML. Use a library like `DOMPurify` or `xss-filters` to sanitize the input.",
+            "confidence": 0.95
+          },
+          "groundTruth": {
+            "category": "security",
+            "severity": "high",
+            "line": 5,
+            "type": "xss",
+            "description": "Unsanitized user input rendered directly in HTML response"
+          },
+          "matchScore": 0.8250000000000001
+        }
+      ],
+      "falsePositives": [],
+      "falseNegatives": [],
+      "durationMs": 4752,
+      "tokens": 2817,
+      "warnings": []
+    },
+    {
+      "id": "sec-path-traversal-006",
+      "groundTruthCount": 1,
+      "predictedCount": 1,
+      "truePositives": [
+        {
+          "predicted": {
+            "category": "security",
+            "severity": "high",
+            "line": 10,
+            "type": "path-traversal",
+            "description": "User-controlled filename is used to construct file path without proper validation, leading to potential path traversal vulnerability.",
+            "recommendation": "Validate the filename against a whitelist of allowed filenames or use a safer file access method that doesn't rely on direct path concatenation. Consider using a library designed for serving static files securely.",
+            "confidence": 0.9
+          },
+          "groundTruth": {
+            "category": "security",
+            "severity": "high",
+            "line": 9,
+            "type": "path-traversal",
+            "description": "User-supplied filename joined to root path allows ../ traversal to read arbitrary files"
+          },
+          "matchScore": 0.8190476190476191
+        }
+      ],
+      "falsePositives": [],
+      "falseNegatives": [],
+      "durationMs": 5857,
+      "tokens": 2898,
+      "warnings": []
+    },
+    {
+      "id": "sec-prototype-pollution-007",
+      "groundTruthCount": 1,
+      "predictedCount": 1,
+      "truePositives": [
+        {
+          "predicted": {
+            "category": "security",
+            "severity": "high",
+            "line": 3,
+            "type": "prototype-pollution",
+            "description": "Recursive merge function is vulnerable to prototype pollution via keys like __proto__ or constructor in the source object.",
+            "recommendation": "Add a check to prevent merging properties with names like '__proto__' or 'constructor'.  For example: `if (key.startsWith('__')) continue;`",
+            "confidence": 0.9
+          },
+          "groundTruth": {
+            "category": "security",
+            "severity": "high",
+            "line": 2,
+            "type": "prototype-pollution",
+            "description": "Recursive merge does not guard against __proto__/constructor keys, enabling prototype pollution"
+          },
+          "matchScore": 0.8368421052631579
+        }
+      ],
+      "falsePositives": [],
+      "falseNegatives": [],
+      "durationMs": 7027,
+      "tokens": 2868,
+      "warnings": []
+    },
+    {
+      "id": "sec-prompt-injection-008",
+      "groundTruthCount": 1,
+      "predictedCount": 1,
+      "truePositives": [
+        {
+          "predicted": {
+            "category": "security",
+            "severity": "medium",
+            "line": 2,
+            "type": "prompt-injection",
+            "description": "Article text is directly embedded into the LLM prompt, creating a prompt injection vulnerability.",
+            "recommendation": "Sanitize or validate the article text before embedding it in the prompt. Consider using a more robust prompt engineering technique that separates instructions from the article content.",
+            "confidence": 0.7
+          },
+          "groundTruth": {
+            "category": "security",
+            "severity": "medium",
+            "line": 2,
+            "type": "prompt-injection",
+            "description": "User-provided article text is concatenated into a prompt with no separation — could contain instructions that override the system prompt"
+          },
+          "matchScore": 0.9227272727272726
+        }
+      ],
+      "falsePositives": [],
+      "falseNegatives": [],
+      "durationMs": 5952,
+      "tokens": 2840,
+      "warnings": []
+    },
+    {
+      "id": "qual-callback-hell-009",
+      "groundTruthCount": 1,
+      "predictedCount": 1,
+      "truePositives": [
+        {
+          "predicted": {
+            "category": "maintainability",
+            "severity": "medium",
+            "line": 1,
+            "type": "callback-hell",
+            "description": "Nested callbacks create a 'Pyramid of Doom' making the code harder to read and maintain.",
+            "recommendation": "Refactor using Promises or async/await to flatten the asynchronous flow.",
+            "confidence": 0.9
+          },
+          "groundTruth": {
+            "category": "maintainability",
+            "severity": "medium",
+            "line": 1,
+            "type": "callback-hell",
+            "description": "Deeply nested callbacks should be refactored to async/await or Promises"
+          },
+          "matchScore": 0.911111111111111
+        }
+      ],
+      "falsePositives": [],
+      "falseNegatives": [],
+      "durationMs": 5249,
+      "tokens": 2826,
+      "warnings": []
+    },
+    {
+      "id": "qual-missing-error-handling-010",
+      "groundTruthCount": 2,
+      "predictedCount": 2,
+      "truePositives": [
+        {
+          "predicted": {
+            "category": "quality",
+            "severity": "high",
+            "line": 2,
+            "type": "missing-null-check",
+            "description": "product could be null if not found — .update will fail with unclear error",
+            "recommendation": "Check if (product == null) return early",
+            "confidence": 0.85
+          },
+          "groundTruth": {
+            "category": "quality",
+            "severity": "high",
+            "line": 2,
+            "type": "missing-null-check",
+            "description": "If product is null (not found), .update will throw an unclear error; should validate first"
+          },
+          "matchScore": 0.9533333333333333
+        },
+        {
+          "predicted": {
+            "category": "quality",
+            "severity": "high",
+            "line": 1,
+            "type": "no-error-handling",
+            "description": "async function with multiple awaits but no try/catch or .catch() handler",
+            "recommendation": "Wrap the awaited calls in try/catch, log the error, and either rethrow or return a default value",
+            "confidence": 0.9
+          },
+          "groundTruth": {
+            "category": "quality",
+            "severity": "high",
+            "line": 1,
+            "type": "no-error-handling",
+            "description": "No try/catch — unhandled rejection can crash the worker on transient DB errors"
+          },
+          "matchScore": 0.9117647058823528
+        }
+      ],
+      "falsePositives": [],
+      "falseNegatives": [],
+      "durationMs": 6740,
+      "tokens": 2878,
+      "warnings": []
+    },
+    {
+      "id": "qual-any-abuse-011",
+      "groundTruthCount": 1,
+      "predictedCount": 2,
+      "truePositives": [
+        {
+          "predicted": {
+            "category": "quality",
+            "severity": "medium",
+            "line": 1,
+            "type": "any-type-abuse",
+            "description": "The function uses 'any' types for input, data, result, and key, which disables type checking and reduces code safety.",
+            "recommendation": "Use more specific types or type guards to narrow the types and improve code clarity.",
+            "confidence": 0.9
+          },
+          "groundTruth": {
+            "category": "quality",
+            "severity": "medium",
+            "line": 1,
+            "type": "any-type-abuse",
+            "description": "Defeats TypeScript type safety — should use proper types or generics"
+          },
+          "matchScore": 0.9124999999999999
+        }
+      ],
+      "falsePositives": [
+        {
+          "category": "quality",
+          "severity": "high",
+          "line": 2,
+          "type": "no-error-handling",
+          "description": "The `JSON.parse` call is not wrapped in a try/catch block, which could lead to an unhandled exception if the input is not valid JSON.",
+          "recommendation": "Wrap the `JSON.parse` call in a try/catch block to handle potential parsing errors.",
+          "confidence": 0.95
+        }
+      ],
+      "falseNegatives": [],
+      "durationMs": 6945,
+      "tokens": 2900,
+      "warnings": []
+    },
+    {
+      "id": "qual-mutable-default-arg-012",
+      "groundTruthCount": 1,
+      "predictedCount": 1,
+      "truePositives": [
+        {
+          "predicted": {
+            "category": "quality",
+            "severity": "medium",
+            "line": 1,
+            "type": "mutable-default-argument",
+            "description": "Mutable default argument `cart=[]` is reused across function calls, leading to unexpected side effects.",
+            "recommendation": "Initialize `cart` to `None` and create a new list inside the function if `cart` is `None`.  For example: `def add_item(item, cart=None): if cart is None: cart = []`",
+            "confidence": 0.95
+          },
+          "groundTruth": {
+            "category": "quality",
+            "severity": "high",
+            "line": 1,
+            "type": "mutable-default-argument",
+            "description": "Mutable default arguments are shared across all calls — classic Python bug"
+          },
+          "matchScore": 0.9210526315789472
+        }
+      ],
+      "falsePositives": [],
+      "falseNegatives": [],
+      "durationMs": 5701,
+      "tokens": 2812,
+      "warnings": []
+    },
+    {
+      "id": "qual-resource-leak-013",
+      "groundTruthCount": 1,
+      "predictedCount": 1,
+      "truePositives": [
+        {
+          "predicted": {
+            "category": "quality",
+            "severity": "high",
+            "line": 4,
+            "type": "resource-leak",
+            "description": "File handle opened with fs.openSync never paired with fs.closeSync",
+            "recommendation": "Use fs.promises.open with a try/finally block, or use fs.readFileSync which handles it",
+            "confidence": 0.95
+          },
+          "groundTruth": {
+            "category": "quality",
+            "severity": "high",
+            "line": 4,
+            "type": "resource-leak",
+            "description": "File handle opened with fs.OpenSync is never closed — exhausts file descriptors under load"
+          },
+          "matchScore": 0.9461538461538461
+        }
+      ],
+      "falsePositives": [],
+      "falseNegatives": [],
+      "durationMs": 4949,
+      "tokens": 2780,
+      "warnings": []
+    },
+    {
+      "id": "qual-no-tests-014",
+      "groundTruthCount": 1,
+      "predictedCount": 1,
+      "truePositives": [],
+      "falsePositives": [
+        {
+          "category": "maintainability",
+          "severity": "medium",
+          "line": 3,
+          "type": "magic-numbers",
+          "description": "The default rate of 0 is a magic number. It's not clear why 0 is the default, and it could be misleading.",
+          "recommendation": "Consider throwing an error or returning a specific value (e.g., NaN) when the region is not found in the rates object.",
+          "confidence": 0.8
+        }
+      ],
+      "falseNegatives": [
+        {
+          "category": "maintainability",
+          "severity": "low",
+          "line": 1,
+          "type": "missing-test-coverage",
+          "description": "Tax calculation logic has no associated tests — high business risk, low coverage"
+        }
+      ],
+      "durationMs": 5597,
+      "tokens": 2818,
+      "warnings": []
+    },
+    {
+      "id": "qual-todo-fixme-015",
+      "groundTruthCount": 2,
+      "predictedCount": 2,
+      "truePositives": [
+        {
+          "predicted": {
+            "category": "maintainability",
+            "severity": "medium",
+            "line": 2,
+            "type": "todo-comment",
+            "description": "TODO comment indicates missing validation logic.",
+            "recommendation": "Implement validation for the 'order' object.",
+            "confidence": 0.95
+          },
+          "groundTruth": {
+            "category": "maintainability",
+            "severity": "low",
+            "line": 2,
+            "type": "todo-comment",
+            "description": "TODO marker indicates incomplete work"
+          },
+          "matchScore": 0.9222222222222222
+        }
+      ],
+      "falsePositives": [
+        {
+          "category": "maintainability",
+          "severity": "low",
+          "line": 4,
+          "type": "debug-code",
+          "description": "HACK comment suggests a workaround that should be replaced with a proper solution.",
+          "recommendation": "Investigate and resolve the underlying Redis bug, or implement a more robust workaround.",
+          "confidence": 0.8
+        }
+      ],
+      "falseNegatives": [
+        {
+          "category": "maintainability",
+          "severity": "medium",
+          "line": 3,
+          "type": "fixme-known-bug",
+          "description": "FIXME indicates a known race condition bug that should be tracked"
+        }
+      ],
+      "durationMs": 8317,
+      "tokens": 2927,
+      "warnings": []
+    },
+    {
+      "id": "perf-n-plus-1-016",
+      "groundTruthCount": 1,
+      "predictedCount": 1,
+      "truePositives": [
+        {
+          "predicted": {
+            "category": "performance",
+            "severity": "high",
+            "line": 4,
+            "type": "n-plus-1-query",
+            "description": "Database queried inside for-loop — N+1 problem.  `db.items.findMany` is called for each order in the `orders` array.",
+            "recommendation": "Use a single JOIN, include, or batch query to retrieve items along with orders in a single database query.",
+            "confidence": 0.95
+          },
+          "groundTruth": {
+            "category": "performance",
+            "severity": "high",
+            "line": 4,
+            "type": "n-plus-1-query",
+            "description": "Database queried in a loop — N+1 query problem; should use a single JOIN or include"
+          },
+          "matchScore": 0.9199999999999999
+        }
+      ],
+      "falsePositives": [],
+      "falseNegatives": [],
+      "durationMs": 5156,
+      "tokens": 2821,
+      "warnings": []
+    },
+    {
+      "id": "perf-quadratic-017",
+      "groundTruthCount": 1,
+      "predictedCount": 1,
+      "truePositives": [
+        {
+          "predicted": {
+            "category": "performance",
+            "severity": "medium",
+            "line": 4,
+            "type": "quadratic-complexity",
+            "description": "The `item in seen` check inside the loop results in O(n) complexity for each item, leading to an overall O(n^2) time complexity.",
+            "recommendation": "Use a set instead of a list for `seen` to achieve O(1) lookup, reducing the overall complexity to O(n).",
+            "confidence": 0.95
+          },
+          "groundTruth": {
+            "category": "performance",
+            "severity": "medium",
+            "line": 3,
+            "type": "quadratic-complexity",
+            "description": "O(n²) — `item in list` is O(n); use a set for O(1) lookups"
+          },
+          "matchScore": 0.8117647058823529
+        }
+      ],
+      "falsePositives": [],
+      "falseNegatives": [],
+      "durationMs": 5053,
+      "tokens": 2781,
+      "warnings": []
+    },
+    {
+      "id": "perf-blocking-event-loop-018",
+      "groundTruthCount": 1,
+      "predictedCount": 2,
+      "truePositives": [
+        {
+          "predicted": {
+            "category": "performance",
+            "severity": "high",
+            "line": 7,
+            "type": "blocking-event-loop",
+            "description": "readFileSync blocks the event loop, potentially causing performance issues and unresponsive API calls.",
+            "recommendation": "Use asynchronous file reading (e.g., fs.promises.readFile) to avoid blocking the event loop.",
+            "confidence": 0.95
+          },
+          "groundTruth": {
+            "category": "performance",
+            "severity": "high",
+            "line": 7,
+            "type": "blocking-event-loop",
+            "description": "Synchronous fs in an async request handler blocks the entire event loop"
+          },
+          "matchScore": 0.9222222222222222
+        }
+      ],
+      "falsePositives": [
+        {
+          "category": "security",
+          "severity": "critical",
+          "line": 8,
+          "type": "path-traversal",
+          "description": "The file path is taken directly from the request parameters without validation, making it vulnerable to path traversal attacks.",
+          "recommendation": "Validate and sanitize the file path to prevent access to unauthorized files. Use a whitelist of allowed files or directories.",
+          "confidence": 0.9
+        }
+      ],
+      "falseNegatives": [],
+      "durationMs": 6990,
+      "tokens": 2943,
+      "warnings": []
+    },
+    {
+      "id": "sec-weak-hash-019",
+      "groundTruthCount": 1,
+      "predictedCount": 1,
+      "truePositives": [
+        {
+          "predicted": {
+            "category": "security",
+            "severity": "high",
+            "line": 3,
+            "type": "weak-crypto",
+            "description": "MD5 is used for password hashing, which is cryptographically weak.",
+            "recommendation": "Use a stronger hashing algorithm like bcrypt, scrypt, or Argon2.",
+            "confidence": 0.95
+          },
+          "groundTruth": {
+            "category": "security",
+            "severity": "medium",
+            "line": 4,
+            "type": "weak-crypto",
+            "description": "MD5 is cryptographically broken for password hashing; use bcrypt/argon2/scrypt"
+          },
+          "matchScore": 0.8384615384615385
+        }
+      ],
+      "falsePositives": [],
+      "falseNegatives": [],
+      "durationMs": 4175,
+      "tokens": 2731,
+      "warnings": []
+    },
+    {
+      "id": "sec-insecure-random-020",
+      "groundTruthCount": 1,
+      "predictedCount": 1,
+      "truePositives": [
+        {
+          "predicted": {
+            "category": "security",
+            "severity": "high",
+            "line": 4,
+            "type": "insecure-random",
+            "description": "Using `random.random()` to generate a session token is insecure as it does not provide sufficient entropy.",
+            "recommendation": "Use `secrets.token_hex()` or `os.urandom()` to generate a cryptographically secure session token.",
+            "confidence": 0.95
+          },
+          "groundTruth": {
+            "category": "security",
+            "severity": "medium",
+            "line": 4,
+            "type": "insecure-random",
+            "description": "random.random() uses Mersenne Twister, not cryptographically secure; use secrets module for tokens"
+          },
+          "matchScore": 0.9095238095238094
+        }
+      ],
+      "falsePositives": [],
+      "falseNegatives": [],
+      "durationMs": 4838,
+      "tokens": 2763,
+      "warnings": []
+    },
+    {
+      "id": "sec-jwt-none-021",
+      "groundTruthCount": 1,
+      "predictedCount": 1,
+      "truePositives": [
+        {
+          "predicted": {
+            "category": "security",
+            "severity": "critical",
+            "line": 4,
+            "type": "jwt-alg-none",
+            "description": "jwt.verify called without specifying the algorithm, allowing 'alg=none' attacks.",
+            "recommendation": "Specify the algorithm in jwt.verify, e.g., jwt.verify(token, 'secret', { algorithms: ['HS256'] });",
+            "confidence": 0.99
+          },
+          "groundTruth": {
+            "category": "security",
+            "severity": "critical",
+            "line": 4,
+            "type": "jwt-alg-none",
+            "description": "jwt.verify without algorithms option allows the alg=none attack — must whitelist allowed algorithms"
+          },
+          "matchScore": 0.9333333333333332
+        }
+      ],
+      "falsePositives": [],
+      "falseNegatives": [],
+      "durationMs": 5123,
+      "tokens": 2766,
+      "warnings": []
+    },
+    {
+      "id": "sec-regex-dos-022",
+      "groundTruthCount": 1,
+      "predictedCount": 1,
+      "truePositives": [],
+      "falsePositives": [
+        {
+          "category": "quality",
+          "severity": "medium",
+          "line": 3,
+          "type": "magic-numbers",
+          "description": "The regex `^([a-zA-Z]+)+@` is not robust enough for email validation. It uses a simplistic pattern that doesn't account for many valid email formats.",
+          "recommendation": "Use a more comprehensive and well-tested regular expression for email validation, or use a dedicated email validation library.",
+          "confidence": 0.8
+        }
+      ],
+      "falseNegatives": [
+        {
+          "category": "security",
+          "severity": "high",
+          "line": 3,
+          "type": "redos",
+          "description": "Nested quantifier creates catastrophic backtracking — ReDoS vulnerability"
+        }
+      ],
+      "durationMs": 6552,
+      "tokens": 2794,
+      "warnings": []
+    },
+    {
+      "id": "qual-console-log-023",
+      "groundTruthCount": 1,
+      "predictedCount": 2,
+      "truePositives": [
+        {
+          "predicted": {
+            "category": "maintainability",
+            "severity": "low",
+            "line": 2,
+            "type": "debug-code",
+            "description": "console.log statement in production code",
+            "recommendation": "Remove the console.log statement",
+            "confidence": 0.9
+          },
+          "groundTruth": {
+            "category": "quality",
+            "severity": "low",
+            "line": 2,
+            "type": "debug-code",
+            "description": "4 console.log statements — debug code should be removed or replaced with proper logging"
+          },
+          "matchScore": 0.923076923076923
+        }
+      ],
+      "falsePositives": [
+        {
+          "category": "quality",
+          "severity": "medium",
+          "line": 4,
+          "type": "no-error-handling",
+          "description": "The authenticate function call is not wrapped in a try/catch block.",
+          "recommendation": "Wrap the authenticate call in a try/catch block to handle potential errors.",
+          "confidence": 0.8
+        }
+      ],
+      "falseNegatives": [],
+      "durationMs": 5984,
+      "tokens": 2834,
+      "warnings": []
+    },
+    {
+      "id": "qual-long-function-024",
+      "groundTruthCount": 1,
+      "predictedCount": 2,
+      "truePositives": [],
+      "falsePositives": [
+        {
+          "category": "quality",
+          "severity": "high",
+          "line": 4,
+          "type": "missing-null-check",
+          "description": "subscription could be null if not found - accessing subscription.planId will cause an error.",
+          "recommendation": "Check if (subscription == null) return early.",
+          "confidence": 0.95
+        },
+        {
+          "category": "performance",
+          "severity": "high",
+          "line": 8,
+          "type": "n-plus-1-query",
+          "description": "Database queried inside loop - N+1 problem. `db.usage.findMany` is called for each feature in `allowed`.",
+          "recommendation": "Use a single JOIN query to fetch usage data for all features at once, filtering by `userId` and `featureId` in the `where` clause.",
+          "confidence": 0.9
+        }
+      ],
+      "falseNegatives": [
+        {
+          "category": "maintainability",
+          "severity": "medium",
+          "line": 1,
+          "type": "long-function",
+          "description": "Function does too many things (auth, billing, quota, alerting) — should be decomposed into smaller functions"
+        }
+      ],
+      "durationMs": 9573,
+      "tokens": 3206,
+      "warnings": []
+    },
+    {
+      "id": "qual-deep-nesting-025",
+      "groundTruthCount": 1,
+      "predictedCount": 3,
+      "truePositives": [
+        {
+          "predicted": {
+            "category": "maintainability",
+            "severity": "medium",
+            "line": 7,
+            "type": "deep-nesting",
+            "description": "Deeply nested if statements make the code hard to follow.",
+            "recommendation": "Consider refactoring to reduce nesting, perhaps using early returns or guard clauses.",
+            "confidence": 0.8
+          },
+          "groundTruth": {
+            "category": "maintainability",
+            "severity": "low",
+            "line": 1,
+            "type": "deep-nesting",
+            "description": "Six levels of nesting — use early returns or extract a helper function"
+          },
+          "matchScore": 0.6
+        }
+      ],
+      "falsePositives": [
+        {
+          "category": "maintainability",
+          "severity": "low",
+          "line": 8,
+          "type": "debug-code",
+          "description": "console.log statement in production code.",
+          "recommendation": "Remove the console.log statement or replace it with a proper logging mechanism.",
+          "confidence": 0.9
+        },
+        {
+          "category": "quality",
+          "severity": "medium",
+          "line": 1,
+          "type": "any-type-abuse",
+          "description": "The function parameter 'data' is typed as 'any', losing type safety.",
+          "recommendation": "Use a more specific type or a type guard to narrow the type of 'data'.",
+          "confidence": 0.85
+        }
+      ],
+      "falseNegatives": [],
+      "durationMs": 7149,
+      "tokens": 2955,
+      "warnings": []
+    },
+    {
+      "id": "sec-timing-attack-026",
+      "groundTruthCount": 1,
+      "predictedCount": 1,
+      "truePositives": [
+        {
+          "predicted": {
+            "category": "security",
+            "severity": "medium",
+            "line": 8,
+            "type": "timing-attack",
+            "description": "String comparison in `verifyAPIKey` is susceptible to timing attacks.",
+            "recommendation": "Use `crypto/subtle.ConstantTimeCompare` for constant-time string comparison.",
+            "confidence": 0.9
+          },
+          "groundTruth": {
+            "category": "security",
+            "severity": "medium",
+            "line": 9,
+            "type": "timing-attack",
+            "description": "String comparison is not constant-time; use subtle.ConstantTimeCompare for secrets"
+          },
+          "matchScore": 0.8142857142857143
+        }
+      ],
+      "falsePositives": [],
+      "falseNegatives": [],
+      "durationMs": 5123,
+      "tokens": 2790,
+      "warnings": []
+    },
+    {
+      "id": "qual-magic-numbers-027",
+      "groundTruthCount": 1,
+      "predictedCount": 1,
+      "truePositives": [
+        {
+          "predicted": {
+            "category": "maintainability",
+            "severity": "low",
+            "line": 2,
+            "type": "magic-numbers",
+            "description": "Magic number 25.00 used in conditional statement.",
+            "recommendation": "Replace with a named constant, e.g., const HEAVY_WEIGHT_SHIPPING_FEE = 25.00",
+            "confidence": 0.8
+          },
+          "groundTruth": {
+            "category": "maintainability",
+            "severity": "low",
+            "line": 2,
+            "type": "magic-numbers",
+            "description": "Magic numbers (50, 25, 1000, 15, 0.5, 0.01) should be named constants for clarity"
+          },
+          "matchScore": 0.9083333333333332
+        }
+      ],
+      "falsePositives": [],
+      "falseNegatives": [],
+      "durationMs": 8447,
+      "tokens": 2920,
+      "warnings": []
+    },
+    {
+      "id": "sec-cors-wildcard-028",
+      "groundTruthCount": 1,
+      "predictedCount": 1,
+      "truePositives": [
+        {
+          "predicted": {
+            "category": "security",
+            "severity": "high",
+            "line": 5,
+            "type": "cors-misconfiguration",
+            "description": "CORS configuration allows requests from any origin ('*'), which is insecure in production. Credentials are also enabled, allowing cookies and auth headers from any origin.",
+            "recommendation": "Restrict the `origin` to specific, trusted domains in production. Remove `credentials: true` if not strictly necessary.",
+            "confidence": 0.95
+          },
+          "groundTruth": {
+            "category": "security",
+            "severity": "high",
+            "line": 5,
+            "type": "cors-misconfiguration",
+            "description": "CORS wildcard origin with credentials=true is a dangerous combination — browsers reject it, but misconfigured proxies may pass it through"
+          },
+          "matchScore": 0.9093749999999999
+        }
+      ],
+      "falsePositives": [],
+      "falseNegatives": [],
+      "durationMs": 5458,
+      "tokens": 2823,
+      "warnings": []
+    },
+    {
+      "id": "qual-improper-async-iter-029",
+      "groundTruthCount": 1,
+      "predictedCount": 1,
+      "truePositives": [],
+      "falsePositives": [
+        {
+          "category": "quality",
+          "severity": "high",
+          "line": 3,
+          "type": "no-error-handling",
+          "description": "forEach does not await, so function returns before work is done",
+          "recommendation": "Use a `for...of` loop or `map` with `Promise.all` to ensure all items are processed before the function returns.",
+          "confidence": 0.95
+        }
+      ],
+      "falseNegatives": [
+        {
+          "category": "quality",
+          "severity": "medium",
+          "line": 3,
+          "type": "async-foreach-bug",
+          "description": "forEach ignores returned promises; use for...of or Promise.all to actually wait for async work"
+        }
+      ],
+      "durationMs": 4535,
+      "tokens": 2790,
+      "warnings": []
+    },
+    {
+      "id": "sec-race-condition-030",
+      "groundTruthCount": 1,
+      "predictedCount": 1,
+      "truePositives": [],
+      "falsePositives": [
+        {
+          "category": "quality",
+          "severity": "medium",
+          "line": 1,
+          "type": "mutation-side-effect",
+          "description": "The `counter` variable is declared outside the function scope and mutated within the function, leading to potential concurrency issues.",
+          "recommendation": "Declare `counter` with `let` inside the function scope to ensure each call has its own independent counter.",
+          "confidence": 0.9
+        }
+      ],
+      "falseNegatives": [
+        {
+          "category": "quality",
+          "severity": "high",
+          "line": 4,
+          "type": "race-condition",
+          "description": "Read-modify-write on shared state without synchronization — two concurrent calls can produce the same value"
+        }
+      ],
+      "durationMs": 11136,
+      "tokens": 2793,
+      "warnings": []
+    },
+    {
+      "id": "qual-null-pointer-031",
+      "groundTruthCount": 0,
+      "predictedCount": 1,
+      "truePositives": [],
+      "falsePositives": [
+        {
+          "category": "quality",
+          "severity": "high",
+          "line": 8,
+          "type": "missing-null-check",
+          "description": "GetUser function always returns a User struct, even if the user is not found. This can lead to nil pointer dereferences if the caller doesn't check for nil.",
+          "recommendation": "Add a check to see if the user exists before returning the struct. If the user is not found, return nil.",
+          "confidence": 0.95
+        }
+      ],
+      "falseNegatives": [],
+      "durationMs": 7191,
+      "tokens": 2854,
+      "warnings": []
+    },
+    {
+      "id": "qual-unsafe-conversion-032",
+      "groundTruthCount": 2,
+      "predictedCount": 2,
+      "truePositives": [
+        {
+          "predicted": {
+            "category": "quality",
+            "severity": "medium",
+            "line": 2,
+            "type": "any-type-abuse",
+            "description": "The `data` variable is typed as `any` after parsing the JSON string. This bypasses TypeScript's type checking.",
+            "recommendation": "Use a more specific type or a type guard to ensure the JSON structure is as expected. For example, define an interface for the expected JSON structure and cast `data` to that interface.",
+            "confidence": 0.9
+          },
+          "groundTruth": {
+            "category": "quality",
+            "severity": "medium",
+            "line": 3,
+            "type": "any-type-abuse",
+            "description": "JSON.parse result cast to any without schema validation"
+          },
+          "matchScore": 0.81
+        },
+        {
+          "predicted": {
+            "category": "quality",
+            "severity": "high",
+            "line": 3,
+            "type": "missing-null-check",
+            "description": "There's no check to ensure that `data.value` exists before attempting to multiply it. This could lead to a runtime error if the JSON doesn't contain a `value` property.",
+            "recommendation": "Add a check to ensure `data` and `data.value` exist before accessing them. For example: `if (data && data.value) { return data.value * 2; } else { return 0; }`",
+            "confidence": 0.95
+          },
+          "groundTruth": {
+            "category": "quality",
+            "severity": "high",
+            "line": 4,
+            "type": "missing-null-check",
+            "description": "No check if data.value is a number before multiplication"
+          },
+          "matchScore": 0.8181818181818182
+        }
+      ],
+      "falsePositives": [],
+      "falseNegatives": [],
+      "durationMs": 12885,
+      "tokens": 2933,
+      "warnings": []
+    },
+    {
+      "id": "perf-large-array-033",
+      "groundTruthCount": 1,
+      "predictedCount": 1,
+      "truePositives": [
+        {
+          "predicted": {
+            "category": "performance",
+            "severity": "medium",
+            "line": 4,
+            "type": "quadratic-complexity",
+            "description": "Using `out.includes(item)` inside a loop results in O(n^2) complexity.",
+            "recommendation": "Replace `out.includes(item)` with a Set to achieve O(n) complexity.  For example: `const seen = new Set(); for (const item of items) { if (!seen.has(item)) { seen.add(item); out.push(item); } }`",
+            "confidence": 0.95
+          },
+          "groundTruth": {
+            "category": "performance",
+            "severity": "medium",
+            "line": 4,
+            "type": "quadratic-complexity",
+            "description": "out.includes(item) is O(n) inside an O(n) loop — O(n²) total"
+          },
+          "matchScore": 0.9555555555555555
+        }
+      ],
+      "falsePositives": [],
+      "falseNegatives": [],
+      "durationMs": 6911,
+      "tokens": 2791,
+      "warnings": []
+    },
+    {
+      "id": "sec-insecure-deserialize-034",
+      "groundTruthCount": 1,
+      "predictedCount": 1,
+      "truePositives": [
+        {
+          "predicted": {
+            "category": "security",
+            "severity": "critical",
+            "line": 3,
+            "type": "code-injection",
+            "description": "Using pickle.loads on untrusted input allows arbitrary code execution.",
+            "recommendation": "Avoid using pickle with untrusted data. Consider using a safer serialization format like JSON or Protobuf, or implement a custom serialization/deserialization protocol with strict validation.",
+            "confidence": 0.95
+          },
+          "groundTruth": {
+            "category": "security",
+            "severity": "critical",
+            "line": 4,
+            "type": "code-injection",
+            "description": "pickle.loads can execute arbitrary code during deserialization"
+          },
+          "matchScore": 0.8307692307692308
+        }
+      ],
+      "falsePositives": [],
+      "falseNegatives": [],
+      "durationMs": 6459,
+      "tokens": 2766,
+      "warnings": []
+    },
+    {
+      "id": "sec-xml-external-entity-035",
+      "groundTruthCount": 1,
+      "predictedCount": 1,
+      "truePositives": [],
+      "falsePositives": [
+        {
+          "category": "quality",
+          "severity": "medium",
+          "line": 4,
+          "type": "no-error-handling",
+          "description": "XML parsing with `parse` can raise exceptions (e.g., `ParseError`) if the XML is malformed. The code doesn't handle these exceptions.",
+          "recommendation": "Wrap the `parse` call in a `try...except` block to catch potential `ParseError` exceptions and handle them gracefully (e.g., log the error and return an appropriate default value).",
+          "confidence": 0.9
+        }
+      ],
+      "falseNegatives": [
+        {
+          "category": "security",
+          "severity": "high",
+          "line": 4,
+          "type": "xxe",
+          "description": "XML parser without entity resolution disabled allows XXE attacks"
+        }
+      ],
+      "durationMs": 8586,
+      "tokens": 2829,
+      "warnings": []
+    },
+    {
+      "id": "qual-no-input-bound-036",
+      "groundTruthCount": 1,
+      "predictedCount": 0,
+      "truePositives": [],
+      "falsePositives": [],
+      "falseNegatives": [
+        {
+          "category": "quality",
+          "severity": "high",
+          "line": 2,
+          "type": "no-error-handling",
+          "description": "No size validation — negative or astronomically large size can crash or OOM"
+        }
+      ],
+      "durationMs": 1906,
+      "tokens": 2595,
+      "warnings": []
+    },
+    {
+      "id": "maintain-duplicated-code-037",
+      "groundTruthCount": 1,
+      "predictedCount": 1,
+      "truePositives": [
+        {
+          "predicted": {
+            "category": "maintainability",
+            "severity": "medium",
+            "line": 1,
+            "type": "duplicated-code",
+            "description": "Three nearly identical functions differ only by tax rate constant",
+            "recommendation": "Extract into one function taking rate as parameter",
+            "confidence": 0.95
+          },
+          "groundTruth": {
+            "category": "maintainability",
+            "severity": "medium",
+            "line": 1,
+            "type": "duplicated-code",
+            "description": "Three nearly identical functions differ only by tax rate — extract into shared function with parameter"
+          },
+          "matchScore": 0.9533333333333333
+        }
+      ],
+      "falsePositives": [],
+      "falseNegatives": [],
+      "durationMs": 6850,
+      "tokens": 2863,
+      "warnings": []
+    },
+    {
+      "id": "test-missing-assertions-038",
+      "groundTruthCount": 1,
+      "predictedCount": 2,
+      "truePositives": [
+        {
+          "predicted": {
+            "category": "testing",
+            "severity": "medium",
+            "line": 5,
+            "type": "missing-test-assertion",
+            "description": "Test calls calculateTax(100, 'US') but has no assertion.",
+            "recommendation": "Add expect(calculateTax(100, 'US')).toBe(expectedValue);",
+            "confidence": 0.95
+          },
+          "groundTruth": {
+            "category": "testing",
+            "severity": "medium",
+            "line": 4,
+            "type": "missing-test-assertion",
+            "description": "Test functions that don't assert anything — no expect() or assert() call"
+          },
+          "matchScore": 0.8071428571428572
+        }
+      ],
+      "falsePositives": [
+        {
+          "category": "testing",
+          "severity": "medium",
+          "line": 9,
+          "type": "missing-test-assertion",
+          "description": "Test calls calculateTax(100, 'UK') but has no assertion.",
+          "recommendation": "Add expect(calculateTax(100, 'UK')).toBe(expectedValue);",
+          "confidence": 0.95
+        }
+      ],
+      "falseNegatives": [],
+      "durationMs": 8210,
+      "tokens": 2829,
+      "warnings": []
+    },
+    {
+      "id": "test-flaky-assert-039",
+      "groundTruthCount": 1,
+      "predictedCount": 1,
+      "truePositives": [
+        {
+          "predicted": {
+            "category": "testing",
+            "severity": "low",
+            "line": 6,
+            "type": "flaky-test",
+            "description": "Test expects a specific date, making it flaky.",
+            "recommendation": "Use a mocking library or a more dynamic assertion to verify the format without relying on a fixed date.",
+            "confidence": 0.9
+          },
+          "groundTruth": {
+            "category": "testing",
+            "severity": "medium",
+            "line": 5,
+            "type": "flaky-test",
+            "description": "Test asserts against a hardcoded date — breaks tomorrow because formatDate(new Date()) will return today"
+          },
+          "matchScore": 0.8117647058823529
+        }
+      ],
+      "falsePositives": [],
+      "falseNegatives": [],
+      "durationMs": 8321,
+      "tokens": 2759,
+      "warnings": []
+    },
+    {
+      "id": "test-missing-exception-040",
+      "groundTruthCount": 1,
+      "predictedCount": 1,
+      "truePositives": [
+        {
+          "predicted": {
+            "category": "testing",
+            "severity": "medium",
+            "line": 5,
+            "type": "missing-test-assertion",
+            "description": "Test function calls div but never asserts anything — no expect() call.",
+            "recommendation": "Add expect(div).toThrow() or expect(() => div(10, 0)).toThrow()",
+            "confidence": 0.95
+          },
+          "groundTruth": {
+            "category": "testing",
+            "severity": "medium",
+            "line": 5,
+            "type": "missing-test-assertion",
+            "description": "Testing that a function throws requires toThrow() assertion, not just calling it"
+          },
+          "matchScore": 0.9052631578947368
+        }
+      ],
+      "falsePositives": [],
+      "falseNegatives": [],
+      "durationMs": 5551,
+      "tokens": 2722,
+      "warnings": []
+    },
+    {
+      "id": "qual-env-leak-041",
+      "groundTruthCount": 1,
+      "predictedCount": 1,
+      "truePositives": [
+        {
+          "predicted": {
+            "category": "maintainability",
+            "severity": "low",
+            "line": 5,
+            "type": "magic-numbers",
+            "description": "The string 'KEY_NAME' is a magic string. It's not clear what this represents without additional context.",
+            "recommendation": "Replace 'KEY_NAME' with a named constant or enum to improve readability and maintainability.",
+            "confidence": 0.8
+          },
+          "groundTruth": {
+            "category": "quality",
+            "severity": "medium",
+            "line": 5,
+            "type": "magic-numbers",
+            "description": "Hardcoded env var name 'KEY_NAME' should be parameterized or use the function argument"
+          },
+          "matchScore": 0.9142857142857141
+        }
+      ],
+      "falsePositives": [],
+      "falseNegatives": [],
+      "durationMs": 8393,
+      "tokens": 2799,
+      "warnings": []
+    },
+    {
+      "id": "sec-command-injection-042",
+      "groundTruthCount": 1,
+      "predictedCount": 1,
+      "truePositives": [
+        {
+          "predicted": {
+            "category": "security",
+            "severity": "high",
+            "line": 4,
+            "type": "command-injection",
+            "description": "User-controlled filename is directly interpolated into a shell command without sanitization, leading to potential command injection.",
+            "recommendation": "Sanitize the filename to prevent command injection. Use a safer alternative like `child_process.spawn` with an array of arguments, or use a library that handles shell escaping.",
+            "confidence": 0.9
+          },
+          "groundTruth": {
+            "category": "security",
+            "severity": "critical",
+            "line": 4,
+            "type": "command-injection",
+            "description": "User-controlled filename interpolated into shell command without escaping"
+          },
+          "matchScore": 0.9571428571428571
+        }
+      ],
+      "falsePositives": [],
+      "falseNegatives": [],
+      "durationMs": 9376,
+      "tokens": 2806,
+      "warnings": []
+    },
+    {
+      "id": "qual-undefined-property-043",
+      "groundTruthCount": 1,
+      "predictedCount": 1,
+      "truePositives": [
+        {
+          "predicted": {
+            "category": "quality",
+            "severity": "high",
+            "line": 7,
+            "type": "missing-null-check",
+            "description": "Accessing `item.name` without checking if it's undefined will cause a runtime error.",
+            "recommendation": "Add a null check before accessing `item.name`: `return item.name ? item.name.toUpperCase() : '';`",
+            "confidence": 0.95
+          },
+          "groundTruth": {
+            "category": "quality",
+            "severity": "high",
+            "line": 7,
+            "type": "missing-null-check",
+            "description": "name is optional but used without a null/undefined check — will crash at runtime"
+          },
+          "matchScore": 0.9312499999999999
+        }
+      ],
+      "falsePositives": [],
+      "falseNegatives": [],
+      "durationMs": 7601,
+      "tokens": 2755,
+      "warnings": []
+    },
+    {
+      "id": "test-oversized-044",
+      "groundTruthCount": 1,
+      "predictedCount": 1,
+      "truePositives": [
+        {
+          "predicted": {
+            "category": "testing",
+            "severity": "medium",
+            "line": 4,
+            "type": "long-function",
+            "description": "The test function contains a very long authentication flow (60 steps, 400+ lines).",
+            "recommendation": "Break down the test into smaller, more focused tests that each verify a specific part of the authentication flow. Consider using helper functions to reduce duplication.",
+            "confidence": 0.8
+          },
+          "groundTruth": {
+            "category": "testing",
+            "severity": "low",
+            "line": 4,
+            "type": "long-function",
+            "description": "Single test function doing too much — should be split into separate focused tests"
+          },
+          "matchScore": 0.9095238095238094
+        }
+      ],
+      "falsePositives": [],
+      "falseNegatives": [],
+      "durationMs": 6355,
+      "tokens": 2849,
+      "warnings": []
+    },
+    {
+      "id": "perf-missing-index-045",
+      "groundTruthCount": 1,
+      "predictedCount": 1,
+      "truePositives": [
+        {
+          "predicted": {
+            "category": "performance",
+            "severity": "medium",
+            "line": 2,
+            "type": "n-plus-1-query",
+            "description": "Retrieving all users and then filtering in memory is inefficient.  Consider querying the database directly using the email as a filter.",
+            "recommendation": "Modify the query to filter by email directly in the database: `const user = await db.user.findUnique({ where: { email: email } });`",
+            "confidence": 0.9
+          },
+          "groundTruth": {
+            "category": "performance",
+            "severity": "medium",
+            "line": 2,
+            "type": "n-plus-1-query",
+            "description": "Loading all users into memory just to find one by email — use findUnique with a filter"
+          },
+          "matchScore": 0.9208333333333333
+        }
+      ],
+      "falsePositives": [],
+      "falseNegatives": [],
+      "durationMs": 8513,
+      "tokens": 2796,
+      "warnings": []
+    },
+    {
+      "id": "qual-direct-mutation-046",
+      "groundTruthCount": 1,
+      "predictedCount": 1,
+      "truePositives": [
+        {
+          "predicted": {
+            "category": "quality",
+            "severity": "medium",
+            "line": 2,
+            "type": "mutation-side-effect",
+            "description": "Function modifies its input parameter instead of returning a new object",
+            "recommendation": "Return a new object: return { ...user, name: newName }",
+            "confidence": 0.85
+          },
+          "groundTruth": {
+            "category": "quality",
+            "severity": "medium",
+            "line": 2,
+            "type": "mutation-side-effect",
+            "description": "Function mutates its input parameter directly instead of returning a new object"
+          },
+          "matchScore": 0.9727272727272727
+        }
+      ],
+      "falsePositives": [],
+      "falseNegatives": [],
+      "durationMs": 5714,
+      "tokens": 2742,
+      "warnings": []
+    },
+    {
+      "id": "sec-hardcoded-jwt-047",
+      "groundTruthCount": 1,
+      "predictedCount": 1,
+      "truePositives": [
+        {
+          "predicted": {
+            "category": "security",
+            "severity": "critical",
+            "line": 4,
+            "type": "hardcoded-secret",
+            "description": "Hardcoded secret key 'super-secret-key-123' used for JWT signing. This should be stored in an environment variable or secure configuration.",
+            "recommendation": "Store the JWT secret key in an environment variable and retrieve it at runtime.  Consider using a more robust key management system.",
+            "confidence": 0.95
+          },
+          "groundTruth": {
+            "category": "security",
+            "severity": "high",
+            "line": 4,
+            "type": "hardcoded-secret",
+            "description": "JWT signing secret hardcoded in source and set to a year-long expiry"
+          },
+          "matchScore": 0.9181818181818181
+        }
+      ],
+      "falsePositives": [],
+      "falseNegatives": [],
+      "durationMs": 6232,
+      "tokens": 2789,
+      "warnings": []
+    },
+    {
+      "id": "sec-csrf-missing-048",
+      "groundTruthCount": 1,
+      "predictedCount": 2,
+      "truePositives": [],
+      "falsePositives": [
+        {
+          "category": "quality",
+          "severity": "high",
+          "line": 6,
+          "type": "no-error-handling",
+          "description": "No try/catch block around db.transfer call.  Errors will not be handled gracefully.",
+          "recommendation": "Wrap the db.transfer call in a try/catch block to handle potential errors and send an appropriate error response to the client.",
+          "confidence": 0.95
+        },
+        {
+          "category": "security",
+          "severity": "high",
+          "line": 8,
+          "type": "missing-null-check",
+          "description": "req.userId is used without validation.  If req.userId is null or undefined, this could lead to unauthorized access.",
+          "recommendation": "Validate that req.userId exists and is a valid user ID before calling db.transfer.",
+          "confidence": 0.9
+        }
+      ],
+      "falseNegatives": [
+        {
+          "category": "security",
+          "severity": "high",
+          "line": 5,
+          "type": "csrf-missing",
+          "description": "State-changing mutation endpoint without CSRF token validation"
+        }
+      ],
+      "durationMs": 9084,
+      "tokens": 2912,
+      "warnings": []
+    },
+    {
+      "id": "perf-unnecessary-alloc-049",
+      "groundTruthCount": 1,
+      "predictedCount": 1,
+      "truePositives": [],
+      "falsePositives": [
+        {
+          "category": "security",
+          "severity": "high",
+          "line": 4,
+          "type": "xss",
+          "description": "Unescaped user input directly inserted into HTML string",
+          "recommendation": "Escape the input `text` before inserting it into the HTML string. Use a library or function designed for HTML escaping.",
+          "confidence": 0.95
+        }
+      ],
+      "falseNegatives": [
+        {
+          "category": "performance",
+          "severity": "medium",
+          "line": 2,
+          "type": "unnecessary-alloc",
+          "description": "Using an array and join for a simple concatenation — unnecessary allocation"
+        }
+      ],
+      "durationMs": 6718,
+      "tokens": 2755,
+      "warnings": []
+    }
+  ],
+  "byCategory": {
+    "security": {
+      "precision": 0.8333333333333334,
+      "recall": 0.75,
+      "f1": 0.7894736842105262,
+      "support": 20
+    },
+    "quality": {
+      "precision": 0.5,
+      "recall": 0.7857142857142857,
+      "f1": 0.6111111111111112,
+      "support": 14
+    },
+    "maintainability": {
+      "precision": 0.625,
+      "recall": 0.625,
+      "f1": 0.625,
+      "support": 8
+    },
+    "performance": {
+      "precision": 0.8333333333333334,
+      "recall": 0.8333333333333334,
+      "f1": 0.8333333333333334,
+      "support": 6
+    },
+    "testing": {
+      "precision": 0.8,
+      "recall": 1,
+      "f1": 0.888888888888889,
+      "support": 4
+    }
+  },
+  "bySeverity": {
+    "critical": {
+      "precision": 0.8333333333333334,
+      "recall": 1,
+      "f1": 0.9090909090909091,
+      "support": 5
+    },
+    "high": {
+      "precision": 0.6086956521739131,
+      "recall": 0.6666666666666666,
+      "f1": 0.6363636363636365,
+      "support": 21
+    },
+    "medium": {
+      "precision": 0.6956521739130435,
+      "recall": 0.8,
+      "f1": 0.7441860465116279,
+      "support": 20
+    },
+    "low": {
+      "precision": 0.7142857142857143,
+      "recall": 0.8333333333333334,
+      "f1": 0.7692307692307692,
+      "support": 6
+    }
+  },
+  "cost": {
+    "totalTokens": 138677,
+    "totalDurationMs": 327032,
+    "averageLatencyMs": 6674.122448979592
+  },
+  "config": {
+    "promptMode": "strict",
+    "lineTolerance": 2,
+    "typeMatchWeight": 0.6,
+    "lineMatchWeight": 0.3,
+    "descriptionSimilarityWeight": 0.1
+  }
+}

@@ -24,8 +24,10 @@ import dashboardRoutes from "./routes/dashboards";
 import timeseriesRoutes from "./routes/timeseries";
 import scopeComplianceRoutes from "./routes/scopeCompliance";
 import webhookRoutes from "./routes/webhooks";
+import internalRoutes from "./routes/internal";
 
 const app: express.Express = express();
+const startTime = Date.now();
 app.use(helmet());
 app.use(cors({ origin: process.env.APP_URL || "http://localhost:5173", credentials: true }));
 
@@ -45,7 +47,11 @@ app.use("/webhooks", express.raw({ type: "application/json" }), (req: any, res, 
 
 app.use(express.json({ limit: "10mb" }));
 
-app.get("/health", (_req, res) => res.json({ status: "ok", timestamp: new Date().toISOString() }));
+app.get("/health", (_req, res) => res.json({ 
+  status: "ok", 
+  uptime: process.uptime(),
+  timestamp: new Date().toISOString() 
+}));
 app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/scans", scanRoutes);
 app.use("/api/v1/billing", billingRoutes);
@@ -65,6 +71,7 @@ app.use("/api/v1/dashboards", dashboardRoutes);
 app.use("/api/v1/scans", timeseriesRoutes);
 app.use("/api/v1/scope-compliance", scopeComplianceRoutes);
 app.use("/webhooks", webhookRoutes);
+app.use("/api/v1/internal", internalRoutes);
 
 app.use(errorHandler);
 export default app;

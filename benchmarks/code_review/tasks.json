@@ -1,0 +1,865 @@
+[
+  {
+    "id": "sec-eval-001",
+    "category": "security",
+    "severity": "critical",
+    "language": "ts",
+    "source": "vibe-pattern",
+    "code": "import { readFileSync } from 'fs';\n\nexport function runUserScript(scriptPath: string, userInput: string): unknown {\n  // Execute a user-provided script with user input\n  const script = readFileSync(scriptPath, 'utf-8');\n  const fn = new Function('input', script);\n  return fn(userInput);\n}\n",
+    "ground_truth": [
+      {
+        "category": "security",
+        "severity": "critical",
+        "line": 5,
+        "type": "code-injection",
+        "description": "new Function() allows arbitrary code execution from a user-controlled script path"
+      }
+    ],
+    "expected_recommendation_keywords": ["eval", "Function", "sandbox", "vm2"]
+  },
+  {
+    "id": "sec-sql-injection-002",
+    "category": "security",
+    "severity": "critical",
+    "language": "ts",
+    "source": "CWE-89",
+    "code": "import { query } from './db';\n\nexport async function getUserByName(name: string) {\n  const result = await query(\n    `SELECT * FROM users WHERE name = '${name}'`\n  );\n  return result.rows[0];\n}\n",
+    "ground_truth": [
+      {
+        "category": "security",
+        "severity": "critical",
+        "line": 5,
+        "type": "sql-injection",
+        "description": "User input interpolated directly into SQL string — classic SQL injection vulnerability"
+      }
+    ],
+    "expected_recommendation_keywords": ["parameterized", "prepared statement", "escape"]
+  },
+  {
+    "id": "sec-sql-injection-003-safe",
+    "category": "security",
+    "severity": "none",
+    "language": "ts",
+    "source": "CWE-89 (false-positive trap)",
+    "code": "import { query } from './db';\n\nexport async function getUserByName(name: string) {\n  const result = await query(\n    'SELECT * FROM users WHERE name = $1',\n    [name]\n  );\n  return result.rows[0];\n}\n",
+    "ground_truth": [],
+    "expected_recommendation_keywords": []
+  },
+  {
+    "id": "sec-secret-004",
+    "category": "security",
+    "severity": "high",
+    "language": "ts",
+    "source": "vibe-pattern",
+    "code": "// config.ts — committed to repo by accident\nexport const config = {\n  openaiApiKey: 'sk-proj-abc123def456ghi789jkl012mno345pqr678stu901',\n  databaseUrl: 'postgresql://user:hunter2@prod-db.example.com:5432/main',\n  stripeKey: 'sk_live_4eC39HqLyjWDarjtT1zdp7dc',\n};\n",
+    "ground_truth": [
+      {
+        "category": "security",
+        "severity": "high",
+        "line": 3,
+        "type": "hardcoded-secret",
+        "description": "OpenAI API key committed to source"
+      },
+      {
+        "category": "security",
+        "severity": "high",
+        "line": 4,
+        "type": "hardcoded-secret",
+        "description": "Database connection string with password committed"
+      },
+      {
+        "category": "security",
+        "severity": "high",
+        "line": 5,
+        "type": "hardcoded-secret",
+        "description": "Live Stripe key committed"
+      }
+    ],
+    "expected_recommendation_keywords": ["env", "secret", "rotate"]
+  },
+  {
+    "id": "sec-xss-005",
+    "category": "security",
+    "severity": "high",
+    "language": "ts",
+    "source": "CWE-79",
+    "code": "import { Request, Response } from 'express';\n\nexport function renderComment(req: Request, res: Response) {\n  const userComment = req.query.comment as string;\n  // Render the user comment directly into HTML\n  res.send(`<div class=\"comment\">${userComment}</div>`);\n}\n",
+    "ground_truth": [
+      {
+        "category": "security",
+        "severity": "high",
+        "line": 5,
+        "type": "xss",
+        "description": "Unsanitized user input rendered directly in HTML response"
+      }
+    ],
+    "expected_recommendation_keywords": ["escape", "sanitize", "DOMPurify"]
+  },
+  {
+    "id": "sec-path-traversal-006",
+    "category": "security",
+    "severity": "high",
+    "language": "ts",
+    "source": "CWE-22",
+    "code": "import { Request, Response } from 'express';\nimport { readFileSync } from 'fs';\nimport { join } from 'path';\n\nconst ROOT = './public';\n\nexport function serveFile(req: Request, res: Response) {\n  const filename = req.params.name;\n  // Serve any file under public/\n  const path = join(ROOT, filename);\n  const content = readFileSync(path, 'utf-8');\n  res.send(content);\n}\n",
+    "ground_truth": [
+      {
+        "category": "security",
+        "severity": "high",
+        "line": 9,
+        "type": "path-traversal",
+        "description": "User-supplied filename joined to root path allows ../ traversal to read arbitrary files"
+      }
+    ],
+    "expected_recommendation_keywords": ["path traversal", "normalize", "resolve", "startsWith"]
+  },
+  {
+    "id": "sec-prototype-pollution-007",
+    "category": "security",
+    "severity": "high",
+    "language": "js",
+    "source": "CVE-2019-7608-style",
+    "code": "function merge(target, source) {\n  for (const key of Object.keys(source)) {\n    if (typeof source[key] === 'object' && source[key] !== null) {\n      if (!target[key]) target[key] = {};\n      merge(target[key], source[key]);\n    } else {\n      target[key] = source[key];\n    }\n  }\n  return target;\n}\n\nmodule.exports = { merge };\n",
+    "ground_truth": [
+      {
+        "category": "security",
+        "severity": "high",
+        "line": 2,
+        "type": "prototype-pollution",
+        "description": "Recursive merge does not guard against __proto__/constructor keys, enabling prototype pollution"
+      }
+    ],
+    "expected_recommendation_keywords": ["__proto__", "hasOwnProperty", "prototype pollution"]
+  },
+  {
+    "id": "sec-prompt-injection-008",
+    "category": "security",
+    "severity": "medium",
+    "language": "ts",
+    "source": "vibe-pattern (2025-era)",
+    "code": "async function summarizeArticle(articleText: string): Promise<string> {\n  const prompt = `Summarize this article:\\n\\n${articleText}\\n\\nSummary:`;\n  const result = await llmCall(prompt);\n  return result;\n}\n",
+    "ground_truth": [
+      {
+        "category": "security",
+        "severity": "medium",
+        "line": 2,
+        "type": "prompt-injection",
+        "description": "User-provided article text is concatenated into a prompt with no separation — could contain instructions that override the system prompt"
+      }
+    ],
+    "expected_recommendation_keywords": ["prompt injection", "delimiter", "injection"]
+  },
+  {
+    "id": "qual-callback-hell-009",
+    "category": "maintainability",
+    "severity": "medium",
+    "language": "js",
+    "source": "vibe-pattern",
+    "code": "function loadUserData(userId, callback) {\n  fetchUser(userId, function(err, user) {\n    if (err) return callback(err);\n    fetchPosts(user.id, function(err, posts) {\n      if (err) return callback(err);\n      fetchComments(posts, function(err, comments) {\n        if (err) return callback(err);\n        callback(null, { user, posts, comments });\n      });\n    });\n  });\n}\n",
+    "ground_truth": [
+      {
+        "category": "maintainability",
+        "severity": "medium",
+        "line": 1,
+        "type": "callback-hell",
+        "description": "Deeply nested callbacks should be refactored to async/await or Promises"
+      }
+    ],
+    "expected_recommendation_keywords": ["async", "await", "promise", "refactor"]
+  },
+  {
+    "id": "qual-missing-error-handling-010",
+    "category": "quality",
+    "severity": "high",
+    "language": "ts",
+    "source": "vibe-pattern",
+    "code": "export async function syncInventory(productId: string): Promise<void> {\n  const product = await db.products.findUnique({ where: { id: productId } });\n  const stock = await inventory.get(productId);\n  await db.products.update({\n    where: { id: productId },\n    data: { stockLevel: stock.quantity },\n  });\n}\n",
+    "ground_truth": [
+      {
+        "category": "quality",
+        "severity": "high",
+        "line": 2,
+        "type": "missing-null-check",
+        "description": "If product is null (not found), .update will throw an unclear error; should validate first"
+      },
+      {
+        "category": "quality",
+        "severity": "high",
+        "line": 1,
+        "type": "no-error-handling",
+        "description": "No try/catch — unhandled rejection can crash the worker on transient DB errors"
+      }
+    ],
+    "expected_recommendation_keywords": ["try", "catch", "null check", "if (!product)"]
+  },
+  {
+    "id": "qual-any-abuse-011",
+    "category": "quality",
+    "severity": "medium",
+    "language": "ts",
+    "source": "AGENTS.md guideline",
+    "code": "export function transform(input: any): any {\n  const data: any = JSON.parse(input);\n  const result: any = {};\n  for (const key of Object.keys(data)) {\n    result[key] = data[key].value;\n  }\n  return result;\n}\n",
+    "ground_truth": [
+      {
+        "category": "quality",
+        "severity": "medium",
+        "line": 1,
+        "type": "any-type-abuse",
+        "description": "Defeats TypeScript type safety — should use proper types or generics"
+      }
+    ],
+    "expected_recommendation_keywords": ["any", "type", "generic", "interface"]
+  },
+  {
+    "id": "qual-mutable-default-arg-012",
+    "category": "quality",
+    "severity": "high",
+    "language": "py",
+    "source": "Python Gotcha",
+    "code": "def add_item(item, cart=[]):\n    cart.append(item)\n    return cart\n\n# Caller 1\nprint(add_item('apple'))  # ['apple']\n# Caller 2\nprint(add_item('banana'))  # ['apple', 'banana'] — surprise!\n",
+    "ground_truth": [
+      {
+        "category": "quality",
+        "severity": "high",
+        "line": 1,
+        "type": "mutable-default-argument",
+        "description": "Mutable default arguments are shared across all calls — classic Python bug"
+      }
+    ],
+    "expected_recommendation_keywords": ["mutable", "default", "None"]
+  },
+  {
+    "id": "qual-resource-leak-013",
+    "category": "quality",
+    "severity": "high",
+    "language": "ts",
+    "source": "vibe-pattern",
+    "code": "import * as fs from 'fs';\n\nexport function readConfig(path: string): string {\n  const handle = fs.openSync(path, 'r');\n  const buffer = Buffer.alloc(1024);\n  fs.readSync(handle, buffer, 0, 1024, 0);\n  return buffer.toString('utf-8');\n  // File handle never closed!\n}\n",
+    "ground_truth": [
+      {
+        "category": "quality",
+        "severity": "high",
+        "line": 4,
+        "type": "resource-leak",
+        "description": "File handle opened with fs.OpenSync is never closed — exhausts file descriptors under load"
+      }
+    ],
+    "expected_recommendation_keywords": ["close", "fd", "handle", "try/finally", "fs.promises"]
+  },
+  {
+    "id": "qual-no-tests-014",
+    "category": "maintainability",
+    "severity": "medium",
+    "language": "ts",
+    "source": "AGENTS.md guideline",
+    "code": "export function calculateTax(amount: number, region: string): number {\n  const rates: Record<string, number> = { US: 0.07, EU: 0.20, UK: 0.20, JP: 0.10 };\n  const rate = rates[region] ?? 0;\n  return amount * rate;\n}\n",
+    "ground_truth": [
+      {
+        "category": "maintainability",
+        "severity": "low",
+        "line": 1,
+        "type": "missing-test-coverage",
+        "description": "Tax calculation logic has no associated tests — high business risk, low coverage"
+      }
+    ],
+    "expected_recommendation_keywords": ["test", "coverage"]
+  },
+  {
+    "id": "qual-todo-fixme-015",
+    "category": "maintainability",
+    "severity": "low",
+    "language": "ts",
+    "source": "vibe-pattern",
+    "code": "export function processOrder(order: Order): void {\n  // TODO: add validation\n  // FIXME: race condition with concurrent updates\n  // HACK: works around Redis bug #1234\n  db.orders.insert(order);\n  queue.publish('order.created', order);\n}\n",
+    "ground_truth": [
+      {
+        "category": "maintainability",
+        "severity": "low",
+        "line": 2,
+        "type": "todo-comment",
+        "description": "TODO marker indicates incomplete work"
+      },
+      {
+        "category": "maintainability",
+        "severity": "medium",
+        "line": 3,
+        "type": "fixme-known-bug",
+        "description": "FIXME indicates a known race condition bug that should be tracked"
+      }
+    ],
+    "expected_recommendation_keywords": ["TODO", "FIXME", "track"]
+  },
+  {
+    "id": "perf-n-plus-1-016",
+    "category": "performance",
+    "severity": "high",
+    "language": "ts",
+    "source": "vibe-pattern",
+    "code": "export async function getOrdersWithItems(userId: string) {\n  const orders = await db.orders.findMany({ where: { userId } });\n  for (const order of orders) {\n    order.items = await db.items.findMany({ where: { orderId: order.id } });\n  }\n  return orders;\n}\n",
+    "ground_truth": [
+      {
+        "category": "performance",
+        "severity": "high",
+        "line": 4,
+        "type": "n-plus-1-query",
+        "description": "Database queried in a loop — N+1 query problem; should use a single JOIN or include"
+      }
+    ],
+    "expected_recommendation_keywords": ["n+1", "join", "include", "batch"]
+  },
+  {
+    "id": "perf-quadratic-017",
+    "category": "performance",
+    "severity": "medium",
+    "language": "py",
+    "source": "vibe-pattern",
+    "code": "def has_duplicates(items: list) -> bool:\n    seen = []\n    for item in items:\n        if item in seen:  # O(n) lookup\n            return True\n        seen.append(item)\n    return False\n",
+    "ground_truth": [
+      {
+        "category": "performance",
+        "severity": "medium",
+        "line": 3,
+        "type": "quadratic-complexity",
+        "description": "O(n²) — `item in list` is O(n); use a set for O(1) lookups"
+      }
+    ],
+    "expected_recommendation_keywords": ["set", "O(n)", "complexity", "performance"]
+  },
+  {
+    "id": "perf-blocking-event-loop-018",
+    "category": "performance",
+    "severity": "high",
+    "language": "ts",
+    "source": "Node.js best practices",
+    "code": "import { readFileSync } from 'fs';\nimport express from 'express';\n\nconst app = express();\n\napp.get('/log/:file', (req, res) => {\n  // Synchronous file read on the event loop\n  const content = readFileSync(req.params.file, 'utf-8');\n  res.send(content);\n});\n",
+    "ground_truth": [
+      {
+        "category": "performance",
+        "severity": "high",
+        "line": 7,
+        "type": "blocking-event-loop",
+        "description": "Synchronous fs in an async request handler blocks the entire event loop"
+      }
+    ],
+    "expected_recommendation_keywords": ["async", "readFile", "blocking", "event loop"]
+  },
+  {
+    "id": "sec-weak-hash-019",
+    "category": "security",
+    "severity": "medium",
+    "language": "py",
+    "source": "CWE-327",
+    "code": "import hashlib\n\ndef hash_password(password: str) -> str:\n    return hashlib.md5(password.encode()).hexdigest()\n",
+    "ground_truth": [
+      {
+        "category": "security",
+        "severity": "medium",
+        "line": 4,
+        "type": "weak-crypto",
+        "description": "MD5 is cryptographically broken for password hashing; use bcrypt/argon2/scrypt"
+      }
+    ],
+    "expected_recommendation_keywords": ["md5", "bcrypt", "argon2", "scrypt", "deprecated"]
+  },
+  {
+    "id": "sec-insecure-random-020",
+    "category": "security",
+    "severity": "medium",
+    "language": "py",
+    "source": "CWE-330",
+    "code": "import random\n\ndef generate_session_token() -> str:\n    return str(random.random())\n",
+    "ground_truth": [
+      {
+        "category": "security",
+        "severity": "medium",
+        "line": 4,
+        "type": "insecure-random",
+        "description": "random.random() uses Mersenne Twister, not cryptographically secure; use secrets module for tokens"
+      }
+    ],
+    "expected_recommendation_keywords": ["secrets", "secure", "random", "cryptographic"]
+  },
+  {
+    "id": "sec-jwt-none-021",
+    "category": "security",
+    "severity": "critical",
+    "language": "js",
+    "source": "CVE-2015-9235",
+    "code": "const jwt = require('jsonwebtoken');\n\nfunction verifyToken(token) {\n  // BUG: algorithm not specified, attacker can set alg=none\n  return jwt.verify(token, 'secret');\n}\n",
+    "ground_truth": [
+      {
+        "category": "security",
+        "severity": "critical",
+        "line": 4,
+        "type": "jwt-alg-none",
+        "description": "jwt.verify without algorithms option allows the alg=none attack — must whitelist allowed algorithms"
+      }
+    ],
+    "expected_recommendation_keywords": ["algorithms", "none", "jwt"]
+  },
+  {
+    "id": "sec-regex-dos-022",
+    "category": "security",
+    "severity": "high",
+    "language": "py",
+    "source": "CWE-1333",
+    "code": "import re\n\nEMAIL_REGEX = re.compile(r'^([a-zA-Z]+)+@')\n\ndef is_valid_email(email: str) -> bool:\n    return bool(EMAIL_REGEX.match(email))\n",
+    "ground_truth": [
+      {
+        "category": "security",
+        "severity": "high",
+        "line": 3,
+        "type": "redos",
+        "description": "Nested quantifier creates catastrophic backtracking — ReDoS vulnerability"
+      }
+    ],
+    "expected_recommendation_keywords": ["redos", "backtrack", "regex", "catastrophic"]
+  },
+  {
+    "id": "qual-console-log-023",
+    "category": "quality",
+    "severity": "low",
+    "language": "ts",
+    "source": "AGENTS.md guideline",
+    "code": "export function login(user: User) {\n  console.log('login called');\n  console.log('user:', user);\n  const result = authenticate(user);\n  console.log('result:', result);\n  console.log('done');\n  return result;\n}\n",
+    "ground_truth": [
+      {
+        "category": "quality",
+        "severity": "low",
+        "line": 2,
+        "type": "debug-code",
+        "description": "4 console.log statements — debug code should be removed or replaced with proper logging"
+      }
+    ],
+    "expected_recommendation_keywords": ["console.log", "debug", "logger"]
+  },
+  {
+    "id": "qual-long-function-024",
+    "category": "maintainability",
+    "severity": "medium",
+    "language": "ts",
+    "source": "vibe-pattern",
+    "code": "export async function handleRequest(req: Request, res: Response) {\n  const user = await db.users.findUnique({ where: { id: req.params.id } });\n  if (!user) return res.status(404).send('not found');\n  const subscription = await db.subscriptions.findFirst({ where: { userId: user.id } });\n  if (subscription && subscription.status === 'active') {\n    const features = await db.features.findMany({ where: { planId: subscription.planId } });\n    const allowed = features.filter(f => f.enabled);\n    const usage = await db.usage.findMany({ where: { userId: user.id, featureId: { in: allowed.map(f => f.id) } } });\n    const quotas = allowed.map(f => ({ id: f.id, used: usage.filter(u => u.featureId === f.id).reduce((s, u) => s + u.amount, 0), limit: f.limit }));\n    const overage = quotas.filter(q => q.used > q.limit);\n    if (overage.length > 0) {\n      await db.usage.updateMany({ where: { userId: user.id }, data: { flagged: true } });\n      await emailService.sendOverageAlert(user.email, overage);\n    }\n    res.json({ user, quotas, overage });\n  } else {\n    res.status(403).send('no active subscription');\n  }\n}\n",
+    "ground_truth": [
+      {
+        "category": "maintainability",
+        "severity": "medium",
+        "line": 1,
+        "type": "long-function",
+        "description": "Function does too many things (auth, billing, quota, alerting) — should be decomposed into smaller functions"
+      }
+    ],
+    "expected_recommendation_keywords": ["refactor", "extract", "decompose", "function"]
+  },
+  {
+    "id": "qual-deep-nesting-025",
+    "category": "maintainability",
+    "severity": "low",
+    "language": "ts",
+    "source": "vibe-pattern",
+    "code": "function process(data: any) {\n  if (data) {\n    if (data.items) {\n      for (const item of data.items) {\n        if (item.active) {\n          if (item.price > 0) {\n            if (item.stock > 0) {\n              console.log(item);\n            }\n          }\n        }\n      }\n    }\n  }\n}\n",
+    "ground_truth": [
+      {
+        "category": "maintainability",
+        "severity": "low",
+        "line": 1,
+        "type": "deep-nesting",
+        "description": "Six levels of nesting — use early returns or extract a helper function"
+      }
+    ],
+    "expected_recommendation_keywords": ["early return", "nesting", "guard", "refactor"]
+  },
+  {
+    "id": "sec-timing-attack-026",
+    "category": "security",
+    "severity": "medium",
+    "language": "go",
+    "source": "CWE-208",
+    "code": "package main\n\nimport (\n\t\"crypto/subtle\"\n\t\"fmt\"\n)\n\nfunc verifyAPIKey(provided, expected string) bool {\n\treturn provided == expected\n}\n\nfunc main() {\n\tfmt.Println(verifyAPIKey(\"abc\", \"xyz\"))\n}\n",
+    "ground_truth": [
+      {
+        "category": "security",
+        "severity": "medium",
+        "line": 9,
+        "type": "timing-attack",
+        "description": "String comparison is not constant-time; use subtle.ConstantTimeCompare for secrets"
+      }
+    ],
+    "expected_recommendation_keywords": ["constant time", "subtle", "timing"]
+  },
+  {
+    "id": "qual-magic-numbers-027",
+    "category": "maintainability",
+    "severity": "low",
+    "language": "ts",
+    "source": "vibe-pattern",
+    "code": "export function calculateShipping(weight: number, distance: number): number {\n  if (weight > 50) return 25.00;\n  if (distance > 1000) return 15.00;\n  return weight * 0.5 + distance * 0.01;\n}\n",
+    "ground_truth": [
+      {
+        "category": "maintainability",
+        "severity": "low",
+        "line": 2,
+        "type": "magic-numbers",
+        "description": "Magic numbers (50, 25, 1000, 15, 0.5, 0.01) should be named constants for clarity"
+      }
+    ],
+    "expected_recommendation_keywords": ["constant", "magic", "named"]
+  },
+  {
+    "id": "sec-cors-wildcard-028",
+    "category": "security",
+    "severity": "high",
+    "language": "ts",
+    "source": "CWE-942",
+    "code": "import express from 'express';\nimport cors from 'cors';\n\nconst app = express();\napp.use(cors({ origin: '*', credentials: true }));\napp.use(express.json());\n",
+    "ground_truth": [
+      {
+        "category": "security",
+        "severity": "high",
+        "line": 5,
+        "type": "cors-misconfiguration",
+        "description": "CORS wildcard origin with credentials=true is a dangerous combination — browsers reject it, but misconfigured proxies may pass it through"
+      }
+    ],
+    "expected_recommendation_keywords": ["origin", "credentials", "cors", "whitelist"]
+  },
+  {
+    "id": "qual-improper-async-iter-029",
+    "category": "quality",
+    "severity": "medium",
+    "language": "ts",
+    "source": "vibe-pattern",
+    "code": "export async function processAll(items: string[]): Promise<void> {\n  // Bug: forEach does not await, so function returns before work is done\n  items.forEach(async (item) => {\n    await processItem(item);\n  });\n}\n",
+    "ground_truth": [
+      {
+        "category": "quality",
+        "severity": "medium",
+        "line": 3,
+        "type": "async-foreach-bug",
+        "description": "forEach ignores returned promises; use for...of or Promise.all to actually wait for async work"
+      }
+    ],
+    "expected_recommendation_keywords": ["forEach", "Promise.all", "for...of", "await"]
+  },
+  {
+    "id": "sec-race-condition-030",
+    "category": "quality",
+    "severity": "high",
+    "language": "ts",
+    "source": "vibe-pattern",
+    "code": "let counter = 0;\n\nexport async function incrementAndReport(): Promise<number> {\n  const current = counter;\n  await someAsyncWork();\n  counter = current + 1;\n  return counter;\n}\n",
+    "ground_truth": [
+      {
+        "category": "quality",
+        "severity": "high",
+        "line": 4,
+        "type": "race-condition",
+        "description": "Read-modify-write on shared state without synchronization — two concurrent calls can produce the same value"
+      }
+    ],
+    "expected_recommendation_keywords": ["race", "atomic", "lock", "mutex", "synchronize"]
+  },
+  {
+    "id": "qual-null-pointer-031",
+    "category": "quality",
+    "severity": "high",
+    "language": "go",
+    "source": "CWE-476",
+    "code": "package main\n\ntype User struct {\n    Name string\n}\n\nfunc GetUser(name string) *User {\n    // Bug: doesn't return nil for missing user\n    return &User{Name: name}\n}\n\nfunc greet(u *User) string {\n    return \"Hello, \" + u.Name\n}\n\nfunc main() {\n    u := GetUser(\"Alice\")\n    println(greet(u))\n}\n",
+    "ground_truth": [],
+    "expected_recommendation_keywords": []
+  },
+  {
+    "id": "qual-unsafe-conversion-032",
+    "category": "quality",
+    "severity": "medium",
+    "language": "ts",
+    "source": "vibe-pattern",
+    "code": "export function parseAndProcess(jsonStr: string): number {\n  const data: any = JSON.parse(jsonStr);\n  return data.value * 2;\n}\n",
+    "ground_truth": [
+      {
+        "category": "quality", "severity": "medium", "line": 3,
+        "type": "any-type-abuse",
+        "description": "JSON.parse result cast to any without schema validation"
+      },
+      {
+        "category": "quality", "severity": "high", "line": 4,
+        "type": "missing-null-check",
+        "description": "No check if data.value is a number before multiplication"
+      }
+    ],
+    "expected_recommendation_keywords": ["type guard", "schema", "validation"]
+  },
+  {
+    "id": "perf-large-array-033",
+    "category": "performance",
+    "severity": "medium",
+    "language": "ts",
+    "source": "vibe-pattern",
+    "code": "export function uniqueItems(items: number[]): number[] {\n  const out: number[] = [];\n  for (const item of items) {\n    if (!out.includes(item)) {\n      out.push(item);\n    }\n  }\n  return out;\n}\n",
+    "ground_truth": [
+      {
+        "category": "performance", "severity": "medium", "line": 4,
+        "type": "quadratic-complexity",
+        "description": "out.includes(item) is O(n) inside an O(n) loop — O(n²) total"
+      }
+    ],
+    "expected_recommendation_keywords": ["set", "complexity"]
+  },
+  {
+    "id": "sec-insecure-deserialize-034",
+    "category": "security",
+    "severity": "critical",
+    "language": "py",
+    "source": "CWE-502",
+    "code": "import pickle\n\ndef load_session(session_bytes: bytes):\n    return pickle.loads(session_bytes)\n",
+    "ground_truth": [
+      {
+        "category": "security", "severity": "critical", "line": 4,
+        "type": "code-injection",
+        "description": "pickle.loads can execute arbitrary code during deserialization"
+      }
+    ],
+    "expected_recommendation_keywords": ["pickle", "deserialize", "json", "safe"]
+  },
+  {
+    "id": "sec-xml-external-entity-035",
+    "category": "security",
+    "severity": "high",
+    "language": "py",
+    "source": "CWE-611",
+    "code": "from xml.etree.ElementTree import parse\n\ndef process_xml(xml_file: str) -> str:\n    tree = parse(xml_file)\n    root = tree.getroot()\n    return root.text or \"\"\n",
+    "ground_truth": [
+      {
+        "category": "security", "severity": "high", "line": 4,
+        "type": "xxe",
+        "description": "XML parser without entity resolution disabled allows XXE attacks"
+      }
+    ],
+    "expected_recommendation_keywords": ["xxe", "xml", "entity", "defusedxml"]
+  },
+  {
+    "id": "qual-no-input-bound-036",
+    "category": "quality",
+    "severity": "high",
+    "language": "ts",
+    "source": "vibe-pattern",
+    "code": "export function allocateBuffer(size: number): Buffer {\n  return Buffer.alloc(size);\n}\n",
+    "ground_truth": [
+      {
+        "category": "quality", "severity": "high", "line": 2,
+        "type": "no-error-handling",
+        "description": "No size validation — negative or astronomically large size can crash or OOM"
+      }
+    ],
+    "expected_recommendation_keywords": ["validation", "clamp", "max"]
+  },
+  {
+    "id": "maintain-duplicated-code-037",
+    "category": "maintainability",
+    "severity": "medium",
+    "language": "ts",
+    "source": "vibe-pattern",
+    "code": "export function calculateTotalUS(items: { price: number }[]): number {\n  let total = 0;\n  for (const item of items) total += item.price * 1.07;\n  return total;\n}\n\nexport function calculateTotalEU(items: { price: number }[]): number {\n  let total = 0;\n  for (const item of items) total += item.price * 1.20;\n  return total;\n}\n\nexport function calculateTotalUK(items: { price: number }[]): number {\n  let total = 0;\n  for (const item of items) total += item.price * 1.20;\n  return total;\n}\n",
+    "ground_truth": [
+      {
+        "category": "maintainability", "severity": "medium", "line": 1,
+        "type": "duplicated-code",
+        "description": "Three nearly identical functions differ only by tax rate — extract into shared function with parameter"
+      }
+    ],
+    "expected_recommendation_keywords": ["duplicate", "extract", "DRY"]
+  },
+  {
+    "id": "test-missing-assertions-038",
+    "category": "testing",
+    "severity": "medium",
+    "language": "ts",
+    "source": "vibe-pattern",
+    "code": "import { describe, it } from 'vitest';\n\ndescribe('calculateTax', () => {\n  it('computes US tax', () => {\n    calculateTax(100, 'US');\n  });\n  \n  it('computes UK tax', () => {\n    calculateTax(100, 'UK');\n  });\n});\n",
+    "ground_truth": [
+      {
+        "category": "testing", "severity": "medium", "line": 4,
+        "type": "missing-test-assertion",
+        "description": "Test functions that don't assert anything — no expect() or assert() call"
+      }
+    ],
+    "expected_recommendation_keywords": ["assert", "expect"]
+  },
+  {
+    "id": "test-flaky-assert-039",
+    "category": "testing",
+    "severity": "medium",
+    "language": "ts",
+    "source": "vibe-pattern",
+    "code": "import { describe, it, expect } from 'vitest';\n\ndescribe('DateUtils', () => {\n  it('formats the current date', () => {\n    const result = formatDate(new Date());\n    expect(result).toBe('2026-06-09');\n  });\n});\n",
+    "ground_truth": [
+      {
+        "category": "testing", "severity": "medium", "line": 5,
+        "type": "flaky-test",
+        "description": "Test asserts against a hardcoded date — breaks tomorrow because formatDate(new Date()) will return today"
+      }
+    ],
+    "expected_recommendation_keywords": ["flaky", "deterministic", "mock date"]
+  },
+  {
+    "id": "test-missing-exception-040",
+    "category": "testing",
+    "severity": "medium",
+    "language": "ts",
+    "source": "vibe-pattern",
+    "code": "import { describe, it, expect } from 'vitest';\n\ndescribe('div', () => {\n  it('throws on division by zero', () => {\n    div(10, 0);\n  });\n});\n",
+    "ground_truth": [
+      {
+        "category": "testing", "severity": "medium", "line": 5,
+        "type": "missing-test-assertion",
+        "description": "Testing that a function throws requires toThrow() assertion, not just calling it"
+      }
+    ],
+    "expected_recommendation_keywords": ["toThrow", "rejects"]
+  },
+  {
+    "id": "qual-env-leak-041",
+    "category": "quality",
+    "severity": "medium",
+    "language": "ts",
+    "source": "vibe-pattern",
+    "code": "import dotenv from 'dotenv';\ndotenv.config();\n\nexport function getConfig(key: string): string | undefined {\n  return process.env.KEY_NAME;\n}\n",
+    "ground_truth": [
+      {
+        "category": "quality", "severity": "medium", "line": 5,
+        "type": "magic-numbers",
+        "description": "Hardcoded env var name 'KEY_NAME' should be parameterized or use the function argument"
+      }
+    ],
+    "expected_recommendation_keywords": ["parameter", "argument", "config"]
+  },
+  {
+    "id": "sec-command-injection-042",
+    "category": "security",
+    "severity": "critical",
+    "language": "ts",
+    "source": "CWE-78",
+    "code": "import { exec } from 'child_process';\n\nexport function runCommand(filename: string): void {\n  exec(`grep -i error ${filename}`, (err, stdout) => {\n    console.log(stdout);\n  });\n}\n",
+    "ground_truth": [
+      {
+        "category": "security", "severity": "critical", "line": 4,
+        "type": "command-injection",
+        "description": "User-controlled filename interpolated into shell command without escaping"
+      }
+    ],
+    "expected_recommendation_keywords": ["escape", "shell", "argument", "child_process"]
+  },
+  {
+    "id": "qual-undefined-property-043",
+    "category": "quality",
+    "severity": "high",
+    "language": "ts",
+    "source": "vibe-pattern",
+    "code": "interface Item {\n  id: number;\n  name?: string;\n}\n\nexport function getName(item: Item): string {\n  return item.name.toUpperCase();\n}\n",
+    "ground_truth": [
+      {
+        "category": "quality", "severity": "high", "line": 7,
+        "type": "missing-null-check",
+        "description": "name is optional but used without a null/undefined check — will crash at runtime"
+      }
+    ],
+    "expected_recommendation_keywords": ["null check", "optional", "undefined"]
+  },
+  {
+    "id": "test-oversized-044",
+    "category": "testing",
+    "severity": "low",
+    "language": "ts",
+    "source": "vibe-pattern",
+    "code": "import { describe, it, expect } from 'vitest';\n\ndescribe('AuthService', () => {\n  it('handles a 60-step authentication flow', async () => {\n    const result = await authService.login('user', 'pass');\n    const token = await authService.refresh(result.sessionId);\n    expect(token).not.toBeNull();\n    const profile = await authService.getProfile(token);\n    // ... 57 more assertions totaling 400+ lines\n  });\n});\n",
+    "ground_truth": [
+      {
+        "category": "testing", "severity": "low", "line": 4,
+        "type": "long-function",
+        "description": "Single test function doing too much — should be split into separate focused tests"
+      }
+    ],
+    "expected_recommendation_keywords": ["split", "describe", "unit", "focused"]
+  },
+  {
+    "id": "perf-missing-index-045",
+    "category": "performance",
+    "severity": "medium",
+    "language": "ts",
+    "source": "vibe-pattern",
+    "code": "export async function findUserByEmail(email: string) {\n  const users = await db.user.findMany();\n  return users.find(u => u.email === email);\n}\n",
+    "ground_truth": [
+      {
+        "category": "performance", "severity": "medium", "line": 2,
+        "type": "n-plus-1-query",
+        "description": "Loading all users into memory just to find one by email — use findUnique with a filter"
+      }
+    ],
+    "expected_recommendation_keywords": ["index", "findUnique", "where", "filter"]
+  },
+  {
+    "id": "qual-direct-mutation-046",
+    "category": "quality",
+    "severity": "medium",
+    "language": "ts",
+    "source": "vibe-pattern",
+    "code": "export function updateUserName(user: { name: string }, newName: string): { name: string } {\n  user.name = newName;\n  return user;\n}\n",
+    "ground_truth": [
+      {
+        "category": "quality", "severity": "medium", "line": 2,
+        "type": "mutation-side-effect",
+        "description": "Function mutates its input parameter directly instead of returning a new object"
+      }
+    ],
+    "expected_recommendation_keywords": ["immutable", "spread", "side effect"]
+  },
+  {
+    "id": "sec-hardcoded-jwt-047",
+    "category": "security",
+    "severity": "high",
+    "language": "ts",
+    "source": "vibe-pattern",
+    "code": "import jwt from 'jsonwebtoken';\n\nexport function createAuthToken(userId: string): string {\n  return jwt.sign({ userId, role: 'admin' }, 'super-secret-key-123', { expiresIn: '365d' });\n}\n",
+    "ground_truth": [
+      {
+        "category": "security", "severity": "high", "line": 4,
+        "type": "hardcoded-secret",
+        "description": "JWT signing secret hardcoded in source and set to a year-long expiry"
+      }
+    ],
+    "expected_recommendation_keywords": ["env", "secret", "rotation", "short"]
+  },
+  {
+    "id": "sec-csrf-missing-048",
+    "category": "security",
+    "severity": "high",
+    "language": "ts",
+    "source": "OWASP A1",
+    "code": "import express from 'express';\n\nconst app = express();\napp.use(express.json());\n\napp.post('/api/transfer', (req, res) => {\n  const { to, amount } = req.body;\n  db.transfer(req.userId, to, amount);\n  res.send({ ok: true });\n});\n",
+    "ground_truth": [
+      {
+        "category": "security", "severity": "high", "line": 5,
+        "type": "csrf-missing",
+        "description": "State-changing mutation endpoint without CSRF token validation"
+      }
+    ],
+    "expected_recommendation_keywords": ["csrf", "token", "same-site"]
+  },
+  {
+    "id": "perf-unnecessary-alloc-049",
+    "category": "performance",
+    "severity": "medium",
+    "language": "ts",
+    "source": "vibe-pattern",
+    "code": "export function createMessage(text: string): string {\n  const arr = [];\n  arr.push('<p>');\n  arr.push(text);\n  arr.push('</p>');\n  return arr.join('');\n}\n",
+    "ground_truth": [
+      {
+        "category": "performance", "severity": "medium", "line": 2,
+        "type": "unnecessary-alloc",
+        "description": "Using an array and join for a simple concatenation — unnecessary allocation"
+      }
+    ],
+    "expected_recommendation_keywords": ["template literal", "concatenation"]
+  }
+]

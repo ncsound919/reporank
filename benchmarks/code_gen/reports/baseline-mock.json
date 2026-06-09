@@ -1,0 +1,167 @@
+{
+  "total": 6,
+  "passed": 0,
+  "passRate": 0,
+  "results": [
+    {
+      "taskId": "counter-component",
+      "passed": false,
+      "durationMs": 57,
+      "files": [
+        {
+          "path": "generated.tsx",
+          "content": "",
+          "language": "tsx"
+        }
+      ],
+      "checks": {
+        "validSyntax": true,
+        "hasExport": false,
+        "typedProperly": false,
+        "errorHandling": true,
+        "requiredKeywords": false,
+        "bannedKeywords": true
+      },
+      "errors": [],
+      "llmTokens": 128
+    },
+    {
+      "taskId": "login-form",
+      "passed": false,
+      "durationMs": 8,
+      "files": [
+        {
+          "path": "generated.tsx",
+          "content": "",
+          "language": "tsx"
+        }
+      ],
+      "checks": {
+        "validSyntax": true,
+        "hasExport": false,
+        "typedProperly": false,
+        "errorHandling": true,
+        "requiredKeywords": false,
+        "bannedKeywords": true
+      },
+      "errors": [],
+      "llmTokens": 127
+    },
+    {
+      "taskId": "data-fetcher-hook",
+      "passed": false,
+      "durationMs": 5,
+      "files": [
+        {
+          "path": "generated.tsx",
+          "content": "",
+          "language": "tsx"
+        }
+      ],
+      "checks": {
+        "validSyntax": true,
+        "hasExport": false,
+        "typedProperly": false,
+        "errorHandling": true,
+        "requiredKeywords": false,
+        "bannedKeywords": true
+      },
+      "errors": [],
+      "llmTokens": 123
+    },
+    {
+      "taskId": "todo-manager",
+      "passed": false,
+      "durationMs": 7,
+      "files": [
+        {
+          "path": "generated.tsx",
+          "content": "",
+          "language": "tsx"
+        }
+      ],
+      "checks": {
+        "validSyntax": true,
+        "hasExport": false,
+        "typedProperly": false,
+        "errorHandling": true,
+        "requiredKeywords": false,
+        "bannedKeywords": true
+      },
+      "errors": [],
+      "llmTokens": 124
+    },
+    {
+      "taskId": "api-middleware",
+      "passed": false,
+      "durationMs": 6,
+      "files": [
+        {
+          "path": "generated.tsx",
+          "content": "",
+          "language": "tsx"
+        }
+      ],
+      "checks": {
+        "validSyntax": true,
+        "hasExport": false,
+        "typedProperly": false,
+        "errorHandling": true,
+        "requiredKeywords": false,
+        "bannedKeywords": true
+      },
+      "errors": [],
+      "llmTokens": 129
+    },
+    {
+      "taskId": "debounce-function",
+      "passed": false,
+      "durationMs": 7,
+      "files": [
+        {
+          "path": "generated.tsx",
+          "content": "",
+          "language": "tsx"
+        }
+      ],
+      "checks": {
+        "validSyntax": true,
+        "hasExport": false,
+        "typedProperly": false,
+        "errorHandling": true,
+        "requiredKeywords": false,
+        "bannedKeywords": true
+      },
+      "errors": [],
+      "llmTokens": 118
+    }
+  ],
+  "aggregateChecks": {
+    "validSyntax": {
+      "passed": 6,
+      "total": 6
+    },
+    "hasExport": {
+      "passed": 0,
+      "total": 6
+    },
+    "typedProperly": {
+      "passed": 0,
+      "total": 6
+    },
+    "errorHandling": {
+      "passed": 6,
+      "total": 6
+    },
+    "requiredKeywords": {
+      "passed": 0,
+      "total": 6
+    },
+    "bannedKeywords": {
+      "passed": 6,
+      "total": 6
+    }
+  },
+  "totalTokens": 749,
+  "totalDurationMs": 90
+}

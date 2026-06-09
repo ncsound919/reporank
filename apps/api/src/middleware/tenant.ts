@@ -1,7 +1,7 @@
 import { Response, NextFunction } from "express";
 import { prisma } from "../db/client";
 import { PLAN_LIMITS, type PlanTier } from "@reporank/shared-types";
-import { AppError } from "./errorHandler";
+import { AppError, ErrorCodes } from "./errorHandler";
 import { AuthRequest } from "./auth";
 import rateLimit from "express-rate-limit";
 

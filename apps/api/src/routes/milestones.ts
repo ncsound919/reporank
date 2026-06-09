@@ -2,8 +2,9 @@ import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../db/client";
 import { authMiddleware, AuthRequest } from "../middleware/auth";
-import { AppError } from "../middleware/errorHandler";
+import { AppError, ErrorCodes } from "../middleware/errorHandler";
 import { asyncHandler } from "../middleware/asyncHandler";
+import { ScanStatus, MilestoneStatus, GateStatus, ErrorCodes as ConstErrorCodes } from "../constants";
 
 const router: Router = Router();
 
@@ -29,12 +30,12 @@ const patchMilestoneSchema = z.object({
 // POST /api/v1/milestones — create milestone
 router.post("/", authMiddleware, asyncHandler<AuthRequest>(async (req, res) => {
   const parsed = milestoneSchema.safeParse(req.body);
-  if (!parsed.success) throw new AppError(400, parsed.error.errors[0].message, "VALIDATION_ERROR");
+  if (!parsed.success) throw new AppError(400, parsed.error.errors[0].message, ErrorCodes.VALIDATION_ERROR);
 
   // Verify user owns the project
   const brief = await prisma.projectBrief.findUnique({ where: { id: parsed.data.projectId } });
-  if (!brief) throw new AppError(404, "Project not found", "NOT_FOUND");
-  if (brief.userId !== req.userId) throw new AppError(403, "Access denied", "FORBIDDEN");
+  if (!brief) throw new AppError(404, "Project not found", ErrorCodes.NOT_FOUND);
+  if (brief.userId !== req.userId) throw new AppError(403, "Access denied", ErrorCodes.FORBIDDEN);
 
   // Snapshot acceptance criteria from brief if not provided
   const snapshot = parsed.data.acceptanceCriteriaSnapshot.length > 0
@@ -59,8 +60,8 @@ router.get("/:id", authMiddleware, asyncHandler<AuthRequest>(async (req, res) =>
     where: { id: req.params.id },
     include: { gates: true, brief: { select: { userId: true, name: true, status: true } } },
   });
-  if (!milestone) throw new AppError(404, "Milestone not found", "NOT_FOUND");
-  if (milestone.brief.userId !== req.userId) throw new AppError(403, "Access denied", "FORBIDDEN");
+  if (!milestone) throw new AppError(404, "Milestone not found", ErrorCodes.NOT_FOUND);
+  if (milestone.brief.userId !== req.userId) throw new AppError(403, "Access denied", ErrorCodes.FORBIDDEN);
 
   res.json({ data: milestone });
 }));
@@ -71,23 +72,23 @@ router.patch("/:id", authMiddleware, asyncHandler<AuthRequest>(async (req, res) 
     where: { id: req.params.id },
     include: { brief: { select: { userId: true } }, gates: true },
   });
-  if (!milestone) throw new AppError(404, "Milestone not found", "NOT_FOUND");
-  if (milestone.brief.userId !== req.userId) throw new AppError(403, "Access denied", "FORBIDDEN");
+  if (!milestone) throw new AppError(404, "Milestone not found", ErrorCodes.NOT_FOUND);
+  if (milestone.brief.userId !== req.userId) throw new AppError(403, "Access denied", ErrorCodes.FORBIDDEN);
 
   // Block "achieved" if any non-overridden gates are still pending/failed
   const parsed = patchMilestoneSchema.safeParse(req.body);
-  if (!parsed.success) throw new AppError(400, parsed.error.errors[0].message, "VALIDATION_ERROR");
+  if (!parsed.success) throw new AppError(400, parsed.error.errors[0].message, ErrorCodes.VALIDATION_ERROR);
 
-  if (parsed.data.status === "achieved") {
+  if (parsed.data.status === MilestoneStatus.ACHIEVED) {
     const blockingGates = milestone.gates.filter(
-      g => g.status === "pending" || g.status === "failed"
+      (g: any) => g.status === GateStatus.PENDING || g.status === GateStatus.FAILED
     );
     if (blockingGates.length > 0) {
-      throw new AppError(
-        409,
-        `${blockingGates.length} acceptance gate(s) must pass or be overridden before marking achieved`,
-        "GATES_BLOCKING"
-      );
+        throw new AppError(
+          409,
+          `${blockingGates.length} acceptance gate(s) must pass or be overridden before marking achieved`,
+          ErrorCodes.GATES_BLOCKING
+        );
     }
   }
 
@@ -109,8 +110,8 @@ router.post("/:id/promote", authMiddleware, asyncHandler<AuthRequest>(async (req
     where: { id: req.params.id },
     include: { brief: { select: { userId: true, repoUrl: true } } },
   });
-  if (!milestone) throw new AppError(404, "Milestone not found", "NOT_FOUND");
-  if (milestone.brief.userId !== req.userId) throw new AppError(403, "Access denied", "FORBIDDEN");
+  if (!milestone) throw new AppError(404, "Milestone not found", ErrorCodes.NOT_FOUND);
+  if (milestone.brief.userId !== req.userId) throw new AppError(403, "Access denied", ErrorCodes.FORBIDDEN);
 
   const scanId = req.body.scanId as string | undefined;
   let resolvedScanId = scanId;
@@ -120,12 +121,12 @@ router.post("/:id/promote", authMiddleware, asyncHandler<AuthRequest>(async (req
     const latestScan = await prisma.scan.findFirst({
       where: {
         userId: req.userId!,
-        status: "complete",
+        status: ScanStatus.COMPLETE,
         ...(milestone.brief.repoUrl ? { repoUrl: milestone.brief.repoUrl } : {}),
       },
       orderBy: { createdAt: "desc" },
     });
-    if (!latestScan) throw new AppError(404, "No completed scans found to promote", "NOT_FOUND");
+    if (!latestScan) throw new AppError(404, "No completed scans found to promote", ErrorCodes.NOT_FOUND);
     resolvedScanId = latestScan.id;
   }
 
@@ -141,8 +142,8 @@ router.post("/:id/promote", authMiddleware, asyncHandler<AuthRequest>(async (req
 // GET /api/v1/milestones/project/:projectId — list milestones for a project
 router.get("/project/:projectId", authMiddleware, asyncHandler<AuthRequest>(async (req, res) => {
   const brief = await prisma.projectBrief.findUnique({ where: { id: req.params.projectId } });
-  if (!brief) throw new AppError(404, "Project not found", "NOT_FOUND");
-  if (brief.userId !== req.userId) throw new AppError(403, "Access denied", "FORBIDDEN");
+  if (!brief) throw new AppError(404, "Project not found", ErrorCodes.NOT_FOUND);
+  if (brief.userId !== req.userId) throw new AppError(403, "Access denied", ErrorCodes.FORBIDDEN);
 
   const milestones = await prisma.milestone.findMany({
     where: { projectId: req.params.projectId },

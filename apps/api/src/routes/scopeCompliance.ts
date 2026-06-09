@@ -2,7 +2,8 @@ import { Router } from "express";
 import type { Router as ExpressRouter } from "express";
 import { prisma } from "../db/client";
 import { authMiddleware, AuthRequest } from "../middleware/auth";
-import { AppError } from "../middleware/errorHandler";
+import { AppError, ErrorCodes } from "../middleware/errorHandler";
+import { ScanStatus, ErrorCodes as ConstErrorCodes, DriftStatus } from "../constants";
 
 const router: ExpressRouter = Router();
 
@@ -15,15 +16,15 @@ router.get("/:projectId", authMiddleware, async (req: AuthRequest, res) => {
     select: { userId: true, orgId: true, deliverables: true, exclusions: true, status: true },
   });
 
-  if (!project) throw new AppError(404, "Project not found", "NOT_FOUND");
+  if (!project) throw new AppError(404, "Project not found", ConstErrorCodes.NOT_FOUND);
 
   // Verify access
   const canAccess = project.userId === req.userId || (project.orgId && await hasOrgAccess(project.orgId, req.userId!));
-  if (!canAccess) throw new AppError(403, "Access denied", "FORBIDDEN");
+  if (!canAccess) throw new AppError(403, "Access denied", ConstErrorCodes.FORBIDDEN);
 
   // Get latest scan for this project
   const latestScan = await prisma.scan.findFirst({
-    where: { projectBriefId: projectId, status: "complete" },
+    where: { projectBriefId: projectId, status: ScanStatus.COMPLETE },
     orderBy: { createdAt: "desc" },
     select: {
       id: true,
@@ -46,7 +47,7 @@ router.get("/:projectId", authMiddleware, async (req: AuthRequest, res) => {
 
   // Get historical snapshots (previous scans for this project)
   const previousScans = await prisma.scan.findMany({
-    where: { projectBriefId: projectId, status: "complete" },
+    where: { projectBriefId: projectId, status: ScanStatus.COMPLETE },
     orderBy: { createdAt: "asc" },
     take: 50,
     select: {
@@ -56,7 +57,7 @@ router.get("/:projectId", authMiddleware, async (req: AuthRequest, res) => {
     },
   });
 
-  const timeline = previousScans.map((s) => {
+  const timeline = previousScans.map((s: any) => {
     const r = s.report as any;
     const d = r?.drift || {};
     const pc = project.deliverables.length > 0 ? Math.round((d.implementedDeliverables?.length || 0 / project.deliverables.length) * 100) : 0;
@@ -66,7 +67,7 @@ router.get("/:projectId", authMiddleware, async (req: AuthRequest, res) => {
       plannedCount: project.deliverables.length,
       implementedCount: d.implementedDeliverables?.length || 0,
       compliancePercent: pc,
-      driftStatus: d.status || "on-scope",
+      driftStatus: d.status || DriftStatus.ON_SCOPE,
     };
   });
 

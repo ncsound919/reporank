@@ -77,7 +77,7 @@ export async function listAgentsFileHistory(input: {
     orderBy: { createdAt: "desc" },
     take: Math.min(input.limit ?? 10, 50),
   });
-  return records.map(r => ({
+  return records.map((r: any) => ({
     id: r.id,
     contentHash: r.contentHash,
     mode: r.mode,

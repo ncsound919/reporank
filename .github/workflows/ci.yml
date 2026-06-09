@@ -49,6 +49,9 @@ jobs:
 
       - run: pnpm build
 
+      - name: Run deterministic benchmarks
+        run: npx tsx comprehensive-benchmark.mjs 2>&1 | tail -20
+
       - run: pnpm --filter @reporank/grading-engine test
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}

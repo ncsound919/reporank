@@ -2,9 +2,10 @@ import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../db/client";
 import { authMiddleware, AuthRequest } from "../middleware/auth";
-import { AppError } from "../middleware/errorHandler";
+import { AppError, ErrorCodes } from "../middleware/errorHandler";
 import { asyncHandler } from "../middleware/asyncHandler";
 import { runScopeMatcher } from "../services/scopeMatcher";
+import { ScanStatus, ErrorCodes as ConstErrorCodes } from "../constants";
 
 const router: Router = Router();
 
@@ -13,13 +14,13 @@ router.post("/:projectId", authMiddleware, asyncHandler<AuthRequest>(async (req,
   const brief = await prisma.projectBrief.findUnique({
     where: { id: req.params.projectId },
   });
-  if (!brief) throw new AppError(404, "Project not found", "NOT_FOUND");
-  if (brief.userId !== req.userId) throw new AppError(403, "Access denied", "FORBIDDEN");
+  if (!brief) throw new AppError(404, "Project not found", ConstErrorCodes.NOT_FOUND);
+  if (brief.userId !== req.userId) throw new AppError(403, "Access denied", ConstErrorCodes.FORBIDDEN);
 
   const latestScan = await prisma.scan.findFirst({
     where: {
       userId: req.userId!,
-      status: "complete",
+      status: ScanStatus.COMPLETE,
       projectBriefId: brief.id,
     },
     orderBy: { createdAt: "desc" },
@@ -68,11 +69,11 @@ router.post("/:projectId", authMiddleware, asyncHandler<AuthRequest>(async (req,
 // GET /api/v1/drift/:projectId — return cached latest drift result
 router.get("/:projectId", authMiddleware, asyncHandler<AuthRequest>(async (req, res) => {
   const brief = await prisma.projectBrief.findUnique({ where: { id: req.params.projectId } });
-  if (!brief) throw new AppError(404, "Project not found", "NOT_FOUND");
-  if (brief.userId !== req.userId) throw new AppError(403, "Access denied", "FORBIDDEN");
+  if (!brief) throw new AppError(404, "Project not found", ConstErrorCodes.NOT_FOUND);
+  if (brief.userId !== req.userId) throw new AppError(403, "Access denied", ConstErrorCodes.FORBIDDEN);
 
-  const latestScan = await prisma.scan.findFirst({
-    where: { userId: req.userId!, status: "complete", projectBriefId: brief.id },
+   const latestScan = await prisma.scan.findFirst({
+    where: { userId: req.userId!, status: ScanStatus.COMPLETE, projectBriefId: brief.id },
     orderBy: { createdAt: "desc" },
     select: { clawFindings: true, createdAt: true, id: true },
   });

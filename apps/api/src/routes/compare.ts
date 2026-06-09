@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { prisma } from "../db/client";
 import { authMiddleware, AuthRequest } from "../middleware/auth";
-import { AppError } from "../middleware/errorHandler";
+import { AppError, ErrorCodes } from "../middleware/errorHandler";
 
 const router: Router = Router();
 
@@ -12,13 +12,13 @@ router.get("/:id1/:id2", authMiddleware, async (req: AuthRequest, res) => {
     prisma.scan.findUnique({ where: { id: req.params.id2 } }),
   ]);
 
-  if (!scan1) throw new AppError(404, "First scan not found", "NOT_FOUND");
-  if (!scan2) throw new AppError(404, "Second scan not found", "NOT_FOUND");
+  if (!scan1) throw new AppError(404, "First scan not found", ErrorCodes.NOT_FOUND);
+  if (!scan2) throw new AppError(404, "Second scan not found", ErrorCodes.NOT_FOUND);
 
   // Authorization: user must own each scan or belong to the same org
   const canAccess = (scan: any) => scan.userId === req.userId || scan.orgId === req.orgId;
-  if (!canAccess(scan1)) throw new AppError(403, "Access denied to first scan", "FORBIDDEN");
-  if (!canAccess(scan2)) throw new AppError(403, "Access denied to second scan", "FORBIDDEN");
+  if (!canAccess(scan1)) throw new AppError(403, "Access denied to first scan", ErrorCodes.FORBIDDEN);
+  if (!canAccess(scan2)) throw new AppError(403, "Access denied to second scan", ErrorCodes.FORBIDDEN);
 
   const report1 = scan1.report as any;
   const report2 = scan2.report as any;
@@ -68,12 +68,12 @@ router.get("/milestones/:m1/:m2", authMiddleware, async (req: AuthRequest, res) 
     prisma.milestone.findUnique({ where: { id: req.params.m2 }, include: { brief: { select: { userId: true } } } }),
   ]);
 
-  if (!m1) throw new AppError(404, "First milestone not found", "NOT_FOUND");
-  if (!m2) throw new AppError(404, "Second milestone not found", "NOT_FOUND");
-  if (m1.brief.userId !== req.userId) throw new AppError(403, "Access denied to first milestone", "FORBIDDEN");
-  if (m2.brief.userId !== req.userId) throw new AppError(403, "Access denied to second milestone", "FORBIDDEN");
-  if (!m1.scanId) throw new AppError(400, "First milestone has no linked scan", "NO_SCAN");
-  if (!m2.scanId) throw new AppError(400, "Second milestone has no linked scan", "NO_SCAN");
+  if (!m1) throw new AppError(404, "First milestone not found", ErrorCodes.NOT_FOUND);
+  if (!m2) throw new AppError(404, "Second milestone not found", ErrorCodes.NOT_FOUND);
+  if (m1.brief.userId !== req.userId) throw new AppError(403, "Access denied to first milestone", ErrorCodes.FORBIDDEN);
+  if (m2.brief.userId !== req.userId) throw new AppError(403, "Access denied to second milestone", ErrorCodes.FORBIDDEN);
+  if (!m1.scanId) throw new AppError(400, "First milestone has no linked scan", ErrorCodes.NO_SCAN);
+  if (!m2.scanId) throw new AppError(400, "Second milestone has no linked scan", ErrorCodes.NO_SCAN);
 
   // Redirect to existing scan compare logic by reusing params
   const [scan1, scan2] = await Promise.all([
@@ -81,7 +81,7 @@ router.get("/milestones/:m1/:m2", authMiddleware, async (req: AuthRequest, res) 
     prisma.scan.findUnique({ where: { id: m2.scanId } }),
   ]);
 
-  if (!scan1 || !scan2) throw new AppError(404, "Linked scan not found", "NOT_FOUND");
+  if (!scan1 || !scan2) throw new AppError(404, "Linked scan not found", ErrorCodes.NOT_FOUND);
 
   const report1 = scan1.report as any;
   const report2 = scan2.report as any;

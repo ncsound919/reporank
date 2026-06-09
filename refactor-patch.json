@@ -1,0 +1,9 @@
+{
+  "edits": [
+    {
+      "filePath": "apps/cli/src/harness.ts",
+      "findContent": "isNearDupe",
+      "replaceContent": "findNearDupe"
+    }
+  ]
+}

@@ -2,8 +2,9 @@ import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../db/client";
 import { authMiddleware, orgAccessMiddleware, AuthRequest } from "../middleware/auth";
-import { AppError } from "../middleware/errorHandler";
+import { AppError, ErrorCodes } from "../middleware/errorHandler";
 import { asyncHandler } from "../middleware/asyncHandler";
+import { BriefStatus, ErrorCodes as ConstErrorCodes } from "../constants";
 
 const router: Router = Router();
 
@@ -27,7 +28,7 @@ const patchBriefSchema = briefSchema.partial();
 // POST /api/v1/projects — create a new project brief
 router.post("/", authMiddleware, orgAccessMiddleware, asyncHandler<AuthRequest>(async (req, res) => {
   const parsed = briefSchema.safeParse(req.body);
-  if (!parsed.success) throw new AppError(400, parsed.error.errors[0].message, "VALIDATION_ERROR");
+  if (!parsed.success) throw new AppError(400, parsed.error.errors[0].message, ErrorCodes.VALIDATION_ERROR);
 
   const brief = await prisma.projectBrief.create({
     data: {
@@ -76,9 +77,9 @@ router.get("/:id", authMiddleware, asyncHandler<AuthRequest>(async (req, res) =>
     },
   });
 
-  if (!brief) throw new AppError(404, "Project not found", "NOT_FOUND");
+  if (!brief) throw new AppError(404, "Project not found", ErrorCodes.NOT_FOUND);
   if (brief.userId !== req.userId && brief.orgId !== req.orgId) {
-    throw new AppError(403, "Access denied", "FORBIDDEN");
+    throw new AppError(403, "Access denied", ErrorCodes.FORBIDDEN);
   }
 
   res.json({ data: brief });
@@ -87,14 +88,14 @@ router.get("/:id", authMiddleware, asyncHandler<AuthRequest>(async (req, res) =>
 // PATCH /api/v1/projects/:id — update brief (blocked if approved without change request)
 router.patch("/:id", authMiddleware, asyncHandler<AuthRequest>(async (req, res) => {
   const brief = await prisma.projectBrief.findUnique({ where: { id: req.params.id } });
-  if (!brief) throw new AppError(404, "Project not found", "NOT_FOUND");
-  if (brief.userId !== req.userId) throw new AppError(403, "Access denied", "FORBIDDEN");
+  if (!brief) throw new AppError(404, "Project not found", ErrorCodes.NOT_FOUND);
+  if (brief.userId !== req.userId) throw new AppError(403, "Access denied", ErrorCodes.FORBIDDEN);
 
   const parsed = patchBriefSchema.safeParse(req.body);
-  if (!parsed.success) throw new AppError(400, parsed.error.errors[0].message, "VALIDATION_ERROR");
+  if (!parsed.success) throw new AppError(400, parsed.error.errors[0].message, ErrorCodes.VALIDATION_ERROR);
 
   // If brief is approved, create a scope change request instead of silent edit
-  if (brief.status === "approved" && Object.keys(parsed.data).length > 0) {
+  if (brief.status === BriefStatus.APPROVED && Object.keys(parsed.data).length > 0) {
     const changeRequest = await prisma.scopeChangeRequest.create({
       data: {
         projectId: brief.id,
@@ -127,19 +128,19 @@ router.patch("/:id", authMiddleware, asyncHandler<AuthRequest>(async (req, res) 
 // POST /api/v1/projects/:id/approve — approve the brief
 router.post("/:id/approve", authMiddleware, asyncHandler<AuthRequest>(async (req, res) => {
   const brief = await prisma.projectBrief.findUnique({ where: { id: req.params.id } });
-  if (!brief) throw new AppError(404, "Project not found", "NOT_FOUND");
-  if (brief.userId !== req.userId) throw new AppError(403, "Access denied", "FORBIDDEN");
+  if (!brief) throw new AppError(404, "Project not found", ErrorCodes.NOT_FOUND);
+  if (brief.userId !== req.userId) throw new AppError(403, "Access denied", ErrorCodes.FORBIDDEN);
 
   // Validate minimum requirements before approval
-  if (brief.deliverables.length === 0) throw new AppError(400, "At least one deliverable required", "VALIDATION_ERROR");
-  if (brief.exclusions.length === 0) throw new AppError(400, "At least one exclusion required", "VALIDATION_ERROR");
-  if (brief.acceptanceCriteria.length === 0) throw new AppError(400, "At least one acceptance criterion required", "VALIDATION_ERROR");
+   if (brief.deliverables.length === 0) throw new AppError(400, "At least one deliverable required", ConstErrorCodes.VALIDATION_ERROR);
+  if (brief.exclusions.length === 0) throw new AppError(400, "At least one exclusion required", ConstErrorCodes.VALIDATION_ERROR);
+  if (brief.acceptanceCriteria.length === 0) throw new AppError(400, "At least one acceptance criterion required", ConstErrorCodes.VALIDATION_ERROR);
 
   const existingApprovals = await prisma.briefApproval.findMany({ where: { projectBriefId: brief.id } });
   const version = existingApprovals.length + 1;
 
   const [updated, approval] = await prisma.$transaction([
-    prisma.projectBrief.update({ where: { id: brief.id }, data: { status: "approved" } }),
+    prisma.projectBrief.update({ where: { id: brief.id }, data: { status: BriefStatus.APPROVED } }),
     prisma.briefApproval.create({
       data: {
         projectBriefId: brief.id,

@@ -1,0 +1,57 @@
+name: Benchmark
+
+on:
+  schedule:
+    - cron: '0 6 * * 1'  # Every Monday at 6am UTC
+  workflow_dispatch:
+  push:
+    branches: [master]
+    paths:
+      - 'packages/**/*.ts'
+      - 'apps/cli/src/**/*.ts'
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.8.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+      - run: pnpm install
+
+      - name: Comprehensive deterministic benchmark
+        run: npx tsx comprehensive-benchmark.mjs
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+
+      - name: Upload comprehensive results
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-comprehensive
+          path: benchmark-results-comprehensive.json
+
+      - name: Code review accuracy (heuristic)
+        run: npx tsx apps/cli/src/index.ts harness --dataset apps/cli/src/__tests__/fixtures/code-review-dataset.json --heuristic-only --output benchmark-results-harness.json
+
+      - name: Upload harness results
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-harness
+          path: benchmark-results-harness.json
+
+      - name: Code review accuracy (LLM)
+        run: npx tsx apps/cli/src/index.ts harness --dataset apps/cli/src/__tests__/fixtures/code-review-dataset.json --llm-only --output benchmark-results-harness-llm.json
+        env:
+          VIBESERVE_URL: ${{ secrets.VIBESERVE_URL }}
+          VIBESERVE_API_KEY: ${{ secrets.VIBESERVE_API_KEY }}
+
+      - name: Upload LLM harness results
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-harness-llm
+          path: benchmark-results-harness-llm.json

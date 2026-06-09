@@ -1,0 +1,173 @@
+{
+  "total": 6,
+  "passed": 3,
+  "passRate": 0.5,
+  "results": [
+    {
+      "taskId": "counter-component",
+      "passed": false,
+      "durationMs": 5856,
+      "files": [
+        {
+          "path": "index.tsx",
+          "content": "import React, { useState } from 'react';\nimport styles from \"./Counter.module.css\";\n\nconst Counter = () => {\n  const [count, setCount] = useState(0);\n\n  const increment = () => {\n    setCount(count + 1);\n  };\n\n  const decrement = () => {\n    setCount(count - 1);\n  };\n\n  const reset = () => {\n    setCount(0);\n  };\n\n  return (\n    <div className={styles.container}>\n      <p className={styles.count}>{count}</p>\n      <div className={styles.buttons}>\n        <button className={styles.button} onClick={increment}>Increment</button>\n        <button className={styles.button} onClick={decrement}>Decrement</button>\n        <button className={styles.button} onClick={reset}>Reset</button>\n      </div>\n    </div>\n  );\n};\n\nexport default Counter;",
+          "language": "tsx"
+        }
+      ],
+      "checks": {
+        "validSyntax": true,
+        "hasExport": true,
+        "typedProperly": false,
+        "errorHandling": true,
+        "requiredKeywords": true,
+        "bannedKeywords": true,
+        "requiredNames": true
+      },
+      "errors": [],
+      "llmTokens": 414
+    },
+    {
+      "taskId": "login-form",
+      "passed": false,
+      "durationMs": 11156,
+      "files": [],
+      "checks": {
+        "validSyntax": true,
+        "hasExport": false,
+        "typedProperly": false,
+        "errorHandling": true,
+        "requiredKeywords": false,
+        "bannedKeywords": true,
+        "requiredNames": false
+      },
+      "errors": [
+        "LLM call: Bad escaped character in JSON at position 59 (line 3 column 33)"
+      ],
+      "llmTokens": 743
+    },
+    {
+      "taskId": "data-fetcher-hook",
+      "passed": true,
+      "durationMs": 9483,
+      "files": [
+        {
+          "path": "index.tsx",
+          "content": "import { useState, useEffect, useRef } from 'react';\n\ninterface UseFetchResult<T> {\n  data: T | undefined;\n  loading: boolean;\n  error: Error | undefined;\n}\n\nfunction useFetch<T>(url: string | null): UseFetchResult<T> {\n  const [data, setData] = useState<T | undefined>(undefined);\n  const [loading, setLoading] = useState<boolean>(true);\n  const [error, setError] = useState<Error | undefined>(undefined);\n  const abortControllerRef = useRef<AbortController | null>(null);\n\n  useEffect(() => {\n    if (!url) {\n      setData(undefined);\n      setLoading(false);\n      setError(undefined);\n      return;\n    }\n\n    abortControllerRef.current = new AbortController();\n\n    const fetchData = async () => {\n      setLoading(true);\n      setError(undefined);\n\n      try {\n        const response = await fetch(url, {\n          signal: abortControllerRef.current?.signal,\n        });\n\n        if (!response.ok) {\n          throw new Error(`HTTP error! Status: ${response.status}`);\n        }\n\n        const json: T = await response.json();\n        setData(json);\n      } catch (e: any) {\n        if (e.name === 'AbortError') {\n          // Request was aborted, do nothing\n          console.log('Fetch aborted');\n        } else {\n          setError(e instanceof Error ? e : new Error(\"An unknown error occurred.\"));\n        }\n      } finally {\n        setLoading(false);\n      }\n    };\n\n    fetchData();\n\n    return () => {\n      abortControllerRef.current?.abort();\n    };\n  }, [url]);\n\n  return { data, loading, error };\n}\n\nexport { useFetch };",
+          "language": "tsx"
+        }
+      ],
+      "checks": {
+        "validSyntax": true,
+        "hasExport": true,
+        "typedProperly": true,
+        "errorHandling": true,
+        "requiredKeywords": true,
+        "bannedKeywords": true,
+        "requiredNames": true
+      },
+      "errors": [],
+      "llmTokens": 636
+    },
+    {
+      "taskId": "todo-manager",
+      "passed": true,
+      "durationMs": 16411,
+      "files": [
+        {
+          "path": "index.tsx",
+          "content": "import React, { useReducer } from 'react';\n\ninterface Todo {\n  id: number;\n  text: string;\n  completed: boolean;\n}\n\ninterface State {\n  todos: Todo[];\n  filter: 'all' | 'active' | 'completed';\n}\n\nconst todoReducer = (state: State, action: {\n  type: string;\n  payload?: any;\n}) => {\n  switch (action.type) {\n    case 'ADD':\n      return {\n        ...state,\n        todos: [...state.todos, { id: Math.random(), text: action.payload, completed: false }],\n        filter: state.filter,\n      };\n    case 'TOGGLE':\n      return {\n        ...state,\n        todos: state.todos.map(todo =>\n          todo.id === action.payload ? { ...todo, completed: !todo.completed } : todo\n        ),\n        filter: state.filter,\n      };\n    case 'DELETE':\n      return {\n        ...state,\n        todos: state.todos.filter(todo => todo.id !== action.payload),\n        filter: state.filter,\n      };\n    case 'SET_FILTER':\n      return {\n        ...state,\n        filter: action.payload,\n      };\n    default:\n      return state;\n  }\n};\n\nconst TodoApp = () => {\n  const initialState: State = {\n    todos: [],\n    filter: 'all',\n  };\n\n  const [state, dispatch] = useReducer(todoReducer, initialState);\n\n  const handleAddTodo = (text: string) => {\n    dispatch({ type: 'ADD', payload: text });\n  };\n\n  const handleToggleTodo = (id: number) => {\n    dispatch({ type: 'TOGGLE', payload: id });\n  };\n\n  const handleDeleteTodo = (id: number) => {\n    dispatch({ type: 'DELETE', payload: id });\n  };\n\n  const handleSetFilter = (filter: 'all' | 'active' | 'completed') => {\n    dispatch({ type: 'SET_FILTER', payload: filter });\n  };\n\n  const visibleTodos = (\n    state.filter === 'active'\n      ? state.todos.filter(todo => !todo.completed)\n      : state.filter === 'completed'\n        ? state.todos.filter(todo => todo.completed)\n        : state.todos\n  );\n\n  return (\n    <div>\n      <h1>Todo App</h1>\n      <input\n        type=\"text\"\n        placeholder=\"Add todo\"\n        onKeyDown={(e) => {\n          if (e.key === 'Enter') {\n            handleAddTodo(e.target.value);\n          }\n        }}\n      />\n      <ul>\n        {visibleTodos.map(todo => (\n          <li key={todo.id}>\n            <input\n              type=\"checkbox\"\n              checked={todo.completed}\n              onChange={() => handleToggleTodo(todo.id)}\n            />\n            <span style={{ textDecoration: todo.completed ? 'line-through' : 'none' }}>\n              {todo.text}\n            </span>\n            <button onClick={() => handleDeleteTodo(todo.id)}>Delete</button>\n          </li>\n        ))}\n      </ul>\n      <div>\n        <button onClick={() => handleSetFilter('all')}>All</button>\n        <button onClick={() => handleSetFilter('active')}>Active</button>\n        <button onClick={() => handleSetFilter('completed')}>Completed</button>\n      </div>\n    </div>\n  );\n};\n\nexport default TodoApp;",
+          "language": "tsx"
+        }
+      ],
+      "checks": {
+        "validSyntax": true,
+        "hasExport": true,
+        "typedProperly": true,
+        "errorHandling": true,
+        "requiredKeywords": true,
+        "bannedKeywords": true,
+        "requiredNames": true
+      },
+      "errors": [],
+      "llmTokens": 974
+    },
+    {
+      "taskId": "api-middleware",
+      "passed": false,
+      "durationMs": 6631,
+      "files": [
+        {
+          "path": "index.tsx",
+          "content": "import { Request, Response, NextFunction } from 'express';\n\nconst API_KEYS = ['valid-api-key-1', 'valid-api-key-2']; // Replace with your actual API keys\n\nexport const authMiddleware = (req: Request, res: Response, next: NextFunction) => {\n  const Authorization = req.headers.authorization;\n\n  if (!Authorization) {\n    return res.status(401).json({\n      error: \"Authorization header is missing.\\n\" // Escape newline\n    });\n  }\n\n  if (!Authorization.startsWith('Bearer ')) {\n    return res.status(401).json({\n      error: \"Invalid authorization header format.  Must be 'Bearer <API_KEY>'.\\n\" // Escape newline\n    });\n  }\n\n  const apiKey = Authorization.substring(7);\n\n  if (!API_KEYS.includes(apiKey)) {\n    return res.status(401).json({\n      error: \"Invalid API key.\\n\" // Escape newline\n    });\n  }\n\n  next();\n};\n",
+          "language": "tsx"
+        }
+      ],
+      "checks": {
+        "validSyntax": true,
+        "hasExport": true,
+        "typedProperly": false,
+        "errorHandling": true,
+        "requiredKeywords": true,
+        "bannedKeywords": true,
+        "requiredNames": true
+      },
+      "errors": [],
+      "llmTokens": 462
+    },
+    {
+      "taskId": "debounce-function",
+      "passed": true,
+      "durationMs": 8050,
+      "files": [
+        {
+          "path": "index.tsx",
+          "content": "import { setTimeout, clearTimeout } from 'timers/promises';\n\ninterface DebounceOptions<T extends unknown[]> {\n  leading?: boolean;\n  trailing?: boolean;\n  maxWait?: number;\n}\n\ninterface DebouncedFunction<T extends unknown[]> {\n  (...args: T):\n    void;\n  cancel(): void;\n}\n\nfunction debounce<T extends unknown[]>(func: (...args: T) => void, delay: number, options: DebounceOptions<T> = {}): DebouncedFunction<T> {\n  let timeoutId: NodeJS.Timeout | null = null;\n  let lastArgs: T | null = null;\n  let lastThis: any = null;\n\n  const { leading = false, trailing = true, maxWait = delay } = options;\n\n  const debounced = function (this: any, ...args: T) {\n    lastArgs = args;\n    lastThis = this;\n\n    if (leading) {\n      func.apply(this, args);\n    }\n\n    if (timeoutId) {\n      clearTimeout(timeoutId);\n    }\n\n    timeoutId = setTimeout(() => {\n      timeoutId = null;\n      if (trailing && lastArgs) {\n        func.apply(lastThis, lastArgs);\n        lastArgs = null;\n        lastThis = null;\n      }\n    }, maxWait);\n  } as DebouncedFunction<T>;\n\n  debounced.cancel = function () {\n    if (timeoutId) {\n      clearTimeout(timeoutId);\n      timeoutId = null;\n      lastArgs = null;\n      lastThis = null;\n    }\n  };\n\n  return debounced;\n}\n\nexport { debounce };",
+          "language": "tsx"
+        }
+      ],
+      "checks": {
+        "validSyntax": true,
+        "hasExport": true,
+        "typedProperly": true,
+        "errorHandling": true,
+        "requiredKeywords": true,
+        "bannedKeywords": true,
+        "requiredNames": true
+      },
+      "errors": [],
+      "llmTokens": 555
+    }
+  ],
+  "aggregateChecks": {
+    "validSyntax": {
+      "passed": 6,
+      "total": 6
+    },
+    "hasExport": {
+      "passed": 5,
+      "total": 6
+    },
+    "typedProperly": {
+      "passed": 3,
+      "total": 6
+    },
+    "errorHandling": {
+      "passed": 6,
+      "total": 6
+    },
+    "requiredKeywords": {
+      "passed": 5,
+      "total": 6
+    },
+    "bannedKeywords": {
+      "passed": 6,
+      "total": 6
+    },
+    "requiredNames": {
+      "passed": 5,
+      "total": 6
+    }
+  },
+  "totalTokens": 3784,
+  "totalDurationMs": 57587
+}

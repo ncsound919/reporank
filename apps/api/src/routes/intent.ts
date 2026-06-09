@@ -2,7 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../db/client";
 import { authMiddleware, AuthRequest } from "../middleware/auth";
-import { AppError } from "../middleware/errorHandler";
+import { AppError, ErrorCodes } from "../middleware/errorHandler";
 import { asyncHandler } from "../middleware/asyncHandler";
 import { parseIntent } from "../services/intentParser";
 
@@ -16,11 +16,11 @@ const intentSchema = z.object({
 // POST /api/v1/projects/:id/intent — parse and store intent document
 router.post("/projects/:id/intent", authMiddleware, asyncHandler<AuthRequest>(async (req, res) => {
   const brief = await prisma.projectBrief.findUnique({ where: { id: req.params.id } });
-  if (!brief) throw new AppError(404, "Project not found", "NOT_FOUND");
-  if (brief.userId !== req.userId) throw new AppError(403, "Access denied", "FORBIDDEN");
+  if (!brief) throw new AppError(404, "Project not found", ErrorCodes.NOT_FOUND);
+  if (brief.userId !== req.userId) throw new AppError(403, "Access denied", ErrorCodes.FORBIDDEN);
 
   const parsed = intentSchema.safeParse(req.body);
-  if (!parsed.success) throw new AppError(400, parsed.error.errors[0].message, "VALIDATION_ERROR");
+  if (!parsed.success) throw new AppError(400, parsed.error.errors[0].message, ErrorCodes.VALIDATION_ERROR);
 
   const intentDocument = parseIntent(parsed.data.text, parsed.data.source);
 
@@ -38,8 +38,8 @@ router.get("/projects/:id/intent", authMiddleware, asyncHandler<AuthRequest>(asy
     where: { id: req.params.id },
     select: { intentDocument: true, userId: true },
   });
-  if (!brief) throw new AppError(404, "Project not found", "NOT_FOUND");
-  if (brief.userId !== req.userId) throw new AppError(403, "Access denied", "FORBIDDEN");
+  if (!brief) throw new AppError(404, "Project not found", ErrorCodes.NOT_FOUND);
+  if (brief.userId !== req.userId) throw new AppError(403, "Access denied", ErrorCodes.FORBIDDEN);
 
   res.json({ data: brief.intentDocument });
 }));

@@ -1,0 +1,46 @@
+#!/bin/sh
+#
+# RepoRank Pre-Commit Hook
+#
+# Installed via: `scripts\install-githooks.ps1` or manually copied to .git/hooks/pre-commit
+# Runs the RepoRank quality gate on staged changes before each commit.
+#
+# To skip: git commit --no-verify
+# To configure: set REPORANK_THRESHOLD env var (default: 50)
+#                set REPORANK_MAX_SECRETS env var (default: 0)
+
+REPORANK_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+TARGET_DIR="$(pwd)"
+THRESHOLD="${REPORANK_THRESHOLD:-50}"
+MAX_SECRETS="${REPORANK_MAX_SECRETS:-0}"
+
+# Check if we're inside a reporank monorepo
+if [ ! -f "$REPORANK_DIR/scripts/quality-gate.mjs" ]; then
+  echo "  ⚠ RepoRank not found at $REPORANK_DIR"
+  echo "  To use RepoRank quality gate:"
+  echo "    export REPORANK_DIR=/path/to/reporank"
+  exit 0
+fi
+
+echo ""
+echo "  🔍 RepoRank Quality Gate (threshold=$THRESHOLD)"
+
+# Only analyze staged files if there are changes
+STAGED_FILES=$(git diff --cached --name-only --diff-filter=ACMR 2>/dev/null | head -50)
+if [ -z "$STAGED_FILES" ]; then
+  echo "  ⏭ No staged files to analyze"
+  exit 0
+fi
+
+# Run the quality gate
+node "$REPORANK_DIR/scripts/quality-gate.mjs" "$TARGET_DIR" \
+  --threshold "$THRESHOLD" \
+  --max-secrets "$MAX_SECRETS"
+
+RESULT=$?
+if [ $RESULT -ne 0 ]; then
+  echo ""
+  echo "  💡 To skip: git commit --no-verify"
+  echo ""
+fi
+exit $RESULT

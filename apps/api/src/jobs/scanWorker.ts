@@ -1,26 +1,22 @@
 import { scanQueue } from "./queue";
 import { prisma } from "../db/client";
 import { logger } from "../logger";
+import { ScanStatus } from "../constants";
 import { fetchRepoData, repoDataToGradeInput } from "@reporank/grading-engine/scanners/github";
 import { GradingService, runDeepAnalysis } from "@reporank/grading-engine";
 import { runNovelAnalysis } from "@reporank/grading-engine/novel";
 import { generateUnstickPlan } from "@reporank/grading-engine/unstick";
 import { detectInvisibleBugs } from "@reporank/grading-engine/invisible-bugs";
-import { calculateVibeCodingIndex, calculateSoftware20Score, calculateTrustScore } from "@reporank/grading-engine";
 import { createProvider } from "@reporank/grading-engine/providers";
 import { analyzeVibe } from "@reporank/vibe-analyzer";
 import { generateFixPacks } from "@reporank/fix-pack-generator";
 import { buildRoadmap } from "@reporank/fix-pack-generator";
 import { scanSecrets } from "@reporank/claw-protect-core";
 import { config } from "../config";
-import { execFileSync } from "node:child_process";
+import { execSync } from "node:child_process";
 import { mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { parseBuilderContext } from "../services/builderContextParser";
-import { checkPortability } from "../services/portabilityChecker";
-import { runScopeMatcher } from "../services/scopeMatcher";
-import { labelFindings } from "../services/evidenceLabeler";
 
 const gradingService = new GradingService(config.gemini.apiKey, config.gemini.model);
 
@@ -62,7 +58,7 @@ async function runDeepScanners(owner: string, repo: string): Promise<Record<stri
   try {
     // Reconstruct URL from validated owner/repo only — never use raw user input in shell
     const safeUrl = `https://github.com/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}.git`;
-    execFileSync("git", ["clone", "--depth", "1", safeUrl, "."], { cwd: tempDir, encoding: "utf-8", timeout: 60000 });
+    execSync(`git clone --depth 1 "${safeUrl}" .`, { cwd: tempDir, encoding: "utf-8", timeout: 60000, stdio: "pipe" });
 
     const scanners: { name: string; cmd: string; args: string[]; parser?: (out: string) => any }[] = [
       { name: "semgrep", cmd: "semgrep", args: ["scan", "--sarif", "--no-rewrite-rule-ids", "--quiet"], parser: parseSarif },
@@ -73,7 +69,7 @@ async function runDeepScanners(owner: string, repo: string): Promise<Record<stri
 
     for (const scanner of scanners) {
       try {
-        const out = execFileSync(scanner.cmd, scanner.args, { cwd: tempDir, encoding: "utf-8", maxBuffer: 10*1024*1024, timeout: 120000 });
+        const out = execSync(`"${scanner.cmd}" ${scanner.args.map(a => `"${a}"`).join(" ")}`, { cwd: tempDir, encoding: "utf-8", maxBuffer: 10*1024*1024, timeout: 120000, stdio: "pipe" });
         results[scanner.name] = scanner.parser ? scanner.parser(out) : out;
       } catch (e: any) {
         logger.warn(`Scanner ${scanner.name} skipped: ${e.message?.slice(0, 80)}`);
@@ -97,20 +93,12 @@ export function startWorker() {
     const startTime = Date.now();
 
     try {
-      // Load full scan row to get projectBriefId + builderMetadata
-      const scanRow = await prisma.scan.findUnique({
-        where: { id: scanId },
-        select: { projectBriefId: true, builderMetadata: true, branch: true },
-      });
-      const projectBriefId = scanRow?.projectBriefId || null;
-      const existingBuilderMeta = (scanRow?.builderMetadata as any) || {};
-      const branch = scanRow?.branch || "main";
       // Phase 1: Fetch or receive data
       let repoData: any;
       let input: any;
 
       if (isLocal) {
-        await prisma.scan.update({ where: { id: scanId }, data: { status: "cloning", message: "Processing uploaded files..." } });
+        await prisma.scan.update({ where: { id: scanId }, data: { status: ScanStatus.CLONING, message: "Processing uploaded files..." } });
         const files = localFiles!;
         const fileTree = files.map(f => f.path);
         const srcExts = new Set([".ts",".tsx",".js",".jsx",".py",".go",".rs",".java",".rb",".php",".css",".html",".json",".md",".yaml",".yml"]);
@@ -126,23 +114,22 @@ export function startWorker() {
           fileTree, sourceFiles,
         };
       } else {
-        await prisma.scan.update({ where: { id: scanId }, data: { status: "cloning", message: "Fetching repository data..." } });
+        await prisma.scan.update({ where: { id: scanId }, data: { status: ScanStatus.CLONING, message: "Fetching repository data..." } });
         repoData = await fetchRepoData(repoOwner, repoName, config.github.token);
         input = repoDataToGradeInput(repoData);
       }
 
-      await prisma.scan.update({ where: { id: scanId }, data: { status: "scanning", progress: 25, message: "Running deep analysis..." } });
+      await prisma.scan.update({ where: { id: scanId }, data: { status: ScanStatus.SCANNING, progress: 25, message: "Running deep analysis..." } });
 
       // Phase 2: Deterministic analysis (runs for all modes)
-      const vibe = analyzeVibe({ files: repoData.fileTree || [], sourceFiles: repoData.sourceFiles || [] });
-      const vibeCoding = calculateVibeCodingIndex(repoData.sourceFiles || [], repoData.fileTree || []);
-      const allContent = (repoData.sourceFiles || []).map((f: any) => f.content).join("\n");
+      const vibe = analyzeVibe({ files: repoData.fileTree, sourceFiles: repoData.sourceFiles });
+      const allContent = repoData.sourceFiles.map((f: any) => f.content).join("\n");
       const clawResults = scanSecrets(allContent);
-      const deep = runDeepAnalysis(null, repoData.fileTree || [], repoData.sourceFiles || [], repoData.packageJson || "{}");
+      const deep = runDeepAnalysis(null, repoData.fileTree, repoData.sourceFiles, repoData.packageJson);
 
       let scannerResults: Record<string, any> = {};
       if (config.deepScan) {
-        await prisma.scan.update({ where: { id: scanId }, data: { status: "scanning", progress: 50, message: "Running deep scanners..." } });
+        await prisma.scan.update({ where: { id: scanId }, data: { status: ScanStatus.SCANNING, progress: 50, message: "Running deep scanners..." } });
         if (!isLocal && input.repoUrl !== "local") {
           scannerResults = await runDeepScanners(input.repoOwner, input.repoName);
         }
@@ -166,9 +153,9 @@ export function startWorker() {
 
       if (isPrivate) {
         // Private mode: deterministic-only, generate a basic report
-        report = buildPrivateReport(input, vibe, deep, clawResults, vibeCoding);
+        report = buildPrivateReport(input, vibe, deep, clawResults);
       } else {
-        await prisma.scan.update({ where: { id: scanId }, data: { status: "grading", progress: 75, message: "AI is evaluating results..." } });
+        await prisma.scan.update({ where: { id: scanId }, data: { status: ScanStatus.GRADING, progress: 75, message: "AI is evaluating results..." } });
 
         // Use specified AI provider, or default from config
         const providerType = aiProvider || config.localAi.provider;
@@ -208,36 +195,6 @@ export function startWorker() {
         overall: vibe.overall,
         recommendations: [...new Set([...vibe.recommendations, ...(report.vibe.recommendations || [])])],
       };
-      report.vibeCodingIndex = {
-        overallScore: vibeCoding.overallScore,
-        knownHumanScore: vibeCoding.knownHumanScore,
-        signalCount: vibeCoding.perFile.length,
-        fileCount: vibeCoding.perFile.length,
-        summary: vibeCoding.summary,
-      };
-
-      // Software 2.0 + Trust score — needed for /trust, /badges/*, and PR impact
-      const sourceFiles = repoData.sourceFiles || [];
-      const fileTree = repoData.fileTree || [];
-      const testFilePaths = new Set<string>(
-        sourceFiles
-          .filter((f: { path: string }) => /\.(test|spec)\.[a-z]+$/i.test(f.path) || f.path.includes("/tests/") || f.path.includes("/__tests__/"))
-          .map((f: { path: string }) => f.path)
-      );
-      const software20 = calculateSoftware20Score(sourceFiles, fileTree, testFilePaths);
-      report.software20Score = { overall: software20.overall, fileSizeScore: software20.fileSizeScore, commentDensity: software20.commentDensity, importClarity: software20.importClarity, testCoverage: software20.testCoverage, structureNotes: software20.structureNotes };
-
-      const securityCritical = (clawResults as any).critical ?? 0;
-      const securityHigh = (clawResults as any).high ?? 0;
-      const securityMedium = (clawResults as any).medium ?? 0;
-      const securityLow = (clawResults as any).low ?? 0;
-      const trust = calculateTrustScore({
-        overallScore: report.overallScore,
-        vibeCodingIndex: vibeCoding.overallScore,
-        securityFindings: { critical: securityCritical, high: securityHigh, medium: securityMedium, low: securityLow },
-        software20Inputs: { sourceFiles, fileTree, testFilePaths },
-      });
-      report.trust = { trust: trust.trust, grade: trust.grade, components: trust.components, feedback: trust.feedback };
 
       const fixPacks = generateFixPacks(report);
       report.roadmap = buildRoadmap(report.quickWins, report.overallScore);
@@ -255,58 +212,14 @@ export function startWorker() {
       // Invisible bugs — patterns even senior devs miss
       const invisible = detectInvisibleBugs(repoData.sourceFiles || []);
 
-      // Builder context + portability (Phase 2/4)
-      const builderContext = parseBuilderContext(
-        repoData.fileTree || [],
-        repoData.sourceFiles || [],
-        branch,
-        existingBuilderMeta.buildSource || (isLocal ? "manual-upload" : "github"),
-      );
-      const portability = checkPortability(repoData.fileTree || [], repoData.sourceFiles || []);
-
-      // Scope drift (if linked to a project)
-      let drift = null;
-      let brief = null;
-      if (projectBriefId) {
-        try {
-          const fullBrief = await prisma.projectBrief.findUnique({ where: { id: projectBriefId } });
-          if (fullBrief) {
-            brief = fullBrief;
-            const briefInput = {
-              deliverables: fullBrief.deliverables,
-              exclusions: fullBrief.exclusions,
-              constraints: fullBrief.constraints,
-              assumptions: fullBrief.assumptions,
-              intentDocument: typeof fullBrief.intentDocument === 'object' && fullBrief.intentDocument !== null ? (fullBrief.intentDocument as Record<string, unknown>) : null,
-            };
-            drift = runScopeMatcher({
-              brief: briefInput,
-              report,
-              fileTree: repoData.fileTree || [],
-              builderMetadata: builderContext as any,
-            });
-          }
-        } catch (e: any) {
-          logger.warn({ err: e.message }, "Scope matcher failed — skipping");
-        }
-      }
-
-      // Evidence labeling
-      const evidenceLabels = labelFindings({
-        report,
-        clawFindings: { secrets: clawResults, unstick, invisible, novel, drift },
-        brief: brief ? { deliverables: brief.deliverables, acceptanceCriteria: brief.acceptanceCriteria } : null,
-      });
-
-      await prisma.scan.updateMany({
-        where: { id: scanId, status: { notIn: ["complete", "error"] } },
+      await prisma.scan.update({
+        where: { id: scanId },
         data: {
-          status: "complete", progress: 100,
+          status: ScanStatus.COMPLETE, progress: 100,
           overallScore: report.overallScore, gradeCategory: report.gradeCategory,
           maturityLevel: report.maturityLevel, vibeScore: vibe.overall,
           report: report as any, fixPack: fixPacks as any,
-          builderMetadata: { ...existingBuilderMeta, ...builderContext } as any,
-          clawFindings: { secrets: clawResults, scanners: scannerResults, private: isPrivate, novel, unstick, invisible, drift, portability, evidenceLabels } as any,
+          clawFindings: { secrets: clawResults, scanners: scannerResults, private: isPrivate, novel, unstick, invisible } as any,
           completedAt: new Date(), duration: Math.floor((Date.now() - startTime) / 1000),
         },
       });
@@ -314,9 +227,8 @@ export function startWorker() {
       logger.info({ scanId, score: report.overallScore, grade: report.gradeCategory, private: isPrivate }, "Scan complete");
 
     } catch (err: any) {
-      await prisma.scan.updateMany({
-        where: { id: scanId, status: { notIn: ["complete"] } },
-        data: { status: "error", errorMessage: err.message, completedAt: new Date() },
+      await prisma.scan.update({
+        where: { id: scanId }, data: { status: ScanStatus.ERROR, errorMessage: err.message, completedAt: new Date() },
       }).catch((e: any) => logger.error(e, "Failed to update scan error"));
       throw err;
     }
@@ -328,7 +240,7 @@ export function startWorker() {
   logger.info("Worker started, processing scan jobs...");
 }
 
-function buildPrivateReport(input: any, vibe: any, deep: any, clawResults: any, vibeCoding: any): any {
+function buildPrivateReport(input: any, vibe: any, deep: any, clawResults: any): any {
   return {
     repoOwner: input.repoOwner, repoName: input.repoName, mainLanguage: input.mainLanguage,
     starsCount: 0, forksCount: 0, openIssuesCount: 0,
@@ -337,13 +249,6 @@ function buildPrivateReport(input: any, vibe: any, deep: any, clawResults: any, 
     gradeCategory: vibe.overall >= 80 ? "B+" : vibe.overall >= 60 ? "C" : vibe.overall >= 40 ? "D" : "F",
     maturityLevel: vibe.overall >= 80 ? "Production" : vibe.overall >= 60 ? "Beta" : "MVP",
     summary: "Private mode analysis (deterministic only). No AI grading performed.",
-    vibeCodingIndex: {
-      overallScore: vibeCoding.overallScore,
-      knownHumanScore: vibeCoding.knownHumanScore,
-      signalCount: vibeCoding.signalCount,
-      fileCount: vibeCoding.perFile.length,
-      summary: vibeCoding.summary,
-    },
     dimensionScores: {
       security: Math.max(0, 100 - clawResults.secretsFound * 10),
       quality: 60, vibe: vibe.overall, architecture: deep.complexity.fileSizeDistribution.xlarge > 0 ? 40 : 70,

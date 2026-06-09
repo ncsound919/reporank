@@ -1,11 +1,12 @@
 #!/usr/bin/env node
 import chalk from "chalk";
-import { readFileSync, existsSync, writeFileSync } from "node:fs";
+import { readFileSync, existsSync, writeFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { generateGuidelines, estimateContextWindowFit, checkGuidelinesCompliance, getRulesForAnalysis, type CodebaseAnalysis, type ComplianceViolation } from "@reporank/agent-guidelines";
-import { runDeepAnalysis } from "@reporank/grading-engine";
+import { runDeepAnalysis, calculateVibeCodingIndex } from "@reporank/grading-engine";
+import { llmAudit, type LLMAuditResult, LLMUnavailableError } from "./llm";
 
-function analyzeLocalDirectory(dir: string): CodebaseAnalysis {
+export function analyzeLocalDirectory(dir: string, opts: { llmFindings?: LLMAuditResult | null } = {}): CodebaseAnalysis {
   const defaultAnalysis: CodebaseAnalysis = {
     vibeCodingScore: 0, securityIssues: 0, aiGeneratedPatterns: 0,
     hasTests: false, hasLicense: false, hasCI: false, hasDockerfile: false,
@@ -27,12 +28,14 @@ function analyzeLocalDirectory(dir: string): CodebaseAnalysis {
     const langs = new Set(sourceFiles.map(f => f.path.split(".").pop() || ""));
 
     return {
-      vibeCodingScore: Math.min(100, deep.codeHygiene.findings.length * 2),
-      securityIssues: deep.production.findings.filter((f: any) => f.type === "config-exposure").length,
-      aiGeneratedPatterns: deep.codeHygiene.findings.length,
+      vibeCodingScore: calculateVibeCodingIndex(sourceFiles, allFiles).overallScore,
+      securityIssues: deep.production.findings.filter((f: any) => f.type === "config-exposure").length
+        + (opts.llmFindings?.findings.filter((f) => f.category === "security").length ?? 0),
+      aiGeneratedPatterns: deep.codeHygiene.findings.length
+        + (opts.llmFindings?.findings.length ?? 0),
       hasTests, hasLicense, hasCI, hasDockerfile,
       fileCount: allFiles.length,
-      languages: [...langs].map(l => l === "ts" ? "TypeScript" : l === "js" ? "JavaScript" : l),
+      languages: [...new Set([...langs].map(l => l === "ts" || l === "tsx" ? "TypeScript" : l === "js" || l === "jsx" ? "JavaScript" : l))],
       teamSize: 1,
       isEducation: false,
       framework: detectFramework(allFiles),
@@ -42,30 +45,26 @@ function analyzeLocalDirectory(dir: string): CodebaseAnalysis {
   }
 }
 
+const SKIP_DIRS = new Set(["node_modules", ".git", "dist", ".next", "coverage", ".cache", ".turbo", "build"]);
+
 function getAllFiles(dir: string): string[] {
-  const result: string[] = [];
-  try {
-    const entries = readdirRecursive(dir);
-    for (const e of entries) {
-      if (e.includes("node_modules") || e.includes(".git") || e.includes("dist")) continue;
-      result.push(e);
-    }
-  } catch { /* ignore */ }
-  return result;
+  return readdirRecursive(dir, dir);
 }
 
-function readdirRecursive(dir: string): string[] {
+function readdirRecursive(dir: string, rootDir: string): string[] {
   const result: string[] = [];
-  const { readdirSync, statSync } = require("node:fs");
   try {
     const entries = readdirSync(dir);
     for (const entry of entries) {
+      // Skip early: avoid even traversing into massive directories like node_modules
+      if (SKIP_DIRS.has(entry)) continue;
       const full = join(dir, entry);
       try {
         if (statSync(full).isDirectory()) {
-          result.push(...readdirRecursive(full));
+          result.push(...readdirRecursive(full, rootDir));
         } else {
-          result.push(full.replace(dir + "/", "").replace(dir + "\\", ""));
+          // Get path relative to the original root directory
+          result.push(full.slice(rootDir.length + 1));
         }
       } catch { /* skip */ }
     }
@@ -83,24 +82,61 @@ function detectFramework(files: string[]): string {
   return "unknown";
 }
 
-export async function agentsGenerateCommand(dir: string | undefined, options: { mode?: string; output?: string; json?: boolean }) {
+export async function agentsGenerateCommand(dir: string | undefined, options: { mode?: string; output?: string; json?: boolean; noLlm?: boolean }) {
   const targetDir = dir || ".";
   const mode = (options.mode || "standard") as "minimal" | "standard" | "comprehensive";
+  const useLlm = !options.noLlm;
 
   if (!options.json) {
     console.log(chalk.bold.cyan("\n  ╔══════════════════════════════════════════════╗"));
     console.log(chalk.bold.cyan("  ║       RepoRank AGENTS.md Generator        ║"));
     console.log(chalk.bold.cyan("  ╚══════════════════════════════════════════════╝"));
     console.log(`\n  ${chalk.bold("Directory:")} ${chalk.white(targetDir)}`);
-    console.log(`  ${chalk.bold("Mode:")} ${chalk.white(mode)}\n`);
+    console.log(`  ${chalk.bold("Mode:")}      ${chalk.white(mode)}`);
+    console.log(`  ${chalk.bold("LLM:")}       ${chalk.white(useLlm ? "enabled" : "disabled (--no-llm)")}\n`);
   }
 
-  const analysis = analyzeLocalDirectory(targetDir);
+  // Phase 0: Optionally run an LLM audit to enrich the heuristic analysis
+  let llmFindings: LLMAuditResult | null = null;
+  let llmStatus: "skipped" | "ok" | "unavailable" | "error" = "skipped";
+  if (useLlm) {
+    try {
+      // Load a small slice of source files for the LLM
+      const sourceExts = new Set([".ts", ".tsx", ".js", ".jsx", ".py", ".go", ".rs", ".java"]);
+      const allFiles = getAllFiles(targetDir);
+      const sources = allFiles
+        .filter((f: string) => sourceExts.has(f.slice(f.lastIndexOf("."))))
+        .slice(0, 8)
+        .map((fp: string) => {
+          try { return { path: fp, content: readFileSync(join(targetDir, fp), "utf-8").slice(0, 10000) }; }
+          catch { return null; }
+        })
+        .filter(Boolean) as { path: string; content: string }[];
+
+      if (sources.length > 0) {
+        llmFindings = await llmAudit(sources, `RepoRank audit mode=${mode}`);
+        llmStatus = llmFindings ? "ok" : "unavailable";
+        if (!options.json && llmFindings) {
+          console.log(chalk.dim(`  LLM: ${llmFindings.findings.length} findings (confidence=${llmFindings.confidence.toFixed(2)})`));
+        }
+      } else {
+        llmStatus = "skipped";
+      }
+    } catch (err) {
+      llmStatus = "error";
+      if (!options.json) {
+        const msg = err instanceof LLMUnavailableError ? err.message : (err as Error).message;
+        console.log(chalk.yellow(`  LLM: unavailable (${msg}) — falling back to heuristic analysis`));
+      }
+    }
+  }
+
+  const analysis = analyzeLocalDirectory(targetDir, { llmFindings });
   const guidelines = generateGuidelines(mode, analysis);
   const fit = estimateContextWindowFit(guidelines);
 
   if (options.json) {
-    console.log(JSON.stringify({ guidelines, analysis, contextFit: fit }, null, 2));
+    console.log(JSON.stringify({ guidelines, analysis, contextFit: fit, llm: { status: llmStatus, findings: llmFindings?.findings || [] } }, null, 2));
     return;
   }
 

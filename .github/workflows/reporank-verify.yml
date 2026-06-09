@@ -1,0 +1,72 @@
+# reporank verify — automated quality gate on every PR
+#
+# Runs `reporank verify --diff` against the PR's changed files and posts a
+# GitHub-flavored markdown comment with the results.  Fails the check if
+# the quality score is below the threshold.
+#
+# Usage:  copy this file to .github/workflows/reporank-verify.yml in
+# your repo and commit.  Then on every PR the quality gate will run.
+
+name: reporank verify
+
+on:
+  pull_request:
+    branches: [main, master]
+  push:
+    branches: [main, master]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # full history for diff
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install reporank
+        run: npm install -g @reporank/cli
+
+      - name: Run quality gate
+        id: verify
+        env:
+          VIBESERVE_URL: ${{ secrets.VIBESERVE_URL }}
+          VIBESERVE_API_KEY: ${{ secrets.VIBESERVE_API_KEY }}
+        run: |
+          reporank verify . \
+            --diff \
+            --gh-markdown \
+            --threshold 70 \
+            --detect-hallucinations \
+            > verify-output.md \
+            || EXIT_CODE=$?
+          echo "exit_code=${EXIT_CODE:-0}" >> "$GITHUB_OUTPUT"
+        continue-on-error: true
+
+      - name: Find summary
+        if: always()
+        run: |
+          # The verify command may exit non-zero on threshold failure
+          # which is the desired behavior.  We treat that as a normal
+          # workflow run with an artifact to attach.
+          echo "Verify output:"
+          cat verify-output.md
+
+      - name: Post PR comment
+        if: github.event_name == 'pull_request' && always()
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: reporank
+          message: |
+            ${{ github.workspace }}/verify-output.md
+
+      - name: Fail check on threshold violation
+        if: steps.verify.outputs.exit_code != '0' && steps.verify.outputs.exit_code != ''
+        run: |
+          echo "::error::reporank verify failed (quality score below threshold)"
+          exit 1
