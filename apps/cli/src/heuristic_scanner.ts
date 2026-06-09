@@ -26,7 +26,8 @@ const RULES: HeuristicRule[] = [
     type: "code-injection",
     category: "security",
     severity: "critical",
-    pattern: /\bnew\s+Function\s*\(/g,
+    // Only flag new Function() when at least one argument is NOT a static string literal
+    pattern: /\bnew\s+Function\s*\((?!\s*(?:['"][^'"]*['"]\s*(?:,\s*)?)*\s*\))/g,
     description: "new Function() compiles and executes arbitrary code from a string",
     recommendation: "Use a static function or a sandboxed VM (vm2/isolated-vm) with strict input validation",
     confidence: 0.95,
@@ -98,7 +99,8 @@ const RULES: HeuristicRule[] = [
     type: "insecure-random",
     category: "security",
     severity: "medium",
-    pattern: /\b(?:Math\.random|random\.random|random\.randint)\s*\(\s*\).*(?:token|secret|session|nonce|key)/gi,
+    // Bidirectional check: keyword can appear before or after Math.random() on the same line
+    pattern: /(?=.*\b(?:token|secret|session|nonce|key)\b).*?\b(?:Math\.random|random\.random|random\.randint)\s*\(\s*\)/gi,
     description: "Math.random/random is not cryptographically secure for token generation",
     recommendation: "Use crypto.randomBytes() (Node), secrets module (Python), or crypto.SecureRandom (Java)",
     confidence: 0.7,
@@ -400,9 +402,17 @@ export function heuristicScan(code: string): Finding[] {
     }
   }
 
+  // Post-process: remove no-error-handling if await is inside a try block
+  const filtered = findings.filter((f) => {
+    if (f.type === "no-error-handling") {
+      return !isInsideTryBlock(code, f.line);
+    }
+    return true;
+  });
+
   // De-dupe: same type + same line → keep highest confidence
   const dedup = new Map<string, Finding>();
-  for (const f of findings) {
+  for (const f of filtered) {
     const key = `${f.type}@${f.line}`;
     const existing = dedup.get(key);
     if (!existing || f.confidence > existing.confidence) {
@@ -410,6 +420,38 @@ export function heuristicScan(code: string): Finding[] {
     }
   }
   return [...dedup.values()];
+}
+
+/**
+ * Check if the given line number is inside a try { ... } block.
+ * Scans preceding code tracking brace depth to detect open try blocks.
+ */
+function isInsideTryBlock(code: string, targetLine: number): boolean {
+  const lines = code.split("\n");
+  let braceDepth = 0;
+  const tryDepths: number[] = [];
+
+  for (let i = 0; i < targetLine - 1 && i < lines.length; i++) {
+    const line = lines[i];
+
+    for (let j = 0; j < line.length; j++) {
+      if (line[j] === "{") {
+        const prefix = line.slice(0, j).trimEnd();
+        if (/\btry$/.test(prefix)) {
+          tryDepths.push(braceDepth);
+        }
+        braceDepth++;
+      } else if (line[j] === "}") {
+        braceDepth--;
+        if (braceDepth < 0) braceDepth = 0;
+        while (tryDepths.length > 0 && tryDepths[tryDepths.length - 1] >= braceDepth) {
+          tryDepths.pop();
+        }
+      }
+    }
+  }
+
+  return tryDepths.length > 0;
 }
 
 function lineNumberAtOffset(text: string, offset: number): number {
