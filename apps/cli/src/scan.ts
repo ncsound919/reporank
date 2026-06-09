@@ -1,5 +1,8 @@
 import chalk from "chalk";
 import cliProgress from "cli-progress";
+import { resolve } from "node:path";
+import { runSemgrep } from "./scanners/semgrep-runner";
+import { SEMGREP_PRESETS } from "./scanners/rule-presets";
 
 interface ScanOptions { token?: string; deep?: boolean; json?: boolean; }
 
@@ -59,11 +62,38 @@ export async function scanCommand(repo: string, options: ScanOptions) {
 
     // 3. Run security + analysis
     const secrets = await runSecretsScan(sourceFiles);
+
+    // 3b. Deep scan with Semgrep
+    const deepFindings: any[] = [];
+    if (options.deep) {
+      try {
+        const presetKey = "default";
+        const config = SEMGREP_PRESETS[presetKey as keyof typeof SEMGREP_PRESETS] as string[];
+        const targetDir = resolve(process.cwd(), repo);
+        const semgrep = await runSemgrep(targetDir, config);
+        for (const f of semgrep.findings) {
+          deepFindings.push({
+            category: f.category,
+            severity: f.severity === "error" ? "critical" : f.severity === "warning" ? "medium" : "low",
+            line: f.line,
+            type: f.ruleId.split(".").slice(-1)[0] || "semgrep",
+            description: f.message,
+            recommendation: `See: https://semgrep.dev/r/${f.ruleId}`,
+            confidence: 0.9,
+          });
+        }
+      } catch (e: any) {
+        if (!options.json) console.error(chalk.yellow(`  ⚠ Semgrep deep scan: ${e.message}`));
+      }
+    }
+
     if (bar) bar.update(5, { status: "Generating report..." });
 
     // 4. Build and display report
     if (options.json) {
-      console.log(JSON.stringify({ repo: displayName, score: vibe.overall, vibe, secrets, files: fileTree.length }, null, 2));
+      const output: any = { repo: displayName, score: vibe.overall, vibe, secrets, files: fileTree.length };
+      if (options.deep) output.deep = deepFindings;
+      console.log(JSON.stringify(output, null, 2));
     } else {
       displayReport(displayName, repoData, fileTree, vibe, secrets);
     }
