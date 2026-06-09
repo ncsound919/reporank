@@ -21,6 +21,7 @@ import { readFileSync, existsSync, readdirSync, statSync } from "node:fs";
 import { resolve, join, extname, relative, isAbsolute } from "node:path";
 import { heuristicScan } from "./heuristic_scanner";
 import { llmScan, type Finding } from "./review_scanner";
+import { dedupeFindings, capFindings } from "./util/dedupe";
 
 const SOURCE_EXTS = new Set([".ts", ".tsx", ".js", ".jsx", ".py", ".go", ".rs", ".java", ".rb"]);
 const SKIP_DIRS = new Set(["node_modules", ".git", "dist", "build", "coverage", ".next", "target", "vendor", ".aether_prime_cache"]);
@@ -242,45 +243,7 @@ function countBy<T>(items: T[], keyFn: (item: T) => string): Record<string, numb
   return out;
 }
 
-/**
- * Same dedup logic as harness.ts — collapses findings of the same (type, line)
- * to avoid double-counting heuristic + LLM output.
- */
-function dedupe(findings: Finding[]): Finding[] {
-  const sorted = [...findings].sort((a, b) => b.confidence - a.confidence);
-  const kept: Finding[] = [];
-  for (const f of sorted) {
-    const dupe = kept.find((k) => isNearDupe(k, f));
-    if (!dupe) kept.push(f);
-  }
-  return kept;
-}
 
-function isNearDupe(a: Finding, b: Finding): boolean {
-  if (a.type !== b.type) {
-    const aTokens = a.type.split("-");
-    const bTokens = b.type.split("-");
-    if (!aTokens.some((t) => bTokens.includes(t))) return false;
-  }
-  if (a.line > 0 && b.line > 0) {
-    return Math.abs(a.line - b.line) <= 2;
-  }
-  return a.category === b.category;
-}
-
-function capFindingsPerType(findings: Finding[], maxPerType = 1): Finding[] {
-  const sorted = [...findings].sort((a, b) => b.confidence - a.confidence);
-  const seen = new Map<string, number>();
-  const kept: Finding[] = [];
-  for (const f of sorted) {
-    const key = `${f.category}::${f.type}`;
-    const count = seen.get(key) ?? 0;
-    if (count >= maxPerType) continue;
-    seen.set(key, count + 1);
-    kept.push(f);
-  }
-  return kept;
-}
 
 async function analyzeFile(
   filePath: string,
@@ -331,7 +294,7 @@ async function analyzeFile(
     }
   }
 
-  const merged = dedupe(capFindingsPerType([...heuristic, ...llmFindings]));
+  const merged = dedupeFindings(capFindings([...heuristic, ...llmFindings]));
 
   return {
     path: relative(rootPath, filePath).replace(/\\/g, "/"),

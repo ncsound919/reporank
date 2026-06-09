@@ -17,6 +17,7 @@ import { fileURLToPath } from "node:url";
 
 import { llmScan, type ScanResult, type Finding } from "./review_scanner";
 import { heuristicScan } from "./heuristic_scanner";
+import { dedupeFindings, capFindings } from "./util/dedupe";
 import type { PromptMode } from "./prompts";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -291,7 +292,7 @@ async function runTask(task: ReviewTask, opts: HarnessOptions): Promise<TaskResu
 
   const synthetic: ScanResult = {
     taskId: task.id,
-    findings: capFindings(dedupe(filtered)),
+    findings: capFindings(dedupeFindings(filtered)),
     durationMs: totalDuration,
     tokens: totalTokens,
     mode: opts.heuristicOnly ? "heuristic" : "llm",
@@ -301,53 +302,7 @@ async function runTask(task: ReviewTask, opts: HarnessOptions): Promise<TaskResu
   return matchFindings(task, synthetic, opts);
 }
 
-function dedupe(findings: Finding[]): Finding[] {
-  // Smarter dedup: findings are the same "real issue" if they match on type
-  // AND are within line tolerance. This is more aggressive than exact-match
-  // dedup and prevents heuristic + LLM from double-reporting the same thing.
-  const sorted = [...findings].sort((a, b) => b.confidence - a.confidence);
-  const kept: Finding[] = [];
-  for (const f of sorted) {
-    const dupe = kept.find((k) => isNearDupe(k, f));
-    if (!dupe) kept.push(f);
-  }
-  return kept;
-}
 
-/**
- * Cap findings to the top N per (category, type) to suppress the LLM's
- * tendency to emit 3+ findings per task when 1-2 would suffice. The benchmark
- * expects 1-2 findings per task; over-emission drags precision down without
- * helping recall. (Phase 1.3: empirically gains ~5 F1 points on quality.)
- */
-function capFindings(findings: Finding[], maxPerType = 1): Finding[] {
-  const sorted = [...findings].sort((a, b) => b.confidence - a.confidence);
-  const seen = new Map<string, number>();
-  const kept: Finding[] = [];
-  for (const f of sorted) {
-    const key = `${f.category}::${f.type}`;
-    const count = seen.get(key) ?? 0;
-    if (count >= maxPerType) continue;
-    seen.set(key, count + 1);
-    kept.push(f);
-  }
-  return kept;
-}
-
-function isNearDupe(a: Finding, b: Finding): boolean {
-  if (a.type !== b.type) {
-    // Different types can still be the same issue if they share a token
-    const aTokens = a.type.split("-");
-    const bTokens = b.type.split("-");
-    if (!aTokens.some((t) => bTokens.includes(t))) return false;
-  }
-  // Same line or adjacent lines → dupe
-  if (a.line > 0 && b.line > 0) {
-    return Math.abs(a.line - b.line) <= 2;
-  }
-  // File-level findings (line=0) are dupes if categories match
-  return a.category === b.category;
-}
 
 // ─── Matching ───────────────────────────────────────────────────
 function matchFindings(task: ReviewTask, scan: ScanResult, opts: HarnessOptions): TaskResult {
