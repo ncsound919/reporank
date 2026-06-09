@@ -1,0 +1,294 @@
+{
+  "totalTasks": 6,
+  "skippedTasks": 0,
+  "aggregate": {
+    "truePositives": 1,
+    "falsePositives": 8,
+    "falseNegatives": 5,
+    "precision": 0.1111111111111111,
+    "recall": 0.16666666666666666,
+    "f1": 0.13333333333333333
+  },
+  "perTask": [
+    {
+      "id": "sql-injection-express",
+      "groundTruthCount": 1,
+      "predictedCount": 1,
+      "truePositives": [],
+      "falsePositives": [
+        {
+          "category": "maintainability",
+          "severity": "low",
+          "line": 1,
+          "type": "deep-nesting",
+          "description": "Six or more levels of indentation — readability hit",
+          "recommendation": "Use early returns (guard clauses) or extract nested logic into named functions",
+          "confidence": 0.5
+        }
+      ],
+      "falseNegatives": [
+        {
+          "category": "security",
+          "severity": "critical",
+          "line": 5,
+          "type": "sql-injection",
+          "description": "SQL injection vulnerability via raw string interpolation of user input"
+        }
+      ],
+      "durationMs": 3232,
+      "tokens": 0,
+      "warnings": [
+        "chunk 0: LLM call failed — Provider 'OpenCode' returned no content"
+      ]
+    },
+    {
+      "id": "missing-error-handling",
+      "groundTruthCount": 1,
+      "predictedCount": 1,
+      "truePositives": [],
+      "falsePositives": [
+        {
+          "category": "maintainability",
+          "severity": "low",
+          "line": 1,
+          "type": "deep-nesting",
+          "description": "Six or more levels of indentation — readability hit",
+          "recommendation": "Use early returns (guard clauses) or extract nested logic into named functions",
+          "confidence": 0.5
+        }
+      ],
+      "falseNegatives": [
+        {
+          "category": "error-handling",
+          "severity": "high",
+          "line": 3,
+          "type": "unhandled-rejection",
+          "description": "Async route handler missing try/catch will cause unhandled promise rejection on error"
+        }
+      ],
+      "durationMs": 3227,
+      "tokens": 0,
+      "warnings": [
+        "chunk 0: LLM call failed — Provider 'OpenCode' returned no content"
+      ]
+    },
+    {
+      "id": "hardcoded-secret",
+      "groundTruthCount": 1,
+      "predictedCount": 2,
+      "truePositives": [
+        {
+          "predicted": {
+            "category": "security",
+            "severity": "high",
+            "line": 2,
+            "type": "hardcoded-secret",
+            "description": "Hardcoded API key or credential detected in source",
+            "recommendation": "Move secrets to environment variables; rotate the exposed credential immediately",
+            "confidence": 0.98
+          },
+          "groundTruth": {
+            "category": "security",
+            "severity": "critical",
+            "line": 2,
+            "type": "hardcoded-secret",
+            "description": "Hardcoded API secret key in source code"
+          },
+          "matchScore": 0.95
+        }
+      ],
+      "falsePositives": [
+        {
+          "category": "maintainability",
+          "severity": "low",
+          "line": 1,
+          "type": "deep-nesting",
+          "description": "Six or more levels of indentation — readability hit",
+          "recommendation": "Use early returns (guard clauses) or extract nested logic into named functions",
+          "confidence": 0.5
+        }
+      ],
+      "falseNegatives": [],
+      "durationMs": 3176,
+      "tokens": 0,
+      "warnings": [
+        "chunk 0: LLM call failed — Provider 'OpenCode' returned no content"
+      ]
+    },
+    {
+      "id": "eval-usage",
+      "groundTruthCount": 1,
+      "predictedCount": 2,
+      "truePositives": [],
+      "falsePositives": [
+        {
+          "category": "security",
+          "severity": "critical",
+          "line": 2,
+          "type": "code-injection",
+          "description": "eval() executes arbitrary code from a string",
+          "recommendation": "Replace with a safe parser; if dynamic evaluation is required, use a sandboxed VM",
+          "confidence": 0.99
+        },
+        {
+          "category": "maintainability",
+          "severity": "low",
+          "line": 1,
+          "type": "deep-nesting",
+          "description": "Six or more levels of indentation — readability hit",
+          "recommendation": "Use early returns (guard clauses) or extract nested logic into named functions",
+          "confidence": 0.5
+        }
+      ],
+      "falseNegatives": [
+        {
+          "category": "security",
+          "severity": "critical",
+          "line": 2,
+          "type": "eval-usage",
+          "description": "eval() allows arbitrary code execution from untrusted input"
+        }
+      ],
+      "durationMs": 3206,
+      "tokens": 0,
+      "warnings": [
+        "chunk 0: LLM call failed — Provider 'OpenCode' returned no content"
+      ]
+    },
+    {
+      "id": "memory-leak-interval",
+      "groundTruthCount": 1,
+      "predictedCount": 2,
+      "truePositives": [],
+      "falsePositives": [
+        {
+          "category": "quality",
+          "severity": "low",
+          "line": 5,
+          "type": "debug-code",
+          "description": "console.log/debug statements should be removed from production code",
+          "recommendation": "Use a proper logger (pino, winston, structlog) with appropriate log levels",
+          "confidence": 0.5
+        },
+        {
+          "category": "maintainability",
+          "severity": "low",
+          "line": 1,
+          "type": "deep-nesting",
+          "description": "Six or more levels of indentation — readability hit",
+          "recommendation": "Use early returns (guard clauses) or extract nested logic into named functions",
+          "confidence": 0.5
+        }
+      ],
+      "falseNegatives": [
+        {
+          "category": "memory",
+          "severity": "high",
+          "line": 5,
+          "type": "missing-cleanup",
+          "description": "setInterval in useEffect without clearInterval causes memory leak"
+        }
+      ],
+      "durationMs": 3171,
+      "tokens": 0,
+      "warnings": [
+        "chunk 0: LLM call failed — Provider 'OpenCode' returned no content"
+      ]
+    },
+    {
+      "id": "xss-vulnerability",
+      "groundTruthCount": 1,
+      "predictedCount": 1,
+      "truePositives": [],
+      "falsePositives": [
+        {
+          "category": "maintainability",
+          "severity": "low",
+          "line": 1,
+          "type": "deep-nesting",
+          "description": "Six or more levels of indentation — readability hit",
+          "recommendation": "Use early returns (guard clauses) or extract nested logic into named functions",
+          "confidence": 0.5
+        }
+      ],
+      "falseNegatives": [
+        {
+          "category": "security",
+          "severity": "critical",
+          "line": 5,
+          "type": "dangerouslySetInnerHTML",
+          "description": "dangerouslySetInnerHTML with unsanitized content enables XSS attacks"
+        }
+      ],
+      "durationMs": 3180,
+      "tokens": 0,
+      "warnings": [
+        "chunk 0: LLM call failed — Provider 'OpenCode' returned no content"
+      ]
+    }
+  ],
+  "byCategory": {
+    "maintainability": {
+      "precision": 0,
+      "recall": 0,
+      "f1": 0,
+      "support": 0
+    },
+    "security": {
+      "precision": 0.5,
+      "recall": 0.25,
+      "f1": 0.3333333333333333,
+      "support": 4
+    },
+    "error-handling": {
+      "precision": 0,
+      "recall": 0,
+      "f1": 0,
+      "support": 1
+    },
+    "quality": {
+      "precision": 0,
+      "recall": 0,
+      "f1": 0,
+      "support": 0
+    },
+    "memory": {
+      "precision": 0,
+      "recall": 0,
+      "f1": 0,
+      "support": 1
+    }
+  },
+  "bySeverity": {
+    "low": {
+      "precision": 0,
+      "recall": 0,
+      "f1": 0,
+      "support": 0
+    },
+    "critical": {
+      "precision": 0.5,
+      "recall": 0.25,
+      "f1": 0.3333333333333333,
+      "support": 4
+    },
+    "high": {
+      "precision": 0,
+      "recall": 0,
+      "f1": 0,
+      "support": 2
+    }
+  },
+  "cost": {
+    "totalTokens": 0,
+    "totalDurationMs": 19192,
+    "averageLatencyMs": 3198.6666666666665
+  },
+  "config": {
+    "promptMode": "strict",
+    "lineTolerance": 2,
+    "typeMatchWeight": 0.6,
+    "lineMatchWeight": 0.3,
+    "descriptionSimilarityWeight": 0.1
+  }
+}

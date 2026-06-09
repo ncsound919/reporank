@@ -1,0 +1,186 @@
+{
+  "totalTasks": 6,
+  "skippedTasks": 0,
+  "aggregate": {
+    "truePositives": 0,
+    "falsePositives": 0,
+    "falseNegatives": 6,
+    "precision": 0,
+    "recall": 0,
+    "f1": 0
+  },
+  "perTask": [
+    {
+      "id": "missing-error-handling",
+      "groundTruthCount": 1,
+      "predictedCount": 0,
+      "truePositives": [],
+      "falsePositives": [],
+      "falseNegatives": [
+        {
+          "category": "error-handling",
+          "severity": "high",
+          "line": 3,
+          "type": "unhandled-rejection",
+          "description": "Async route handler missing try/catch will cause unhandled promise rejection on error"
+        }
+      ],
+      "durationMs": 704,
+      "tokens": 0,
+      "warnings": [
+        "chunk 0: LLM call failed — Provider 'OpenCode' returned no content"
+      ]
+    },
+    {
+      "id": "sql-injection-express",
+      "groundTruthCount": 1,
+      "predictedCount": 0,
+      "truePositives": [],
+      "falsePositives": [],
+      "falseNegatives": [
+        {
+          "category": "security",
+          "severity": "critical",
+          "line": 5,
+          "type": "sql-injection",
+          "description": "SQL injection vulnerability via raw string interpolation of user input"
+        }
+      ],
+      "durationMs": 781,
+      "tokens": 0,
+      "warnings": [
+        "chunk 0: LLM call failed — Provider 'OpenCode' returned no content"
+      ]
+    },
+    {
+      "id": "hardcoded-secret",
+      "groundTruthCount": 1,
+      "predictedCount": 0,
+      "truePositives": [],
+      "falsePositives": [],
+      "falseNegatives": [
+        {
+          "category": "security",
+          "severity": "critical",
+          "line": 2,
+          "type": "hardcoded-secret",
+          "description": "Hardcoded API secret key in source code"
+        }
+      ],
+      "durationMs": 411,
+      "tokens": 0,
+      "warnings": [
+        "chunk 0: LLM call failed — Provider 'OpenCode' returned no content"
+      ]
+    },
+    {
+      "id": "eval-usage",
+      "groundTruthCount": 1,
+      "predictedCount": 0,
+      "truePositives": [],
+      "falsePositives": [],
+      "falseNegatives": [
+        {
+          "category": "security",
+          "severity": "critical",
+          "line": 2,
+          "type": "eval-usage",
+          "description": "eval() allows arbitrary code execution from untrusted input"
+        }
+      ],
+      "durationMs": 424,
+      "tokens": 0,
+      "warnings": [
+        "chunk 0: LLM call failed — Provider 'OpenCode' returned no content"
+      ]
+    },
+    {
+      "id": "memory-leak-interval",
+      "groundTruthCount": 1,
+      "predictedCount": 0,
+      "truePositives": [],
+      "falsePositives": [],
+      "falseNegatives": [
+        {
+          "category": "memory",
+          "severity": "high",
+          "line": 5,
+          "type": "missing-cleanup",
+          "description": "setInterval in useEffect without clearInterval causes memory leak"
+        }
+      ],
+      "durationMs": 3243,
+      "tokens": 0,
+      "warnings": [
+        "chunk 0: LLM call failed — Provider 'OpenCode' returned no content"
+      ]
+    },
+    {
+      "id": "xss-vulnerability",
+      "groundTruthCount": 1,
+      "predictedCount": 0,
+      "truePositives": [],
+      "falsePositives": [],
+      "falseNegatives": [
+        {
+          "category": "security",
+          "severity": "critical",
+          "line": 5,
+          "type": "dangerouslySetInnerHTML",
+          "description": "dangerouslySetInnerHTML with unsanitized content enables XSS attacks"
+        }
+      ],
+      "durationMs": 3228,
+      "tokens": 0,
+      "warnings": [
+        "chunk 0: LLM call failed — Provider 'OpenCode' returned no content"
+      ]
+    }
+  ],
+  "byCategory": {
+    "error-handling": {
+      "precision": 0,
+      "recall": 0,
+      "f1": 0,
+      "support": 1
+    },
+    "security": {
+      "precision": 0,
+      "recall": 0,
+      "f1": 0,
+      "support": 4
+    },
+    "memory": {
+      "precision": 0,
+      "recall": 0,
+      "f1": 0,
+      "support": 1
+    }
+  },
+  "bySeverity": {
+    "high": {
+      "precision": 0,
+      "recall": 0,
+      "f1": 0,
+      "support": 2
+    },
+    "critical": {
+      "precision": 0,
+      "recall": 0,
+      "f1": 0,
+      "support": 4
+    }
+  },
+  "cost": {
+    "totalTokens": 0,
+    "totalDurationMs": 8791,
+    "averageLatencyMs": 1465.1666666666667
+  },
+  "config": {
+    "promptMode": "strict",
+    "lineTolerance": 2,
+    "typeMatchWeight": 0.6,
+    "lineMatchWeight": 0.3,
+    "descriptionSimilarityWeight": 0.1
+  }
+}
