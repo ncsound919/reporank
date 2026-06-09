@@ -67,3 +67,8 @@ __pycache__/
 
 # Tooling state
 .history/
+
+# promptfoo output
+promptfoo.db
+output/
+.promptfoo/

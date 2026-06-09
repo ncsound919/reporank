@@ -1,0 +1,52 @@
+description: "RepoRank LLM code-review prompt A/B eval"
+providers:
+  - id: "opencode:opencode/deepseek-v4-pro"
+    label: "DeepSeek V4 Pro"
+  - id: "opencode:opencode/deepseek-v4-flash-free"
+    label: "DeepSeek Flash Free"
+
+prompts:
+  - "You are a senior code reviewer. Analyze this code and return JSON with findings (type, severity, line, description, recommendation). Code:\n{{code}}"
+  - "You are a senior code reviewer doing a focused review of a single {{language}} file.\nRules:\n- Be specific: name the exact line, the exact issue, and the exact fix.\n- Don't invent issues: if you see no real problems, return an empty findings array.\n- Severity: critical (security/data loss), high (clear bug), medium (maintainability), low (style).\n- Confidence: 0.0 to 1.0.\n\nReturn JSON:\n{\"reasoning\": \"...\", \"findings\": [{ \"category\": \"security|quality|performance|maintainability|testing\", \"severity\": \"critical|high|medium|low|info\", \"line\": <int>, \"type\": \"<kebab-case-tag>\", \"description\": \"...\", \"recommendation\": \"...\", \"confidence\": 0.0 }]}\n\nCode:\n{{code}}"
+
+tests:
+  - vars:
+      code: "import express from 'express';\nconst app = express();\napp.get('/users', (req, res) => {\n  const id = req.query.id;\n  const sql = `SELECT * FROM users WHERE id = ${id}`;\n  db.query(sql, (err, rows) => {\n    if (err) throw err;\n    res.json(rows);\n  });\n});"
+      language: "typescript"
+    assert:
+      - type: contains-json
+      - type: icontains
+        value: "sql"
+  - vars:
+      code: "import { useEffect } from 'react';\nfunction PollingComponent() {\n  useEffect(() => {\n    setInterval(() => {\n      console.log('Polling...');\n    }, 1000);\n  }, []);\n  return <div>Polling</div>;\n}"
+      language: "typescript"
+    assert:
+      - type: contains-json
+      - type: icontains
+        value: "leak"
+  - vars:
+      code: "<div dangerouslySetInnerHTML={{ __html: content }} />"
+      language: "tsx"
+    assert:
+      - type: contains-json
+      - type: icontains
+        value: "xss"
+  - vars:
+      code: "function calculate(expr) { return eval(expr); }"
+      language: "javascript"
+    assert:
+      - type: contains-json
+      - type: icontains
+        value: "code-injection"
+  - vars:
+      code: "export async function createUser(req, res) {\n  const user = await db.users.create({ data: req.body });\n  res.status(201).json(user);\n}"
+      language: "typescript"
+    assert:
+      - type: contains-json
+  - vars:
+      code: "export const config = {\n  apiKey: 'sk-abc123def456ghi789jkl',\n  timeout: 5000,\n};"
+      language: "typescript"
+    assert:
+      - type: contains-json
+      - type: icontains
+        value: "secret"
