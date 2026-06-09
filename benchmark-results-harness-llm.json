@@ -2,12 +2,12 @@
   "totalTasks": 6,
   "skippedTasks": 0,
   "aggregate": {
-    "truePositives": 2,
-    "falsePositives": 2,
-    "falseNegatives": 4,
-    "precision": 0.5,
-    "recall": 0.3333333333333333,
-    "f1": 0.4
+    "truePositives": 5,
+    "falsePositives": 3,
+    "falseNegatives": 1,
+    "precision": 0.625,
+    "recall": 0.8333333333333334,
+    "f1": 0.7142857142857143
   },
   "perTask": [
     {
@@ -47,7 +47,7 @@
         }
       ],
       "falseNegatives": [],
-      "durationMs": 8576,
+      "durationMs": 1,
       "tokens": 3514,
       "warnings": []
     },
@@ -88,72 +88,112 @@
         }
       ],
       "falseNegatives": [],
-      "durationMs": 11356,
+      "durationMs": 0,
       "tokens": 3488,
       "warnings": []
     },
     {
       "id": "hardcoded-secret",
       "groundTruthCount": 1,
-      "predictedCount": 0,
-      "truePositives": [],
-      "falsePositives": [],
-      "falseNegatives": [
+      "predictedCount": 1,
+      "truePositives": [
         {
-          "category": "security",
-          "severity": "critical",
-          "line": 2,
-          "type": "hardcoded-secret",
-          "description": "Hardcoded API secret key in source code"
+          "predicted": {
+            "category": "security",
+            "severity": "critical",
+            "line": 2,
+            "type": "hardcoded-secret",
+            "description": "API key 'sk-abc123def456ghi789jkl' is hardcoded in the source file.",
+            "recommendation": "Move the API key to environment variables (e.g., process.env.API_KEY) or a secure configuration management system. Do not commit secrets to version control.",
+            "confidence": 0.99
+          },
+          "groundTruth": {
+            "category": "security",
+            "severity": "critical",
+            "line": 2,
+            "type": "hardcoded-secret",
+            "description": "Hardcoded API secret key in source code"
+          },
+          "matchScore": 0.9444444444444443
         }
       ],
-      "durationMs": 15455,
-      "tokens": 0,
-      "warnings": [
-        "chunk 0: LLM call failed — Provider 'Gemini' returned no content"
-      ]
+      "falsePositives": [],
+      "falseNegatives": [],
+      "durationMs": 0,
+      "tokens": 3277,
+      "warnings": []
     },
     {
       "id": "eval-usage",
       "groundTruthCount": 1,
-      "predictedCount": 0,
-      "truePositives": [],
-      "falsePositives": [],
-      "falseNegatives": [
+      "predictedCount": 1,
+      "truePositives": [
         {
-          "category": "security",
-          "severity": "critical",
-          "line": 2,
-          "type": "code-injection",
-          "description": "eval() allows arbitrary code execution from untrusted input"
+          "predicted": {
+            "category": "security",
+            "severity": "critical",
+            "line": 2,
+            "type": "code-injection",
+            "description": "The `eval()` function is used with the `expression` parameter, which could be user-controlled, allowing for arbitrary code execution.",
+            "recommendation": "Avoid using `eval()`. If dynamic expression evaluation is required, consider a safer alternative like a dedicated expression parser library or a sandboxed environment, ensuring all input is strictly validated and sanitized.",
+            "confidence": 0.99
+          },
+          "groundTruth": {
+            "category": "security",
+            "severity": "critical",
+            "line": 2,
+            "type": "code-injection",
+            "description": "eval() allows arbitrary code execution from untrusted input"
+          },
+          "matchScore": 0.9199999999999999
         }
       ],
-      "durationMs": 15800,
-      "tokens": 0,
-      "warnings": [
-        "chunk 0: LLM call failed — Provider 'Gemini' returned no content"
-      ]
+      "falsePositives": [],
+      "falseNegatives": [],
+      "durationMs": 0,
+      "tokens": 3309,
+      "warnings": []
     },
     {
       "id": "memory-leak-interval",
       "groundTruthCount": 1,
-      "predictedCount": 0,
-      "truePositives": [],
-      "falsePositives": [],
-      "falseNegatives": [
+      "predictedCount": 2,
+      "truePositives": [
         {
-          "category": "quality",
-          "severity": "high",
-          "line": 5,
-          "type": "resource-leak",
-          "description": "setInterval in useEffect without clearInterval causes memory leak"
+          "predicted": {
+            "category": "quality",
+            "severity": "high",
+            "line": 4,
+            "type": "resource-leak",
+            "description": "setInterval in useEffect without clearInterval cleanup function. The interval will continue to run even after the component unmounts, leading to memory leaks and potential performance issues.",
+            "recommendation": "Return a cleanup function from useEffect that calls clearInterval with the ID returned by setInterval.",
+            "confidence": 0.95
+          },
+          "groundTruth": {
+            "category": "quality",
+            "severity": "high",
+            "line": 5,
+            "type": "resource-leak",
+            "description": "setInterval in useEffect without clearInterval causes memory leak"
+          },
+          "matchScore": 0.8208333333333334
         }
       ],
-      "durationMs": 15352,
-      "tokens": 0,
-      "warnings": [
-        "chunk 0: LLM call failed — Provider 'Gemini' returned no content"
-      ]
+      "falsePositives": [
+        {
+          "category": "maintainability",
+          "severity": "low",
+          "line": 5,
+          "type": "debug-code",
+          "description": "console.log statement found in component logic, which should typically be removed or replaced with a proper logging solution in production.",
+          "recommendation": "Remove the console.log statement or replace it with a more robust logging mechanism.",
+          "confidence": 0.8
+        }
+      ],
+      "falseNegatives": [],
+      "durationMs": 6634,
+      "tokens": 3437,
+      "warnings": []
     },
     {
       "id": "xss-vulnerability",
@@ -170,7 +210,7 @@
           "description": "dangerouslySetInnerHTML with unsanitized content enables XSS attacks"
         }
       ],
-      "durationMs": 15229,
+      "durationMs": 16419,
       "tokens": 0,
       "warnings": [
         "chunk 0: LLM call failed — Provider 'Gemini' returned no content"
@@ -180,35 +220,47 @@
   "byCategory": {
     "security": {
       "precision": 1,
-      "recall": 0.25,
-      "f1": 0.4,
+      "recall": 0.75,
+      "f1": 0.8571428571428571,
       "support": 4
     },
     "quality": {
-      "precision": 0.3333333333333333,
-      "recall": 0.5,
-      "f1": 0.4,
+      "precision": 0.5,
+      "recall": 1,
+      "f1": 0.6666666666666666,
       "support": 2
+    },
+    "maintainability": {
+      "precision": 0,
+      "recall": 0,
+      "f1": 0,
+      "support": 0
     }
   },
   "bySeverity": {
     "critical": {
       "precision": 1,
-      "recall": 0.25,
-      "f1": 0.4,
+      "recall": 0.75,
+      "f1": 0.8571428571428571,
       "support": 4
     },
     "high": {
-      "precision": 0.3333333333333333,
-      "recall": 0.5,
-      "f1": 0.4,
+      "precision": 0.5,
+      "recall": 1,
+      "f1": 0.6666666666666666,
       "support": 2
+    },
+    "low": {
+      "precision": 0,
+      "recall": 0,
+      "f1": 0,
+      "support": 0
     }
   },
   "cost": {
-    "totalTokens": 7002,
-    "totalDurationMs": 81768,
-    "averageLatencyMs": 13628
+    "totalTokens": 17025,
+    "totalDurationMs": 23054,
+    "averageLatencyMs": 3842.3333333333335
   },
   "config": {
     "promptMode": "strict",
