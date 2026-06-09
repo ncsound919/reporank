@@ -9,14 +9,17 @@
   "scripts": {
     "build": "tsc",
     "prepublish": "tsc",
-    "prompt:eval": "promptfoo eval --config tests/promptfoo/review.yaml"
+    "prompt:eval": "promptfoo eval --config tests/promptfoo/review.yaml",
+    "server": "npx tsx src/server/index.ts"
   },
   "dependencies": {
     "@reporank/agent-guidelines": "workspace:*",
     "@reporank/grading-engine": "workspace:*",
     "chalk": "^5.4.1",
     "cli-progress": "^3.12.0",
-    "commander": "^13.1.0"
+    "commander": "^13.1.0",
+    "hono": "^4.6.0",
+    "@hono/node-server": "^1.13.0"
   },
   "devDependencies": {
     "@types/cli-progress": "^3.11.6",
