@@ -50,8 +50,29 @@ export async function scanCommand(repo: string, options: ScanOptions) {
     try { const pkg = await gh(`/repos/${owner}/${name}/contents/package.json`); packageJson = Buffer.from(pkg.content, "base64").toString("utf-8"); } catch {}
 
     const srcExts = new Set([".ts",".tsx",".js",".jsx",".py",".go",".rs",".java",".rb",".php",".vue",".svelte"]);
+    const candidates = fileTree.filter((f: string) => srcExts.has(f.slice(f.lastIndexOf("."))));
+
+    // Stratified sampling: take up to 5 files per top-level directory, max 50 total
+    const byDir = new Map<string, string[]>();
+    for (const p of candidates) {
+      const topDir = p.includes("/") ? p.split("/")[0] : "__root__";
+      if (!byDir.has(topDir)) byDir.set(topDir, []);
+      byDir.get(topDir)!.push(p);
+    }
+    const sampled: string[] = [];
+    const buckets = [...byDir.values()].map(fs => fs.slice(0, 5));
+    let moreFiles = true;
+    while (sampled.length < 50 && moreFiles) {
+      moreFiles = false;
+      for (const bucket of buckets) {
+        if (sampled.length >= 50) break;
+        const next = bucket.shift();
+        if (next !== undefined) { sampled.push(next); moreFiles = true; }
+      }
+    }
+
     const sourceFiles: { path: string; content: string }[] = [];
-    for (const fp of fileTree.filter((f: string) => srcExts.has(f.slice(f.lastIndexOf(".")))).slice(0, 10)) {
+    for (const fp of sampled) {
       try { const f = await gh(`/repos/${owner}/${name}/contents/${fp}`); sourceFiles.push({ path: fp, content: Buffer.from(f.content, "base64").toString("utf-8").slice(0, 15000) }); } catch {}
     }
     if (bar) bar.update(3, { status: "Running vibe analysis..." });
@@ -218,8 +239,16 @@ function displayReport(displayName: string, repoData: any, fileTree: string[], v
     process.stdout.write(`\n  ${chalk.red("⚠ No license detected — enterprise blocker")}`);
   }
 
-  process.stdout.write(`\n  ${chalk.dim("─".repeat(46))}`);
-  process.stdout.write(`  ${chalk.dim("Full report:")} ${chalk.cyan(`https://reporank.dev/report/${displayName}`)}`);
-  process.stdout.write(`  ${chalk.dim("npx @reporank/cli scan --json ${displayName}")} ${chalk.dim("for machine-readable output")}`);
+  process.stdout.write(`  ${chalk.dim("─".repeat(46))}`);
+
+  // Only print a report URL if the scan was persisted via the API (REPORANK_API_KEY is set).
+  // Otherwise, guide the user to the --json flag to get machine-readable output locally.
+  if (process.env.REPORANK_API_KEY) {
+    process.stdout.write(`  ${chalk.dim("Full report:")} ${chalk.cyan(`https://reporank.dev/report/${displayName}`)}`);
+  } else {
+    process.stdout.write(`  ${chalk.dim("For full machine-readable output run:")} ${chalk.cyan(`npx @reporank/cli scan --json ${displayName}`)}`);
+    process.stdout.write(`  ${chalk.dim("Sign in at")} ${chalk.cyan("https://reporank.dev")} ${chalk.dim("to save & share persistent reports.")}`);
+  }
+
   process.stdout.write(`  ${chalk.dim("─".repeat(46))}`);
 }

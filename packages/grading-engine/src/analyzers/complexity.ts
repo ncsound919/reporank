@@ -2,6 +2,17 @@ import { readFileSync, statSync } from "node:fs";
 import { join, extname, dirname, relative } from "node:path";
 import { countPatterns } from "./pattern-utils";
 
+const REACT_EXTS = new Set([".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"]);
+
+/**
+ * Returns true only if the scanned files belong to a React/JSX ecosystem.
+ * Avoids false-positive hook violations on Python, Go, Rust, etc.
+ */
+function isReactEcosystem(sourceFiles: { path: string; content: string }[], packageJson?: string): boolean {
+  if (packageJson && /["']react["']/.test(packageJson)) return true;
+  return sourceFiles.some(f => /\bimport\b[^;]+\bfrom\s+['"]react['"]/m.test(f.content));
+}
+
 export interface FileHotSpot {
   filePath: string;
   size: number;
@@ -123,6 +134,7 @@ export function analyzeComplexity(repoPath: string, sourceFiles: { path: string;
   }
 
   // Cohesion violations: files in wrong places
+  const reactProject = isReactEcosystem(sourceFiles);
   for (const file of sourceFiles) {
     const parts = file.path.replace(/\\/g, "/").split("/");
     const dir = parts.slice(0, -1).join("/");
@@ -134,8 +146,15 @@ export function analyzeComplexity(repoPath: string, sourceFiles: { path: string;
       cohesionViolations.push(`${file.path} — test file outside __tests__ directory`);
     }
 
-    // File in wrong directory based on name
-    if (name.startsWith("use") && !dir.includes("hooks") && !dir.includes("hook")) {
+    // React hook not in hooks/ — only flag for JS/TS files in React projects
+    if (
+      reactProject &&
+      REACT_EXTS.has(ext) &&
+      name.startsWith("use") &&
+      /^use[A-Z]/.test(name.replace(ext, "")) && // camelCase hook convention
+      !dir.includes("hooks") &&
+      !dir.includes("hook")
+    ) {
       cohesionViolations.push(`${file.path} — React hook not in hooks/ directory`);
     }
     if ((name.includes("Controller") || name.includes("Handler")) && !dir.includes("routes") && !dir.includes("controllers") && !dir.includes("handlers")) {
