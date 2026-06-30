@@ -1,405 +1,264 @@
-// LLM client for RepoRank CLI — calls VibeServe's /v1/llm/complete endpoint.
-// Per AGENTS.md: no hardcoded URLs (read from env), no eval(), proper error handling,
-// no debug console.log in production.
+import { createHash } from "node:crypto";
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  renameSync,
+  writeFileSync,
+} from "node:fs";
+import { dirname, join, resolve } from "node:path";
 
-import { setTimeout as sleep } from "node:timers/promises";
-import { LLMCache } from "./llm-cache";
+const CACHE_VERSION = 1;
+const CACHE_FILE_NAME = "llm-cache.json";
+const SAVE_ERROR_PREFIX = "[llm-cache] save failed:";
 
-const VIBESERVE_URL = process.env.VIBESERVE_URL || "http://127.0.0.1:8000";
-const VIBESERVE_API_KEY = process.env.VIBESERVE_API_KEY || "";
-const LLM_TIMEOUT_MS = Number(process.env.REPORANK_LLM_TIMEOUT_MS || "30000");
-const LLM_MAX_RETRIES = Number(process.env.REPORANK_LLM_RETRIES || "2");
-
-// Set REPORANK_NO_LLM_CACHE=1 to disable caching (force fresh LLM calls).
-// Set REPORANK_WIPE_LLM_CACHE=1 to delete the cache file at startup.
-const CACHE_DISABLED = process.env.REPORANK_NO_LLM_CACHE === "1";
-const CACHE = CACHE_DISABLED ? null : new LLMCache();
-if (process.env.REPORANK_WIPE_LLM_CACHE === "1" && CACHE) {
-  CACHE.reset();
-  console.error("[llm-cache] wiped cache at startup");
-}
-
-export interface LLMCompleteOptions {
-  prompt: string;
-  temperature?: number;
-  responseFormat?: "json" | "text";
-  provider?: string;
-  model?: string;
-}
-
-export interface LLMCompleteResult {
+export interface CacheEntry {
+  promptHash: string;
   content: string;
   provider: string;
   model: string;
   usage: { prompt_tokens: number; completion_tokens: number; total_tokens: number };
   latencyMs: number;
+  timestamp: number;
 }
 
-/** A token emitted by `llmStream`.  Each event is a delta — append to the
- *  previously-seen tokens to reconstruct the full response. */
-export interface LLMStreamEvent {
-  /** Incremental content chunk.  Empty string means "end of stream". */
-  delta: string;
-  /** Cumulative content (delta + everything before it).  Available on the
-   *  final event only. */
-  content?: string;
-  /** Provider name. */
-  provider?: string;
-  /** Model name. */
-  model?: string;
-  /** Usage — available on the final event. */
-  usage?: { prompt_tokens: number; completion_tokens: number; total_tokens: number };
-  /** True when the stream is complete. */
-  done: boolean;
+export interface LLMCacheState {
+  version: number;
+  entries: Record<string, CacheEntry>;
+  hits: number;
+  misses: number;
 }
 
-export interface LLMError {
-  status: "error";
-  error: string;
-  provider?: string;
+interface CacheUsage {
+  prompt_tokens: number;
+  completion_tokens: number;
+  total_tokens: number;
 }
 
-export class LLMUnavailableError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "LLMUnavailableError";
+function ensureDir(path: string): void {
+  if (!existsSync(path)) {
+    mkdirSync(path, { recursive: true });
   }
 }
 
-/**
- * Call VibeServe's /v1/llm/complete endpoint.
- *
- * Throws LLMUnavailableError if the service is unreachable or returns no content.
- * Callers should catch and fall back to heuristic-only analysis.
- */
-export async function llmComplete(opts: LLMCompleteOptions): Promise<LLMCompleteResult> {
-  // Cache lookup — skip the network roundtrip if we already have this response.
-  // The cache key is (prompt, model, temperature, response_format) so identical
-  // requests are served from disk.  Disable with REPORANK_NO_LLM_CACHE=1.
-  //
-  // The model name is read from the env (e.g. OLLAMA_MODEL) so the cache key
-  // is stable across runs.  When unset we use "default" — same string is
-  // used for both put and get.
-  if (CACHE) {
-    const cacheModel = process.env.OLLAMA_MODEL || process.env.GOOGLE_MODEL || opts.model || "default";
-    const cached = CACHE.get(
-      opts.prompt,
-      cacheModel,
-      opts.temperature ?? 0.3,
-      opts.responseFormat ?? "text",
-    );
-    if (cached) {
-      return {
-        content: cached.content,
-        provider: cached.provider,
-        model: cached.model,
-        usage: cached.usage,
-        latencyMs: cached.latencyMs,
-      };
-    }
+function cachePathFor(): string {
+  const dir = process.env.VIBESERVE_CACHE_DIR;
+
+  if (typeof dir === "string" && dir.trim() !== "") {
+    const resolvedDir = resolve(dir);
+    ensureDir(resolvedDir);
+    return join(resolvedDir, CACHE_FILE_NAME);
   }
 
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), LLM_TIMEOUT_MS);
-
-  let lastError: string = "unknown error";
-  try {
-    for (let attempt = 0; attempt <= LLM_MAX_RETRIES; attempt++) {
-      try {
-        const res = await fetch(`${VIBESERVE_URL}/v1/llm/complete`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            ...(VIBESERVE_API_KEY ? { "X-VibeServe-API-Key": VIBESERVE_API_KEY } : {}),
-          },
-          body: JSON.stringify({
-            prompt: opts.prompt,
-            temperature: opts.temperature ?? 0.3,
-            response_format: opts.responseFormat ?? "text",
-            ...(opts.provider ? { provider: opts.provider } : {}),
-            ...(opts.model ? { model: opts.model } : {}),
-          }),
-          signal: controller.signal,
-        });
-
-        if (!res.ok) {
-          // 4xx/5xx — try to parse JSON error, fall back to text
-          const text = await res.text();
-          let parsed: any = null;
-          try { parsed = JSON.parse(text); } catch { /* not JSON */ }
-          lastError = parsed?.error || `HTTP ${res.status}: ${text.slice(0, 200)}`;
-          if (res.status >= 500 && attempt < LLM_MAX_RETRIES) {
-            await sleep(250 * Math.pow(2, attempt));
-            continue;
-          }
-          throw new LLMUnavailableError(lastError);
-        }
-
-        const body = (await res.json()) as any;
-        if (body?.status !== "success" || !body?.content) {
-          throw new LLMUnavailableError(body?.error || "empty response");
-        }
-
-        // Store in cache for future runs (skip if cache disabled)
-        if (CACHE) {
-          const cacheModel = process.env.OLLAMA_MODEL || process.env.GOOGLE_MODEL || opts.model || "default";
-          CACHE.put(
-            opts.prompt,
-            cacheModel,
-            opts.temperature ?? 0.3,
-            opts.responseFormat ?? "text",
-            body.content as string,
-            body.provider as string,
-            (body.usage as LLMCompleteResult["usage"]) || { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
-            (body.latency_ms as number) || 0,
-          );
-        }
-
-        return {
-          content: body.content as string,
-          provider: body.provider as string,
-          model: body.model as string,
-          usage: body.usage as LLMCompleteResult["usage"],
-          latencyMs: body.latency_ms as number,
-        };
-      } catch (err) {
-        if (err instanceof LLMUnavailableError) throw err;
-        const e = err as Error;
-        lastError = e.name === "AbortError" ? `timeout after ${LLM_TIMEOUT_MS}ms` : e.message;
-        if (attempt < LLM_MAX_RETRIES) {
-          await sleep(250 * Math.pow(2, attempt));
-          continue;
-        }
-      }
-    }
-    throw new LLMUnavailableError(`LLM unreachable: ${lastError}`);
-  } finally {
-    // Always clear the timer to prevent the process from hanging on
-    // a pending timeout. Without this, the timer keeps the event loop
-    // alive for up to LLM_TIMEOUT_MS after the function returns.
-    clearTimeout(timer);
-  }
+  return resolve(`.${CACHE_FILE_NAME}`);
 }
 
-/**
- * Phase 3.1 — streaming LLM client. Calls VibeServe's `/v1/llm/stream` SSE
- * endpoint and yields each token as an `LLMStreamEvent`.
- *
- * Usage:
- * ```ts
- * for await (const event of llmStream({ prompt })) {
- *   if (event.done) {
- *     process.stdout.write("Total:", event.usage);
- *   } else {
- *     process.stdout.write(event.delta);
- *   }
- * }
- * ```
- *
- * Falls back to a single non-streaming call if the streaming endpoint is
- * unavailable (404, 5xx, or unsupported provider).
- */
-export async function* llmStream(opts: LLMCompleteOptions): AsyncGenerator<LLMStreamEvent> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), LLM_TIMEOUT_MS);
+function hashPrompt(
+  prompt: string,
+  model: string,
+  temperature: number,
+  responseFormat: string,
+): string {
+  return createHash("sha256")
+    .update(prompt, "utf-8")
+    .update("|", "utf-8")
+    .update(model, "utf-8")
+    .update("|", "utf-8")
+    .update(String(temperature), "utf-8")
+    .update("|", "utf-8")
+    .update(responseFormat, "utf-8")
+    .digest("hex");
+}
 
-  // Helper: clear timer exactly once on the first fallback
-  let timerCleared = false;
-  const clearTimer = (): void => {
-    if (!timerCleared) {
-      clearTimeout(timer);
-      timerCleared = true;
-    }
+function defaultState(): LLMCacheState {
+  return {
+    version: CACHE_VERSION,
+    entries: {},
+    hits: 0,
+    misses: 0,
   };
+}
 
-  // Helper: yield a single full-result event and return — used for fallbacks
-  async function* yieldFull(): AsyncGenerator<LLMStreamEvent> {
-    const full = await llmComplete(opts);
-    yield { delta: full.content, content: full.content, provider: full.provider, model: full.model, usage: full.usage, done: true };
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+function normalizeUsage(value: unknown): CacheUsage {
+  const usage = (value ?? {}) as Partial<CacheUsage>;
+
+  const promptTokens = isFiniteNumber(usage.prompt_tokens) ? usage.prompt_tokens : 0;
+  const completionTokens = isFiniteNumber(usage.completion_tokens) ? usage.completion_tokens : 0;
+  const totalTokens =
+    isFiniteNumber(usage.total_tokens) ? usage.total_tokens : promptTokens + completionTokens;
+
+  return {
+    prompt_tokens: promptTokens,
+    completion_tokens: completionTokens,
+    total_tokens: totalTokens,
+  };
+}
+
+function normalizeEntry(key: string, value: unknown): CacheEntry | null {
+  if (!value || typeof value !== "object") return null;
+
+  const raw = value as Partial<CacheEntry>;
+
+  if (
+    typeof raw.content !== "string" ||
+    typeof raw.provider !== "string" ||
+    typeof raw.model !== "string"
+  ) {
+    return null;
   }
 
-  let res: Response;
-  try {
-    res = await fetch(`${VIBESERVE_URL}/v1/llm/stream`, {
-      method: "GET",
-      headers: {
-        "Accept": "text/event-stream",
-        ...(VIBESERVE_API_KEY ? { "X-VibeServe-API-Key": VIBESERVE_API_KEY } : {}),
-        // Pass prompt via custom header since the bridge uses GET
-        "X-Query-String": new URLSearchParams({
-          prompt: opts.prompt,
-          temperature: String(opts.temperature ?? 0.3),
-          response_format: opts.responseFormat ?? "text",
-          ...(opts.provider ? { provider: opts.provider } : {}),
-          ...(opts.model ? { model: opts.model } : {}),
-        }).toString(),
-      },
-      signal: controller.signal,
-    });
-  } catch {
-    // Network error — fall back to non-streaming
-    clearTimer();
-    for await (const ev of yieldFull()) yield ev;
-    return;
-  }
-  clearTimer();
+  return {
+    promptHash: typeof raw.promptHash === "string" ? raw.promptHash : key,
+    content: raw.content,
+    provider: raw.provider,
+    model: raw.model,
+    usage: normalizeUsage(raw.usage),
+    latencyMs: isFiniteNumber(raw.latencyMs) ? raw.latencyMs : 0,
+    timestamp: isFiniteNumber(raw.timestamp) ? raw.timestamp : Date.now(),
+  };
+}
 
-  if (!res.ok) {
-    // Streaming endpoint not available — fall back to non-streaming
-    for await (const ev of yieldFull()) yield ev;
-    return;
-  }
-  if (!res.body) {
-    for await (const ev of yieldFull()) yield ev;
-    return;
+function normalizeState(value: unknown): LLMCacheState {
+  if (!value || typeof value !== "object") {
+    return defaultState();
   }
 
-  // Parse SSE: each event is "data: <json>\n\n"
-  const reader = res.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
-  let cumulative = "";
-  let finalUsage: LLMCompleteResult["usage"] | undefined;
-  let finalProvider: string | undefined;
-  let finalModel: string | undefined;
+  const raw = value as Partial<LLMCacheState>;
+  if (raw.version !== CACHE_VERSION) {
+    return defaultState();
+  }
 
-  try {
-    while (true) {
-      const { value, done } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
-
-      // Process complete SSE events (separated by \n\n)
-      let idx: number;
-      while ((idx = buffer.indexOf("\n\n")) !== -1) {
-        const raw = buffer.slice(0, idx);
-        buffer = buffer.slice(idx + 2);
-
-        // Strip "data: " prefix (and "event:" if present)
-        const lines = raw.split("\n");
-        for (const line of lines) {
-          if (line.startsWith("data:")) {
-            const data = line.slice(5).trim();
-            if (data === "[DONE]") {
-              yield { delta: "", content: cumulative, provider: finalProvider, model: finalModel, usage: finalUsage, done: true };
-              return;
-            }
-            try {
-              const parsed = JSON.parse(data);
-              // Ollama format: { message: { content: "..." }, done: bool }
-              const delta = parsed.message?.content || parsed.content || parsed.delta || "";
-              cumulative += delta;
-              if (parsed.provider) finalProvider = parsed.provider;
-              if (parsed.model) finalModel = parsed.model;
-              if (parsed.usage || parsed.done) finalUsage = parsed.usage || finalUsage;
-              if (delta) yield { delta, done: !!parsed.done };
-            } catch {
-              // Non-JSON event — treat as raw delta
-              if (data) {
-                cumulative += data;
-                yield { delta: data, done: false };
-              }
-            }
-          }
-        }
+  const entries: Record<string, CacheEntry> = {};
+  if (raw.entries && typeof raw.entries === "object") {
+    for (const [key, entry] of Object.entries(raw.entries)) {
+      const normalized = normalizeEntry(key, entry);
+      if (normalized) {
+        entries[key] = normalized;
       }
     }
-    // Stream ended without [DONE]
-    yield { delta: "", content: cumulative, provider: finalProvider, model: finalModel, usage: finalUsage, done: true };
-  } finally {
-    try {
-      reader.releaseLock();
-    } catch {
-      // Lock may already be released if reader was cancelled
-    }
-    clearTimer();
   }
+
+  return {
+    version: CACHE_VERSION,
+    entries,
+    hits: isFiniteNumber(raw.hits) ? raw.hits : 0,
+    misses: isFiniteNumber(raw.misses) ? raw.misses : 0,
+  };
 }
 
-/**
- * Build a JSON-only LLM prompt for codebase analysis.
- * Strips the content to avoid blowing context — keep it lean.
- */
-export interface LLMAuditFinding {
-  category: string;
-  severity: "info" | "low" | "medium" | "high" | "critical";
-  file: string;
-  description: string;
-  recommendation: string;
+function writeJsonAtomically(path: string, data: unknown): void {
+  const dir = dirname(path);
+  ensureDir(dir);
+
+  const tempPath = `${path}.${process.pid}.${Date.now()}.tmp`;
+  const payload = `${JSON.stringify(data, null, 2)}\n`;
+
+  writeFileSync(tempPath, payload, "utf-8");
+  renameSync(tempPath, path);
 }
 
-export interface LLMAuditResult {
-  summary: string;
-  findings: LLMAuditFinding[];
-  confidence: number; // 0..1
-}
+export class LLMCache {
+  private readonly path: string;
+  private state: LLMCacheState;
 
-/**
- * Run an LLM-augmented audit on a slice of source files.
- * Returns null if the LLM is unavailable.
- */
-export async function llmAudit(
-  files: { path: string; content: string }[],
-  rulesContext: string,
-): Promise<LLMAuditResult | null> {
-  if (files.length === 0) return null;
+  constructor(path = cachePathFor()) {
+    this.path = path;
+    this.state = this.load();
+  }
 
-  // Trim each file to keep prompt under ~30K tokens
-  const maxCharsPerFile = 6000;
-  const trimmedFiles = files.slice(0, 8).map((f) => ({
-    path: f.path,
-    excerpt: f.content.slice(0, maxCharsPerFile),
-  }));
-
-  const userPrompt = `You are a senior code reviewer. Analyze these source files and return STRICT JSON only (no prose, no markdown).
-
-Required JSON shape:
-{
-  "summary": "one-paragraph overview of code quality",
-  "findings": [
-    {
-      "category": "security|quality|performance|maintainability|testing",
-      "severity": "info|low|medium|high|critical",
-      "file": "path/to/file",
-      "description": "short description",
-      "recommendation": "actionable fix"
+  private load(): LLMCacheState {
+    if (!existsSync(this.path)) {
+      return defaultState();
     }
-  ],
-  "confidence": 0.0
-}
 
-Repo's project rules context:
-${rulesContext.slice(0, 1500)}
-
-Files to review:
-${trimmedFiles.map((f) => `\n--- ${f.path} ---\n${f.excerpt}`).join("\n")}
-
-Return strict JSON only.`;
-
-  try {
-    const result = await llmComplete({
-      prompt: userPrompt,
-      temperature: 0.2,
-      responseFormat: "json",
-    });
-
-    let parsed: any;
     try {
-      parsed = JSON.parse(result.content);
+      const raw = JSON.parse(readFileSync(this.path, "utf-8")) as unknown;
+      return normalizeState(raw);
     } catch {
-      // Try to extract JSON from a code fence
-      const m = result.content.match(/\{[\s\S]*\}/);
-      if (!m) throw new Error("LLM returned non-JSON");
-      parsed = JSON.parse(m[0]);
+      return defaultState();
     }
+  }
+
+  private save(): void {
+    try {
+      writeJsonAtomically(this.path, this.state);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      process.stderr.write(`${SAVE_ERROR_PREFIX} ${message}\n`);
+    }
+  }
+
+  private maybePersistCounters(): void {
+    const totalLookups = this.state.hits + this.state.misses;
+    if (totalLookups % 10 === 0) {
+      this.save();
+    }
+  }
+
+  get(
+    prompt: string,
+    model: string,
+    temperature: number,
+    responseFormat: string,
+  ): CacheEntry | null {
+    const key = hashPrompt(prompt, model, temperature, responseFormat);
+    const entry = this.state.entries[key];
+
+    if (entry) {
+      this.state.hits += 1;
+      this.maybePersistCounters();
+      return entry;
+    }
+
+    this.state.misses += 1;
+    this.maybePersistCounters();
+    return null;
+  }
+
+  put(
+    prompt: string,
+    model: string,
+    temperature: number,
+    responseFormat: string,
+    content: string,
+    provider: string,
+    usage: CacheUsage,
+    latencyMs: number,
+  ): CacheEntry {
+    const key = hashPrompt(prompt, model, temperature, responseFormat);
+
+    const entry: CacheEntry = {
+      promptHash: key,
+      content,
+      provider,
+      model,
+      usage: normalizeUsage(usage),
+      latencyMs: Number.isFinite(latencyMs) ? latencyMs : 0,
+      timestamp: Date.now(),
+    };
+
+    this.state.entries[key] = entry;
+    this.save();
+    return entry;
+  }
+
+  stats(): { entries: number; hits: number; misses: number; hitRate: number } {
+    const total = this.state.hits + this.state.misses;
 
     return {
-      summary: String(parsed.summary || ""),
-      findings: Array.isArray(parsed.findings) ? parsed.findings.slice(0, 50) : [],
-      confidence: typeof parsed.confidence === "number" ? Math.max(0, Math.min(1, parsed.confidence)) : 0.5,
+      entries: Object.keys(this.state.entries).length,
+      hits: this.state.hits,
+      misses: this.state.misses,
+      hitRate: total > 0 ? this.state.hits / total : 0,
     };
-  } catch (err) {
-    // Caller decides how to handle — return null to signal "no LLM signal"
-    return null;
+  }
+
+  reset(): void {
+    this.state = defaultState();
+    this.save();
   }
 }
