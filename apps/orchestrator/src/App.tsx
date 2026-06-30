@@ -6,11 +6,11 @@ import { DispatchForm } from "./DispatchForm";
 import { Timeline } from "./Timeline";
 import { CostPanel } from "./CostPanel";
 
-const API_BASE = "http://127.0.0.1:8000";
-const API_KEY = "benchmark-secret-2024";
+const API_BASE = import.meta.env.VITE_API_BASE || "http://127.0.0.1:8000";
+const API_KEY = import.meta.env.VITE_API_KEY || "";
 
 function httpReq(method: string, path: string, body?: unknown) {
-  return fetch(`${API_BASE}${path}`, {
+  
     method,
     headers: {
       "Content-Type": "application/json",
