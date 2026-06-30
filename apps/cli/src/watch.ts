@@ -1,69 +1,129 @@
-import chokidar from 'chokidar';
-import { resolve } from 'node:path';
-import { execa } from 'execa';
+import chokidar, { type FSWatcher } from "chokidar";
+import { execa } from "execa";
+import { fileURLToPath } from "node:url";
+import { dirname, resolve } from "node:path";
+
+const DEBOUNCE_MS = 300;
+const DEFAULT_IGNORE = [
+  /(^|[\/\\])\../,
+  /(^|[\/\\])node_modules([\/\\]|$)/,
+  /(^|[\/\\])dist([\/\\]|$)/,
+  /(^|[\/\\])build([\/\\]|$)/,
+  /(^|[\/\\])coverage([\/\\]|$)/,
+  /(^|[\/\\])\.next([\/\\]|$)/,
+];
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const dagsterDir = resolve(__dirname, "../../orchestrator-dag");
 
 let runTimeout: NodeJS.Timeout | null = null;
 let currentController: AbortController | null = null;
+let currentRunId = 0;
 
-export async function watchCommand(folder: string) {
+function writeInfo(message: string): void {
+  process.stdout.write(`${message}\n`);
+}
+
+function writeError(message: string): void {
+  process.stderr.write(`${message}\n`);
+}
+
+function buildDagsterConfig(targetPath: string): string {
+  return JSON.stringify({
+    ops: {
+      project_analysis: { config: { target_path: targetPath } },
+      static_analysis_results: { config: { target_path: targetPath } },
+      tool_adapter_results: { config: { target_path: targetPath } },
+    },
+  });
+}
+
+export async function watchCommand(folder: string): Promise<FSWatcher> {
   const targetPath = resolve(folder);
-  console.log(`Watching for changes in ${targetPath}...`);
+  writeInfo(`Watching for changes in ${targetPath}...`);
 
-  const runPipeline = async () => {
-    // Cancel the ongoing process if any
+  const runPipeline = async (): Promise<void> => {
     if (currentController) {
       currentController.abort();
     }
-    
-    currentController = new AbortController();
-    const { signal } = currentController;
-    
-    console.log(`\n[Watch] Triggering Dagster pipeline...`);
-    
+
+    const runId = ++currentRunId;
+    const controller = new AbortController();
+    currentController = controller;
+
+    writeInfo(`\n[Watch] Triggering Dagster pipeline...`);
+
     try {
-      const dagsterDir = resolve(import.meta.dirname, "../../orchestrator-dag");
-      
-      const { stdout } = await execa("dagster", [
-        "asset", "materialize", "--select", "*", 
-        "--config-json", JSON.stringify({
-          ops: {
-            project_analysis: { config: { target_path: targetPath } },
-            static_analysis_results: { config: { target_path: targetPath } },
-            tool_adapter_results: { config: { target_path: targetPath } }
-          }
-        })
-      ], {
-        cwd: dagsterDir,
-        env: { ...process.env, DAGSTER_HOME: dagsterDir },
-        signal
-      });
-      
-      console.log(`[Watch] Pipeline completed successfully. Outputting SARIF...`);
-      console.log(stdout);
-    } catch (err: any) {
-      if (err.isCanceled) {
-        console.log(`[Watch] Pipeline aborted due to new file changes.`);
-      } else {
-        console.error(`[Watch] Pipeline failed:`, err.message);
+      const { stdout } = await execa(
+        "dagster",
+        [
+          "asset",
+          "materialize",
+          "--select",
+          "*",
+          "--config-json",
+          buildDagsterConfig(targetPath),
+        ],
+        {
+          cwd: dagsterDir,
+          env: {
+            ...process.env,
+            DAGSTER_HOME: dagsterDir,
+          },
+          cancelSignal: controller.signal,
+        },
+      );
+
+      if (currentRunId !== runId) {
+        return;
       }
+
+      writeInfo("[Watch] Pipeline completed successfully. Outputting SARIF...");
+      if (stdout.trim()) {
+        writeInfo(stdout);
+      }
+    } catch (error: unknown) {
+      const err = error as { isCanceled?: boolean; shortMessage?: string; message?: string };
+
+      if (err.isCanceled) {
+        writeInfo("[Watch] Pipeline aborted due to new file changes.");
+        return;
+      }
+
+      writeError(`[Watch] Pipeline failed: ${err.shortMessage || err.message || String(error)}`);
     } finally {
-      if (currentController?.signal === signal) {
+      if (currentController === controller) {
         currentController = null;
       }
     }
   };
 
-  const scheduleRun = () => {
-    if (runTimeout) clearTimeout(runTimeout);
+  const scheduleRun = (): void => {
+    if (runTimeout) {
+      clearTimeout(runTimeout);
+    }
+
     runTimeout = setTimeout(() => {
-      runPipeline();
-    }, 300); // 300ms debounce
+      runTimeout = null;
+      void runPipeline();
+    }, DEBOUNCE_MS);
   };
 
-  chokidar.watch(targetPath, { ignored: /(^|[\/\\])\../, ignoreInitial: true }).on('all', (event, path) => {
+  const watcher = chokidar.watch(targetPath, {
+    ignored: DEFAULT_IGNORE,
+    ignoreInitial: true,
+    persistent: true,
+  });
+
+  watcher.on("all", () => {
     scheduleRun();
   });
 
-  // Initial run
+  watcher.on("error", (error) => {
+    writeError(`[Watch] File watcher error: ${error instanceof Error ? error.message : String(error)}`);
+  });
+
   scheduleRun();
+  return watcher;
 }
