@@ -7,5 +7,5 @@
   "types": "./dist/index.d.ts",
   "scripts": { "build": "tsc", "lint": "tsc --noEmit" },
   "dependencies": { "@reporank/shared-types": "workspace:*" },
-  "devDependencies": { "typescript": "^5.8.0", "vitest": "^3.1.0" }
+  "devDependencies": { "typescript": "^5.8.0", "vitest": "^4.1.9" }
 }
