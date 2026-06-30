@@ -16,7 +16,7 @@ import { readFileSync, existsSync, readdirSync, statSync } from "node:fs";
 import { resolve, join, extname } from "node:path";
 
 const VIBESERVE_URL = process.env.VIBESERVE_URL || "http://127.0.0.1:8000";
-const VIBESERVE_API_KEY = process.env.VIBESERVE_API_KEY || "benchmark-secret-2024";
+const VIBESERVE_API_KEY = process.env.VIBESERVE_API_KEY || "";
 const AUTH_HEADERS = { "X-VibeServe-API-Key": VIBESERVE_API_KEY };
 
 // ─── Types ────────────────────────────────────────────────────
