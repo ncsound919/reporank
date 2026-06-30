@@ -20,7 +20,7 @@ jobs:
           egress-policy: audit
           disable-telemetry: true
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
         with:
           version: 10.8.0
       - uses: actions/setup-node@v4
