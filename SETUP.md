@@ -1,89 +1,184 @@
-# RepoRank — Development Setup
+# RepoRank Setup
+
+RepoRank is a pnpm/Turborepo monorepo with three main runtime surfaces:
+
+- API server.
+- Web frontend.
+- Scanner worker.
 
 ## Prerequisites
 
-- **Node.js** >= 22
-- **pnpm** >= 10 (`npm install -g pnpm@10`)
-- **PostgreSQL** 16+ (local install or remote)
-- **Redis** 7+ (local install or remote)
-- **External scanners** (optional, for full scans):
-  - [Semgrep](https://semgrep.dev/docs/getting-started/) — `pip install semgrep`
-  - [Trivy](https://trivy.dev/latest/getting-started/installation/) — `winget install aquasecurity.Trivy`
-  - [TruffleHog](https://github.com/trufflesecurity/trufflehog) — `winget install trufflesecurity.trufflehog`
-  - [Hadolint](https://github.com/hadolint/hadolint) — `winget install hadolint`
+Install these before starting:
 
-## Quick Start
+- Node.js 22 or newer.
+- pnpm 10 or newer.
+- PostgreSQL 16 or newer.
+- Redis 7 or newer.
+
+Optional external scanners for deeper analysis:
+
+- Semgrep — [Getting started](https://semgrep.dev/docs/getting-started/)
+- Trivy — [Installation](https://trivy.dev/latest/getting-started/installation/)
+- TruffleHog — [GitHub](https://github.com/trufflesecurity/trufflehog)
+- Hadolint — [GitHub](https://github.com/hadolint/hadolint)
+
+## Quickstart
 
 ```bash
-# 1. Install dependencies
+# 1) Install dependencies
 pnpm install
 
-# 2. Set up environment
+# 2) Create local environment file
 cp .env.example .env
-# Edit .env with your DB URL, Redis URL, API keys
 
-# 3. Push database schema
-cd apps/api
-npx prisma db push
-cd ../..
+# 3) Edit .env and set required values
+# DATABASE_URL=
+# REDIS_URL=
+# JWT_SECRET=
+# GEMINI_API_KEY=
 
-# 4. Start API server (terminal 1)
-pnpm --filter @reporank/api dev
+# 4) Generate Prisma client
+pnpm db:generate
 
-# 5. Start frontend (terminal 2)
-pnpm --filter @reporank/web dev
+# 5) Initialize local database schema
+pnpm db:push
 
-# 6. Start scanner worker (terminal 3)
+# 6) Start core services
+pnpm dev:local
+```
+
+Then start the scanner worker in a separate terminal:
+
+```bash
 pnpm --filter @reporank/scanner-worker dev
 ```
 
-## API Server (port 3001)
+## Runtime services
+
+### API server
 
 ```bash
-pnpm --filter @reporank/api dev      # Dev with hot reload
-pnpm --filter @reporank/api build    # Production build
-pnpm --filter @reporank/api start    # Run production build
+pnpm --filter @reporank/api dev
+pnpm --filter @reporank/api build
+pnpm --filter @reporank/api start
 ```
 
-## Frontend (port 5173)
+Default local port:
+
+- API: `3001`
+
+### Frontend
 
 ```bash
-pnpm --filter @reporank/web dev      # Dev with HMR
-pnpm --filter @reporank/web build    # Production build
+pnpm --filter @reporank/web dev
+pnpm --filter @reporank/web build
 ```
 
-## Scanner Worker (background)
+Default local port:
+
+- Web: `5173`
+
+### Scanner worker
 
 ```bash
-pnpm --filter @reporank/scanner-worker dev   # Dev mode
-pnpm --filter @reporank/scanner-worker build # Build
+pnpm --filter @reporank/scanner-worker dev
+pnpm --filter @reporank/scanner-worker build
 ```
 
-## Architecture
+## Monorepo layout
 
-```
-apps/api/     → Express REST API (auth, scans, billing, orgs)
-apps/web/     → React 19 SPA dashboard
+```text
+apps/
+  api/                     Express REST API
+  web/                     React dashboard
+
 packages/
-  shared-types/      → Shared TypeScript interfaces
-  grading-engine/    → Gemini AI grading + scanner wrappers
-  vibe-analyzer/     → Code vibe scoring (naming, modernity, hygiene)
-  claw-protect-core/ → Security scanning (prompt injection, secrets)
-  fix-pack-generator/→ Auto-generated patches + roadmap
+  shared-types/            Shared TypeScript interfaces
+  grading-engine/          AI grading and scanner wrappers
+  vibe-analyzer/           Naming, modernity, and hygiene scoring
+  claw-protect-core/       Security scanning and prompt-injection checks
+  fix-pack-generator/      Patch and roadmap generation
+
 services/
-  scanner-worker/    → Bull queue worker (fetches, grades, generates fixes)
+  scanner-worker/          Background job worker
 ```
 
-## Environment Variables
+## Environment variables
 
-| Variable | Required | Description |
-|---|---|---|
-| `DATABASE_URL` | Yes | PostgreSQL connection string |
-| `REDIS_URL` | Yes | Redis connection string |
-| `JWT_SECRET` | Yes | JWT signing key (no fallback) |
-| `GEMINI_API_KEY` | Yes | Google Gemini API key |
-| `GITHUB_CLIENT_ID` | For OAuth | GitHub OAuth app ID |
-| `GITHUB_CLIENT_SECRET` | For OAuth | GitHub OAuth app secret |
-| `STRIPE_SECRET_KEY` | For billing | Stripe API key |
-| `STRIPE_WEBHOOK_SECRET` | For billing | Stripe webhook signing secret |
-| `APP_URL` | No | Frontend URL (default: localhost:5173) |
+### Required
+
+| Variable | Purpose |
+|---|---|
+| `DATABASE_URL` | PostgreSQL connection string |
+| `REDIS_URL` | Redis connection string |
+| `JWT_SECRET` | JWT signing secret |
+| `GEMINI_API_KEY` | Gemini API key |
+
+### Optional
+
+| Variable | Purpose |
+|---|---|
+| `GITHUB_CLIENT_ID` | GitHub OAuth client ID |
+| `GITHUB_CLIENT_SECRET` | GitHub OAuth client secret |
+| `STRIPE_SECRET_KEY` | Stripe API secret |
+| `STRIPE_WEBHOOK_SECRET` | Stripe webhook secret |
+| `APP_URL` | Frontend URL, defaults to local web app |
+
+## Database workflow
+
+For local development, this repo uses:
+
+```bash
+pnpm db:generate
+pnpm db:push
+```
+
+Notes:
+
+- `db push` is appropriate for local schema sync and prototyping.
+- For production or shared environments, prefer migration-driven workflows rather than relying on `db push`.
+
+## Common commands
+
+```bash
+pnpm dev
+pnpm dev:local
+pnpm build
+pnpm lint
+pnpm test
+pnpm clean
+pnpm db:generate
+pnpm db:push
+pnpm db:migrate
+pnpm db:setup
+```
+
+## Troubleshooting
+
+### pnpm version mismatch
+
+Make sure your local pnpm version matches the root `packageManager` field:
+
+```bash
+corepack enable
+corepack prepare pnpm@10.8.0 --activate
+```
+
+### Frontend environment variables
+
+If the web app needs browser-exposed environment variables, they usually need a public prefix depending on the frontend framework setup.
+
+### Database connection errors
+
+Check:
+
+- PostgreSQL is running.
+- `DATABASE_URL` points to the correct host, port, user, password, and database.
+- The schema has been initialized with `pnpm db:push`.
+
+### Redis connection errors
+
+Check:
+
+- Redis is running.
+- `REDIS_URL` is valid and reachable from your local environment.
