@@ -13,74 +13,155 @@ export interface IntentDocument {
   extractedAt: string;
 }
 
-const FEATURE_PATTERNS = [
-  /users? (?:can|should|will|must|shall) (.+?)(?:\.|,|;|$)/gi,
-  /(?:implement|build|create|add|support) (.+?)(?:\.|,|;|$)/gi,
+const FEATURE_PATTERNS: readonly RegExp[] = [
+  /users?\s+(?:can|should|will|must|shall)\s+(.+?)(?:\.|,|;|$)/gi,
+  /(?:implement|build|create|add|support)\s+(.+?)(?:\.|,|;|$)/gi,
   /(?:feature|functionality|capability):\s*(.+?)(?:\.|,|;|$)/gi,
-  /- (.+?) (?:feature|page|screen|endpoint|flow)/gi,
-  /##\s+(.+)/g, // Markdown headings as features
+  /-\s+(.+?)\s+(?:feature|page|screen|endpoint|flow)/gi,
+  /^##\s+(.+)$/gim,
 ];
 
 const INTEGRATION_MARKERS = [
-  "stripe", "supabase", "firebase", "clerk", "auth0", "sendgrid", "resend",
-  "twilio", "openai", "anthropic", "pinecone", "algolia", "elasticsearch",
-  "redis", "postgres", "mysql", "mongodb", "s3", "cloudinary", "vercel",
-  "railway", "fly.io", "netlify", "aws", "gcp", "azure", "github", "linear",
-  "slack", "discord", "notion", "airtable", "hubspot", "salesforce",
-];
+  "stripe",
+  "supabase",
+  "firebase",
+  "clerk",
+  "auth0",
+  "sendgrid",
+  "resend",
+  "twilio",
+  "openai",
+  "anthropic",
+  "pinecone",
+  "algolia",
+  "elasticsearch",
+  "redis",
+  "postgres",
+  "mysql",
+  "mongodb",
+  "s3",
+  "cloudinary",
+  "vercel",
+  "railway",
+  "fly.io",
+  "netlify",
+  "aws",
+  "gcp",
+  "azure",
+  "github",
+  "linear",
+  "slack",
+  "discord",
+  "notion",
+  "airtable",
+  "hubspot",
+  "salesforce",
+] as const;
 
-const PERSONA_PATTERNS = [
-  /(?:as a|for|target user is|users are) ([a-z\s]+?)(?:\.|,|;|$)/gi,
+const PERSONA_PATTERNS: readonly RegExp[] = [
+  /(?:as a|for|target user is|users are)\s+([a-z][a-z\s/-]+?)(?:\.|,|;|$)/gi,
   /persona:\s*([^.\n]+)/gi,
   /role:\s*([^.\n]+)/gi,
 ];
 
-const CONSTRAINT_PATTERNS = [
-  /(?:must not|should not|do not|never) (.+?)(?:\.|,|;|$)/gi,
+const CONSTRAINT_PATTERNS: readonly RegExp[] = [
+  /(?:must not|should not|do not|never)\s+(.+?)(?:\.|,|;|$)/gi,
   /(?:constraint|limitation|restriction|out of scope):\s*(.+?)(?:\.|,|;|$)/gi,
-  /(?:no|without) (.+?)(?:\.|,|;|$)/gi,
+  /(?:no|without)\s+(.+?)(?:\.|,|;|$)/gi,
 ];
 
-const QUALITY_PATTERNS = [
-  /(?:must be|should be|needs to be) (?:fast|secure|accessible|responsive|reliable|scalable|tested)/gi,
+const QUALITY_PATTERNS: readonly RegExp[] = [
+  /(?:must be|should be|needs to be)\s+(?:fast|secure|accessible|responsive|reliable|scalable|tested)(?:\.|,|;|$)/gi,
   /(?:performance|security|accessibility|test coverage|uptime|latency)[^\n.]*(?:\.|$)/gi,
   /(?:95th percentile|p99|<\d+ms|zero downtime|99\.?\d*%)[^\n.]*/gi,
 ];
 
-function extractMatches(text: string, patterns: RegExp[]): string[] {
-  const results = new Set<string>();
+const MAX_ITEMS_PER_SECTION = 30;
+const DETERMINISTIC_EXTRACTED_AT = "1970-01-01T00:00:00.000Z";
+
+function uniqPreserveOrder(values: string[]): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+
+  for (const value of values) {
+    if (!seen.has(value)) {
+      seen.add(value);
+      result.push(value);
+    }
+  }
+
+  return result;
+}
+
+function normalizeExtracted(value: string): string {
+  const cleaned = value
+    .replace(/[`*_#>-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/^[a-z]/, (char) => char.toUpperCase());
+
+  return cleaned;
+}
+
+function extractMatches(text: string, patterns: readonly RegExp[]): string[] {
+  const results: string[] = [];
+
   for (const pattern of patterns) {
-    pattern.lastIndex = 0;
-    let match: RegExpExecArray | null;
-    while ((match = pattern.exec(text)) !== null) {
-      const extracted = (match[1] || match[0]).trim();
+    const regex = new RegExp(pattern.source, pattern.flags);
+    let match: RegExpExecArray | null = null;
+
+    while ((match = regex.exec(text)) !== null) {
+      const extracted = normalizeExtracted((match[1] ?? match[0] ?? "").trim());
+
       if (extracted.length > 3 && extracted.length < 200) {
-        results.add(extracted.charAt(0).toUpperCase() + extracted.slice(1));
+        results.push(extracted);
+      }
+
+      if (match[0].length === 0) {
+        regex.lastIndex += 1;
       }
     }
   }
-  return [...results].slice(0, 30);
+
+  return uniqPreserveOrder(results).slice(0, MAX_ITEMS_PER_SECTION);
+}
+
+function escapeRegex(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function includesMarker(text: string, marker: string): boolean {
+  const escaped = escapeRegex(marker);
+  const regex = new RegExp(`(^|[^a-z0-9])${escaped}([^a-z0-9]|$)`, "i");
+  return regex.test(text);
 }
 
 function extractIntegrations(text: string): string[] {
   const lower = text.toLowerCase();
-  return INTEGRATION_MARKERS.filter(marker => lower.includes(marker));
+
+  return INTEGRATION_MARKERS.filter((marker) => includesMarker(lower, marker)).slice(
+    0,
+    MAX_ITEMS_PER_SECTION,
+  );
 }
 
 export function parseIntent(text: string, source: string): IntentDocument {
-  const promisedFeatures = extractMatches(text, FEATURE_PATTERNS);
-  const constraints = extractMatches(text, CONSTRAINT_PATTERNS);
-  const personas = extractMatches(text, PERSONA_PATTERNS);
-  const integrations = extractIntegrations(text);
-  const qualityExpectations = extractMatches(text, QUALITY_PATTERNS);
+  const safeText = typeof text === "string" ? text : "";
+  const safeSource = typeof source === "string" ? source : "";
+
+  const promisedFeatures = extractMatches(safeText, FEATURE_PATTERNS);
+  const constraints = extractMatches(safeText, CONSTRAINT_PATTERNS);
+  const personas = extractMatches(safeText, PERSONA_PATTERNS);
+  const integrations = extractIntegrations(safeText);
+  const qualityExpectations = extractMatches(safeText, QUALITY_PATTERNS);
 
   return {
-    source,
+    source: safeSource,
     promisedFeatures,
     constraints,
     personas,
     integrations,
     qualityExpectations,
-    extractedAt: new Date().toISOString(),
+    extractedAt: DETERMINISTIC_EXTRACTED_AT,
   };
 }

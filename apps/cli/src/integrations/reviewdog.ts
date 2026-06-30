@@ -8,26 +8,82 @@ const SEVERITY_ICON: Record<string, string> = {
   info: "ℹ️",
 };
 
+function escapeMarkdownTableCell(value: string): string {
+  return value
+    .replace(/\r?\n/g, " ")
+    .replace(/\|/g, "\\|")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function normalizeSeverity(severity: string | undefined): string {
+  return (severity ?? "info").toLowerCase();
+}
+
+function getFindingPath(finding: Finding): string {
+  return typeof finding.path === "string" && finding.path.trim().length > 0
+    ? finding.path
+    : "<file>";
+}
+
+function getFindingLine(finding: Finding): string {
+  return typeof finding.line === "number" && Number.isFinite(finding.line) && finding.line > 0
+    ? `L${finding.line}`
+    : "—";
+}
+
+function getFindingType(finding: Finding): string {
+  return typeof finding.type === "string" && finding.type.trim().length > 0
+    ? escapeMarkdownTableCell(finding.type.trim())
+    : "unknown";
+}
+
+function getFindingDescription(finding: Finding): string {
+  const raw =
+    typeof finding.description === "string" && finding.description.trim().length > 0
+      ? finding.description
+      : "No description provided.";
+
+  return escapeMarkdownTableCell(raw).slice(0, 100);
+}
+
 export function formatAsReviewDogComment(findings: Finding[]): string {
+  if (!Array.isArray(findings) || findings.length === 0) {
+    return ["# 🔍 RepoRank Code Review", "", "No findings."].join("\n");
+  }
+
   const byFile = new Map<string, Finding[]>();
-  for (const f of findings) {
-    const path = f.path || "<file>";
-    if (!byFile.has(path)) byFile.set(path, []);
-    byFile.get(path)!.push(f);
+
+  for (const finding of findings) {
+    const path = getFindingPath(finding);
+    const existing = byFile.get(path);
+
+    if (existing) {
+      existing.push(finding);
+    } else {
+      byFile.set(path, [finding]);
+    }
   }
 
   const lines: string[] = ["# 🔍 RepoRank Code Review", ""];
+
   for (const [file, fileFindings] of byFile) {
-    lines.push(`## ${file}`, "");
+    lines.push(`## ${escapeMarkdownTableCell(file)}`, "");
     lines.push("| Severity | Line | Type | Description |");
     lines.push("| --- | --- | --- | --- |");
-    for (const f of fileFindings) {
-      const icon = SEVERITY_ICON[f.severity] || "•";
-      const line = f.line > 0 ? `L${f.line}` : "—";
-      const desc = f.description.replace(/\|/g, "\\|").slice(0, 100);
-      lines.push(`| ${icon} ${f.severity} | ${line} | \`${f.type}\` | ${desc} |`);
+
+    for (const finding of fileFindings) {
+      const severity = normalizeSeverity(finding.severity);
+      const icon = SEVERITY_ICON[severity] ?? "•";
+      const line = getFindingLine(finding);
+      const type = getFindingType(finding);
+      const description = getFindingDescription(finding);
+
+      lines.push(`| ${icon} ${severity} | ${line} | \`${type}\` | ${description} |`);
     }
+
     lines.push("");
   }
-  return lines.join("\n");
+
+  return lines.join("\n").trimEnd();
 }

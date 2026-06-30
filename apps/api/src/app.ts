@@ -1,5 +1,5 @@
 import "express-async-errors";
-import express from "express";
+import express, { type NextFunction, type Request, type Response } from "express";
 import cors from "cors";
 import helmet from "helmet";
 import { errorHandler } from "./middleware/errorHandler";
@@ -26,10 +26,22 @@ import scopeComplianceRoutes from "./routes/scopeCompliance";
 import webhookRoutes from "./routes/webhooks";
 import internalRoutes from "./routes/internal";
 
+type RawBodyRequest = Request & {
+  rawBody?: Buffer;
+};
+
 const app: express.Express = express();
-const startTime = Date.now();
+const appUrl = process.env.APP_URL || "http://localhost:5173";
+
+app.disable("x-powered-by");
+
 app.use(helmet());
-app.use(cors({ origin: process.env.APP_URL || "http://localhost:5173", credentials: true }));
+app.use(
+  cors({
+    origin: appUrl,
+    credentials: true,
+  }),
+);
 
 // Badge endpoint has its own relaxed rate limit and is cached — mount before global rate limiter
 app.use("/api/v1/badges", badgeRoutes);
@@ -37,27 +49,62 @@ app.use("/api/v1/badges", badgeRoutes);
 app.use(apiRateLimit);
 
 // Stripe webhook needs raw body for signature verification — mount BEFORE express.json()
-app.use("/api/v1/billing/webhook", express.raw({ type: "application/json" }));
+app.use(
+  "/api/v1/billing/webhook",
+  express.raw({
+    type: "application/json",
+    limit: "2mb",
+  }),
+);
 
-// GitHub webhook needs raw body for signature verification — mount BEFORE express.json()
-app.use("/webhooks", express.raw({ type: "application/json" }), (req: any, res, next) => {
-  req.rawBody = req.body;
-  next();
+// Generic webhook raw body capture — mount BEFORE express.json()
+app.use(
+  "/webhooks",
+  express.raw({
+    type: "*/*",
+    limit: "2mb",
+  }),
+  (req: Request, _res: Response, next: NextFunction) => {
+    const rawReq = req as RawBodyRequest;
+
+    if (Buffer.isBuffer(req.body)) {
+      rawReq.rawBody = req.body;
+
+      if (req.is("application/json")) {
+        try {
+          req.body = JSON.parse(req.body.toString("utf8"));
+        } catch {
+          // Leave req.body as Buffer so downstream verification/handlers can decide how to respond.
+        }
+      }
+    }
+
+    next();
+  },
+);
+
+app.use(
+  express.json({
+    limit: "10mb",
+  }),
+);
+
+app.get("/health", (_req: Request, res: Response) => {
+  res.json({
+    status: "ok",
+    uptime: process.uptime(),
+    timestamp: new Date().toISOString(),
+  });
 });
 
-app.use(express.json({ limit: "10mb" }));
-
-app.get("/health", (_req, res) => res.json({ 
-  status: "ok", 
-  uptime: process.uptime(),
-  timestamp: new Date().toISOString() 
-}));
-app.use("/api", (req, res, next) => {
+app.use("/api", (_req: Request, res: Response, next: NextFunction) => {
   if (!process.env.DATABASE_URL) {
     return res.status(503).json({ error: "Database not configured" });
   }
+
   next();
 });
+
 app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/scans", scanRoutes);
 app.use("/api/v1/billing", billingRoutes);
@@ -79,5 +126,10 @@ app.use("/api/v1/scope-compliance", scopeComplianceRoutes);
 app.use("/webhooks", webhookRoutes);
 app.use("/api/v1/internal", internalRoutes);
 
+app.use((_req: Request, res: Response) => {
+  res.status(404).json({ error: "Not found" });
+});
+
 app.use(errorHandler);
+
 export default app;

@@ -1,12 +1,10 @@
-import { exec } from "node:child_process";
-import { promisify } from "node:util";
-
-const execAsync = promisify(exec);
+import { execa } from "execa";
 
 export async function runTrufflehog(repoPath: string) {
   try {
-    const { stdout } = await execAsync(
-      `trufflehog filesystem --json --no-update ${repoPath}`,
+    const { stdout } = await execa(
+      "trufflehog",
+      ["filesystem", "--json", "--no-update", repoPath],
       { encoding: "utf-8", maxBuffer: 10 * 1024 * 1024, timeout: 120000 }
     );
     return stdout.trim().split("\n").filter(Boolean).map(l => {
@@ -21,3 +19,4 @@ export async function runTrufflehog(repoPath: string) {
     return [];
   }
 }
+

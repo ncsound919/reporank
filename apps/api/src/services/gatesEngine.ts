@@ -9,10 +9,50 @@ export interface GateEvaluation {
   detail: string;
 }
 
-interface GateInput {
+export interface GateInput {
   type: string;
   criterion: string;
   milestoneId: string | null;
+}
+
+type UnknownRecord = Record<string, unknown>;
+
+function isRecord(value: unknown): value is UnknownRecord {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function asRecord(value: unknown): UnknownRecord {
+  return isRecord(value) ? value : {};
+}
+
+function asStringArray(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+}
+
+function asNumber(value: unknown, fallback = 0): number {
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
+
+function asString(value: unknown, fallback = ""): string {
+  return typeof value === "string" ? value : fallback;
+}
+
+function safeStringify(value: unknown): string {
+  const seen = new WeakSet<object>();
+
+  try {
+    return JSON.stringify(value, (_key, currentValue) => {
+      if (typeof currentValue === "object" && currentValue !== null) {
+        if (seen.has(currentValue)) {
+          return "[Circular]";
+        }
+        seen.add(currentValue);
+      }
+      return currentValue;
+    });
+  } catch {
+    return "";
+  }
 }
 
 export function evaluateGate(
@@ -20,24 +60,24 @@ export function evaluateGate(
   report: Record<string, unknown> | null,
   clawFindings: Record<string, unknown> | null,
 ): GateEvaluation {
-  const r = report || {};
-  const claw = clawFindings || {};
+  const normalizedReport = asRecord(report);
+  const normalizedClaw = asRecord(clawFindings);
 
   switch (gate.type) {
     case "code-present":
-      return evaluateCodePresent(gate.criterion, r, claw);
+      return evaluateCodePresent(gate.criterion, normalizedReport, normalizedClaw);
     case "tests-present":
-      return evaluateTestsPresent(r, claw);
+      return evaluateTestsPresent(normalizedReport, normalizedClaw);
     case "deploy-preview":
-      return evaluateDeployPreview(r, claw);
+      return evaluateDeployPreview(normalizedReport);
     case "health-endpoint":
-      return evaluateHealthEndpoint(r, claw);
+      return evaluateHealthEndpoint(normalizedReport, normalizedClaw);
     case "docs-updated":
-      return evaluateDocsUpdated(r, claw);
+      return evaluateDocsUpdated(normalizedReport);
     case "security":
-      return evaluateSecurityGate(r, claw);
+      return evaluateSecurityGate(normalizedReport, normalizedClaw);
     case "performance":
-      return evaluatePerformanceGate(r, claw);
+      return evaluatePerformanceGate(normalizedReport);
     case "manual-qa":
       return {
         passed: false,
@@ -53,16 +93,28 @@ export function evaluateGate(
   }
 }
 
-function evaluateCodePresent(criterion: string, report: any, claw: any): GateEvaluation {
-  const lowerCriterion = criterion.toLowerCase();
-  const reportStr = JSON.stringify(report).toLowerCase();
-  const builderStr = JSON.stringify(claw.builder || {}).toLowerCase();
-  const stack: string[] = claw.builder?.detectedStack || [];
+function evaluateCodePresent(
+  criterion: string,
+  report: UnknownRecord,
+  claw: UnknownRecord,
+): GateEvaluation {
+  const lowerCriterion = criterion.toLowerCase().trim();
+  const reportStr = safeStringify(report).toLowerCase();
 
-  const keywords = lowerCriterion.split(/[\s,;]+/).filter(w => w.length > 3);
-  const found = keywords.some(k =>
-    reportStr.includes(k) || builderStr.includes(k) || stack.some(s => s.toLowerCase().includes(k))
-  );
+  const builder = asRecord(claw.builder);
+  const builderStr = safeStringify(builder).toLowerCase();
+  const stack = asStringArray(builder.detectedStack);
+
+  const keywords = lowerCriterion.split(/[\s,;]+/).filter((word) => word.length > 3);
+
+  const found =
+    keywords.length > 0 &&
+    keywords.some(
+      (keyword) =>
+        reportStr.includes(keyword) ||
+        builderStr.includes(keyword) ||
+        stack.some((item) => item.toLowerCase().includes(keyword)),
+    );
 
   return {
     passed: found,
@@ -75,28 +127,32 @@ function evaluateCodePresent(criterion: string, report: any, claw: any): GateEva
   };
 }
 
-function evaluateTestsPresent(report: any, claw: any): GateEvaluation {
-  const quality = report.quality || {};
-  const testCount = quality.testFileCount || 0;
+function evaluateTestsPresent(report: UnknownRecord, claw: UnknownRecord): GateEvaluation {
+  const quality = asRecord(report.quality);
+  const testCount = asNumber(quality.testFileCount);
   const hasTests = testCount > 0;
-  const testGaps = claw.novel?.seniorDev?.testGaps?.gaps || [];
+
+  const novel = asRecord(claw.novel);
+  const seniorDev = asRecord(novel.seniorDev);
+  const testGapsRecord = asRecord(seniorDev.testGaps);
+  const testGaps = Array.isArray(testGapsRecord.gaps) ? testGapsRecord.gaps : [];
 
   return {
     passed: hasTests,
-    evidence: hasTests
-      ? `${testCount} test file(s) detected`
-      : "No test files detected",
+    evidence: hasTests ? `${testCount} test file(s) detected` : "No test files detected",
     detail: hasTests
-      ? `Test framework: ${quality.testFramework || "unknown"}. ${testGaps.length > 0 ? `${testGaps.length} coverage gap(s) identified.` : "No major gaps found."}`
+      ? `Test framework: ${asString(quality.testFramework, "unknown")}. ${
+          testGaps.length > 0 ? `${testGaps.length} coverage gap(s) identified.` : "No major gaps found."
+        }`
       : "The scan found no test files. Add tests matching the acceptance criterion.",
   };
 }
 
-function evaluateDeployPreview(report: any, _claw: any): GateEvaluation {
-  const deployment = report.deployment || {};
-  const hasDocker = deployment.hasDockerfile || false;
-  const hasCI = deployment.hasCIConfig || false;
-  const score = deployment.score || 0;
+function evaluateDeployPreview(report: UnknownRecord): GateEvaluation {
+  const deployment = asRecord(report.deployment);
+  const hasDocker = Boolean(deployment.hasDockerfile);
+  const hasCI = Boolean(deployment.hasCIConfig);
+  const score = asNumber(deployment.score);
   const passed = hasDocker || hasCI || score >= 60;
 
   return {
@@ -110,14 +166,21 @@ function evaluateDeployPreview(report: any, _claw: any): GateEvaluation {
   };
 }
 
-function evaluateHealthEndpoint(report: any, claw: any): GateEvaluation {
-  const stack: string[] = claw.builder?.detectedStack || [];
-  const hasBackend = stack.some(s => ["Express", "Fastify", "Next.js", "tRPC"].includes(s));
-  const routeEvidence = JSON.stringify(report).toLowerCase().includes("/health");
+function evaluateHealthEndpoint(report: UnknownRecord, claw: UnknownRecord): GateEvaluation {
+  const builder = asRecord(claw.builder);
+  const stack = asStringArray(builder.detectedStack);
+  const backendFrameworks = new Set(["Express", "Fastify", "Next.js", "tRPC"]);
+  const hasBackend = stack.some((item) => backendFrameworks.has(item));
+  const routeEvidence = safeStringify(report).toLowerCase().includes("/health");
+  const passed = routeEvidence || hasBackend;
 
   return {
-    passed: routeEvidence || hasBackend,
-    evidence: routeEvidence ? "/health endpoint string found in scan" : (hasBackend ? "Backend framework detected" : "No backend detected"),
+    passed,
+    evidence: routeEvidence
+      ? "/health endpoint string found in scan"
+      : hasBackend
+        ? "Backend framework detected"
+        : "No backend detected",
     detail: routeEvidence
       ? "A /health route string was found in the scan report."
       : hasBackend
@@ -126,43 +189,46 @@ function evaluateHealthEndpoint(report: any, claw: any): GateEvaluation {
   };
 }
 
-function evaluateDocsUpdated(report: any, _claw: any): GateEvaluation {
-  const docs = report.documentation || {};
-  const score = docs.score || 0;
-  const hasReadme = docs.readmeCompleteness >= 60;
+function evaluateDocsUpdated(report: UnknownRecord): GateEvaluation {
+  const docs = asRecord(report.documentation);
+  const score = asNumber(docs.score);
+  const readmeCompleteness = asNumber(docs.readmeCompleteness);
+  const hasReadme = readmeCompleteness >= 60;
   const passed = hasReadme || score >= 60;
 
   return {
     passed,
-    evidence: `Documentation score: ${score}. README completeness: ${docs.readmeCompleteness || 0}`,
+    evidence: `Documentation score: ${score}. README completeness: ${readmeCompleteness}`,
     detail: passed
       ? "Documentation score meets the threshold."
       : "Documentation score is below 60 and README completeness is low. Update docs before marking this gate.",
   };
 }
 
-function evaluateSecurityGate(report: any, claw: any): GateEvaluation {
-  const secrets = claw.secrets || {};
-  const security = report.security || {};
-  const noCriticalSecrets = (secrets.secretsFound || 0) === 0;
-  const noHighVulns = (security.highestSeverity !== "critical") && (security.highestSeverity !== "high");
+function evaluateSecurityGate(report: UnknownRecord, claw: UnknownRecord): GateEvaluation {
+  const secrets = asRecord(claw.secrets);
+  const security = asRecord(report.security);
+  const secretsFound = asNumber(secrets.secretsFound);
+  const highestSeverity = asString(security.highestSeverity, "none").toLowerCase();
+
+  const noCriticalSecrets = secretsFound === 0;
+  const noHighVulns = highestSeverity !== "critical" && highestSeverity !== "high";
   const passed = noCriticalSecrets && noHighVulns;
 
   return {
     passed,
-    evidence: `Secrets found: ${secrets.secretsFound || 0}. Highest severity: ${security.highestSeverity || "none"}`,
+    evidence: `Secrets found: ${secretsFound}. Highest severity: ${highestSeverity || "none"}`,
     detail: passed
       ? "No critical secrets or high-severity vulnerabilities detected."
-      : `Security issues blocking this gate: secrets=${secrets.secretsFound || 0}, highest severity=${security.highestSeverity || "unknown"}.`,
+      : `Security issues blocking this gate: secrets=${secretsFound}, highest severity=${highestSeverity || "unknown"}.`,
   };
 }
 
-function evaluatePerformanceGate(report: any, _claw: any): GateEvaluation {
-  // Performance is hard to auto-evaluate without runtime data — use deployment score as proxy
-  const deployment = report.deployment || {};
-  const quality = report.quality || {};
-  const hasLogging = deployment.hasLogging || false;
-  const score = quality.score || 0;
+function evaluatePerformanceGate(report: UnknownRecord): GateEvaluation {
+  const deployment = asRecord(report.deployment);
+  const quality = asRecord(report.quality);
+  const hasLogging = Boolean(deployment.hasLogging);
+  const score = asNumber(quality.score);
   const passed = score >= 70 && hasLogging;
 
   return {

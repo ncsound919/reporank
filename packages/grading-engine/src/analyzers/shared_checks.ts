@@ -5,14 +5,40 @@ export interface SharedCheckResult {
   hardcodedUrlHits: string[];
 }
 
+export interface AnchoredFinding {
+  file: string;
+  line: number;
+  match: string;
+}
+
+/**
+ * Checks for structured logging per file, returning anchored findings.
+ * No longer joins all content — line numbers are now meaningful.
+ */
 export function checkStructuredLogging(sourceFiles: { path: string; content: string }[]): {
   hasStructuredLogger: boolean;
   consoleLogCount: number;
+  findings: AnchoredFinding[];
 } {
-  const allContent = sourceFiles.map(f => f.content).join("\n");
-  const hasStructuredLogger = /\b(pino|winston|bunyan|log4j)\b/i.test(allContent);
-  const consoleLogCount = (allContent.match(/console\.(log|warn|error|debug|info)\(/g) || []).length;
-  return { hasStructuredLogger, consoleLogCount };
+  let hasStructuredLogger = false;
+  let consoleLogCount = 0;
+  const findings: AnchoredFinding[] = [];
+
+  for (const file of sourceFiles) {
+    if (/\b(pino|winston|bunyan|log4j)\b/i.test(file.content)) {
+      hasStructuredLogger = true;
+    }
+    const lines = file.content.split("\n");
+    for (let i = 0; i < lines.length; i++) {
+      const match = lines[i].match(/console\.(log|warn|error|debug|info)\(/);
+      if (match) {
+        consoleLogCount++;
+        findings.push({ file: file.path, line: i + 1, match: match[0] });
+      }
+    }
+  }
+
+  return { hasStructuredLogger, consoleLogCount, findings };
 }
 
 export function checkHealthEndpoint(sourceFiles: { path: string; content: string }[]): boolean {
@@ -23,18 +49,38 @@ export function checkHealthEndpoint(sourceFiles: { path: string; content: string
   );
 }
 
-export function checkHardcodedUrls(allContent: string): string[] {
-  const hits: string[] = [];
+/**
+ * Checks for hardcoded URLs per file, returning anchored findings with file + line context.
+ */
+export function checkHardcodedUrls(sourceFiles: { path: string; content: string }[]): {
+  summary: string[];
+  findings: AnchoredFinding[];
+} {
   const patterns: { regex: RegExp; label: string }[] = [
-    { regex: /localhost:\d+/g, label: "hardcoded localhost URLs" },
-    { regex: /['"]https?:\/\/[^'"{}]+\.[a-z]{2,}(?:\.[a-z]{2,})*/g, label: "hardcoded external URLs" },
-    { regex: /port\s*=\s*\d{4,5}/g, label: "hardcoded port numbers" },
+    { regex: /localhost:\d+/, label: "hardcoded localhost URL" },
+    { regex: /['"]https?:\/\/[^'"{}]+\.[a-z]{2,}(?:\.[a-z]{2,})*/, label: "hardcoded external URL" },
+    { regex: /port\s*=\s*\d{4,5}/, label: "hardcoded port number" },
   ];
-  for (const { regex, label } of patterns) {
-    const matches = allContent.match(regex);
-    if (matches && matches.length > 2) {
-      hits.push(`${matches.length} instances of ${label}`);
+
+  const findings: AnchoredFinding[] = [];
+  const hitCounts: Record<string, number> = {};
+
+  for (const file of sourceFiles) {
+    const lines = file.content.split("\n");
+    for (let i = 0; i < lines.length; i++) {
+      for (const { regex, label } of patterns) {
+        const match = lines[i].match(regex);
+        if (match) {
+          findings.push({ file: file.path, line: i + 1, match: match[0].trim() });
+          hitCounts[label] = (hitCounts[label] || 0) + 1;
+        }
+      }
     }
   }
-  return hits;
+
+  const summary = Object.entries(hitCounts)
+    .filter(([, count]) => count > 2)
+    .map(([label, count]) => `${count} instances of ${label}`);
+
+  return { summary, findings };
 }
