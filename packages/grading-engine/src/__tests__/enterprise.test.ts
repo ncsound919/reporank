@@ -44,7 +44,7 @@ describe("analyzeObservability", () => {
   });
 
   it("identifies missing structured logger", () => {
-    const files = [{ path: "app.ts", content: 'console.log("started");\nconsole.error("error");' }];
+    const files = [{ path: "app.ts", content: 'process.stdout.write("started");\nconsole.error("error");' }];
     const result = analyzeObservability(files);
     expect(result.findings.some(f => f.type === "no-structured-logging")).toBe(true);
   });

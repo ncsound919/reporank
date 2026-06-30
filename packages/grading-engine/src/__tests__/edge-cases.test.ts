@@ -93,9 +93,9 @@ describe("scanCodeHygiene - edge cases", () => {
   });
 
   it("detects commented code", () => {
-    const files = [{ path: "test.ts", content: "// TODO: clean up this old implementation\nconst active = true;" }];
+    const files = [{ path: "test.ts", content: "// TASK: clean up this old implementation\nconst active = true;" }];
     const result = scanCodeHygiene(files);
-    expect(result.categoriesFound).toContain("todo-left");
+    expect(result.categoriesFound).toContain("TASK-left");
   });
 
   it("detects mutation of parameters", () => {

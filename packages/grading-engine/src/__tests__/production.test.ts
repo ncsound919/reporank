@@ -50,7 +50,7 @@ describe("analyzeProductionReadiness", () => {
   });
 
   it("detects insufficient logging", () => {
-    const files = Array(10).fill(null).map((_, i) => ({ path: `file${i}.ts`, content: 'console.log("hello");' }));
+    const files = Array(10).fill(null).map((_, i) => ({ path: `file${i}.ts`, content: 'process.stdout.write("hello");' }));
     const result = analyzeProductionReadiness(files, []);
     expect(result.findings.some(f => f.type === "insufficient-logging")).toBe(true);
   });

@@ -9,6 +9,10 @@
 
 name: reporank verify
 
+permissions:
+  contents: read
+  actions: read
+
 on:
   pull_request:
     branches: [main, master]
@@ -23,6 +27,10 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0  # full history for diff
+      - uses: step-security/harden-runner@v2
+        with:
+          egress-policy: audit
+          disable-telemetry: true
 
       - name: Setup Node.js
         uses: actions/setup-node@v4

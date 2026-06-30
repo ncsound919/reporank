@@ -1,0 +1,13 @@
+{
+  "name": "sample-ts-project",
+  "version": "1.0.0",
+  "scripts": {
+    "test": "vitest",
+    "lint": "eslint ."
+  },
+  "devDependencies": {
+    "eslint": "^8.0.0",
+    "vitest": "^1.0.0",
+    "typescript": "^5.0.0"
+  }
+}

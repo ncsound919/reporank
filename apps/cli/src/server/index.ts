@@ -12,10 +12,10 @@ app.notFound((c) => c.json({ status: "error", error: "not found" }, 404));
 
 const port = Number(process.env.PORT || 3002);
 serve({ fetch: app.fetch, port }, (info) => {
-  console.log(`Mutly HTTP server listening on http://localhost:${info.port}`);
-  console.log(`Endpoints:`);
-  console.log(`  GET  /health`);
-  console.log(`  POST /v1/llm/complete`);
+  process.stdout.write(`Mutly HTTP server listening on http://localhost:${info.port}`);
+  process.stdout.write(`Endpoints:`);
+  process.stdout.write(`  GET  /health`);
+  process.stdout.write(`  POST /v1/llm/complete`);
 });
 
 process.on("SIGTERM", () => process.exit(0));

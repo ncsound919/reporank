@@ -11,7 +11,7 @@ set -e
 
 echo "[entrypoint] Running Prisma schema push..."
 cd /app/apps/api
-npx prisma db push --accept-data-loss --schema=src/db/prisma/schema.prisma 2>&1 | grep -v "Already" || true
+npx prisma db push --schema=src/db/prisma/schema.prisma 2>&1 | grep -v "Already" || true
 
 echo "[entrypoint] Starting RepoRank API..."
 exec node dist/index.js

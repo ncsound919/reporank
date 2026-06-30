@@ -1,5 +1,9 @@
 name: RepoRank Scan
 
+permissions:
+  contents: read
+  actions: read
+
 on:
   push:
     branches: [master, main]
@@ -14,6 +18,10 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      - uses: step-security/harden-runner@v2
+        with:
+          egress-policy: audit
+          disable-telemetry: true
 
       - name: Run RepoRank scan
         uses: anomalyco/reporank-action@v1

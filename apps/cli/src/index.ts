@@ -12,6 +12,7 @@ import { Command } from "commander";
 import { resolve } from "node:path";
 import { scanCommand } from "./scan.js";
 import { agentsGenerateCommand, agentsAuditCommand } from "./agents.js";
+import { registerImportCommand } from "./commands/import.js";
 
 const program = new Command();
 
@@ -29,11 +30,82 @@ program
   .option("--json", "Output as JSON instead of formatted report")
   .action(scanCommand);
 
+program
+  .command("analyze")
+  .description("Run the deterministic Reporank DAG pipeline on a local folder")
+  .argument("<folder>", "Local folder to analyze")
+  .action(async (folder) => {
+    try {
+      const { execa } = await import("execa");
+      console.log(`Starting Dagster pipeline for ${folder}...`);
+      
+      const dagsterDir = resolve(import.meta.dirname, "../../orchestrator-dag");
+      
+      // Materialize the Dagster assets for the given folder
+      const { stdout } = await execa("dagster", [
+        "asset", "materialize", "--select", "*", 
+        "--config-json", JSON.stringify({
+          ops: {
+            project_analysis: { config: { target_path: resolve(folder) } },
+            static_analysis_results: { config: { target_path: resolve(folder) } },
+            tool_adapter_results: { config: { target_path: resolve(folder) } }
+          }
+        })
+      ], {
+        cwd: dagsterDir,
+        env: { ...process.env, DAGSTER_HOME: dagsterDir }
+      });
+      
+      console.log("Pipeline completed successfully.");
+      console.log(stdout);
+    } catch (err: any) {
+      console.error("Pipeline failed:", err.message);
+      if (err.stderr) console.error(err.stderr);
+      process.exit(1);
+    }
+  });
+
+program
+  .command("watch")
+  .description("Watch a folder and run the Reporank DAG pipeline automatically")
+  .argument("<folder>", "Local folder to watch")
+  .action(async (folder) => {
+    try {
+      const { watchCommand } = await import("./watch.js");
+      await watchCommand(folder);
+    } catch (err: any) {
+      console.error("Watch mode failed:", err.message);
+      process.exit(1);
+    }
+  });
+
+program
+  .command("fitness")
+  .description("Analyze Git history and print a fitness sparkline")
+  .argument("<folder>", "Local folder to analyze")
+  .action(async (folder) => {
+    try {
+      const { analyzeFitness } = await import("@reporank/git-analyzer");
+      // @ts-ignore
+      const sparkly = (await import("sparkly")).default;
+      
+      console.log(`Analyzing git fitness for ${folder}...`);
+      const history = await analyzeFitness(folder, 15);
+      
+      const scores = history.map((h: any) => h.score);
+      console.log(`\nFitness trend (last ${scores.length} commits):`);
+      console.log(sparkly(scores, { min: 0, max: 100 }));
+    } catch (err: any) {
+      console.error("Fitness analysis failed:", err.message);
+      process.exit(1);
+    }
+  });
+
 const agents = program
   .command("agents")
   .description("Generate and audit AGENTS.md governance files");
 
-function wrapAsync<T extends (...args: any[]) => Promise<void>>(fn: T): (...args: Parameters<T>) => void {
+function wrapAsync<T extends (...args: unknown[]) => Promise<void>>(fn: T): (...args: Parameters<T>) => void {
   return (...args: Parameters<T>) => {
     fn(...args).catch((err) => {
       console.error("Command failed:", err);
@@ -74,17 +146,17 @@ program
         maxFiles: Number(opts.maxFiles),
         concurrency: Number(opts.concurrency),
       });
-      console.log(`\n  Bulk scan results:`);
-      console.log(`    Total files:  ${result.totalFiles}`);
-      console.log(`    Cached:       ${result.cachedFiles}`);
-      console.log(`    Analyzed:     ${result.analyzedFiles}`);
-      console.log(`    Findings:     ${result.totalFindings}`);
-      console.log(`    Cache hit:    ${(result.cacheHitRate * 100).toFixed(1)}%`);
-      console.log(`    Duration:     ${(result.durationMs / 1000).toFixed(2)}s`);
+      process.stdout.write(`\n  Bulk scan results:`);
+      process.stdout.write(`    Total files:  ${result.totalFiles}`);
+      process.stdout.write(`    Cached:       ${result.cachedFiles}`);
+      process.stdout.write(`    Analyzed:     ${result.analyzedFiles}`);
+      process.stdout.write(`    Findings:     ${result.totalFindings}`);
+      process.stdout.write(`    Cache hit:    ${(result.cacheHitRate * 100).toFixed(1)}%`);
+      process.stdout.write(`    Duration:     ${(result.durationMs / 1000).toFixed(2)}s`);
       if (result.errors.length > 0) {
-        console.log(`    Errors:       ${result.errors.length}`);
+        process.stdout.write(`    Errors:       ${result.errors.length}`);
         for (const e of result.errors.slice(0, 5)) {
-          console.log(`      ${e.file}: ${e.error}`);
+          process.stdout.write(`      ${e.file}: ${e.error}`);
         }
       }
     }).catch((err) => {
@@ -105,9 +177,51 @@ program
   .option("--no-llm", "Skip LLM scan (heuristic only — fast, no API cost)")
   .option("--detect-hallucinations", "Phase 1.2: detect phantom imports (LLM-hallucinated packages)")
   .option("--mode <mode>", "Prompt mode: zero-shot | few-shot | react | strict (default: strict)", "strict")
+  .option("--apply", "Auto-apply fixable findings as git commits (like eslint --fix)")
+  .option("--dry-run", "With --apply: show what would change without applying")
+  .option("--interactive", "With --apply: prompt per-fix with y/n/skip")
   .action((path: string, opts) => {
     import("./verify.js").then(async (m) => {
       const format = opts.json ? "json" : (opts.ghMarkdown ? "gh-markdown" : "text");
+      const applyMode = opts.apply || opts.dryRun || opts.interactive;
+      if (applyMode) {
+        const { applyFixesFromVerify } = await import("./verify-apply.js");
+        const result = await applyFixesFromVerify({
+          path,
+          threshold: Number(opts.threshold),
+          diff: !!opts.diff,
+          pr: opts.pr ? Number(opts.pr) : undefined,
+          format,
+          noLlm: opts.llm === false,
+          promptMode: opts.mode,
+          detectHallucinations: !!opts.detectHallucinations,
+          dryRun: !!opts.dryRun,
+          interactive: !!opts.interactive,
+        });
+        if (result.dryRun) {
+          process.stdout.write("\n  Dry-run — no changes applied.\n");
+          for (const line of result.dryRunOutput) {
+            process.stdout.write(`  ${line}`);
+          }
+          process.stdout.write(`\n  Total: ${result.total}  |  Would apply: ${result.dryRunWouldApply.length}  |  Skipped: ${result.skipped.length}  |  Failed: ${result.failed.length}\n`);
+        } else if (result.failed.length > 0 && result.applied.length === 0) {
+          process.stdout.write("\n  All fixes failed or were skipped.\n");
+        } else {
+          process.stdout.write(`\n  Applied ${result.applied.length} fix(es) in ${result.commitShas.length} commit(s).\n`);
+          for (const sha of result.commitShas) {
+            process.stdout.write(`    commit: ${sha}`);
+          }
+          if (result.skipped.length > 0) {
+            process.stdout.write(`  Skipped: ${result.skipped.length}`);
+          }
+          if (result.failed.length > 0) {
+            process.stdout.write(`  Failed: ${result.failed.length}`);
+          }
+          process.stdout.write();
+        }
+        process.exit(result.failed.length > 0 ? 1 : 0);
+        return;
+      }
       const { report, exitCode } = await m.runVerify({
         path,
         threshold: Number(opts.threshold),
@@ -119,9 +233,9 @@ program
         detectHallucinations: !!opts.detectHallucinations,
       });
       if (format === "json") {
-        console.log(JSON.stringify(report, null, 2));
+        process.stdout.write(JSON.stringify(report, null, 2));
       } else if (format === "gh-markdown") {
-        console.log(renderGhMarkdown(report));
+        process.stdout.write(renderGhMarkdown(report));
       } else {
         printTextReport(report);
       }
@@ -134,44 +248,44 @@ program
 
 function printTextReport(r: import("./verify.js").VerifyReport): void {
   const verdict = r.passed ? "✓ PASS" : "✗ FAIL";
-  console.log(`\n  ${verdict}  Quality score: ${r.qualityScore}/100 (threshold: ${r.config.threshold})`);
-  console.log(`  Path: ${r.path}`);
-  console.log(`  Files analyzed: ${r.filesAnalyzed}  •  Used LLM: ${r.usedLlm}  •  Duration: ${(r.durationMs / 1000).toFixed(2)}s\n`);
+  process.stdout.write(`\n  ${verdict}  Quality score: ${r.qualityScore}/100 (threshold: ${r.config.threshold})`);
+  process.stdout.write(`  Path: ${r.path}`);
+  process.stdout.write(`  Files analyzed: ${r.filesAnalyzed}  •  Used LLM: ${r.usedLlm}  •  Duration: ${(r.durationMs / 1000).toFixed(2)}s\n`);
   if (r.findings.length === 0 && !r.hallucinations) {
-    console.log("  No findings.");
+    process.stdout.write("  No findings.");
     return;
   }
   if (r.findings.length > 0) {
-    console.log("  By severity:");
+    process.stdout.write("  By severity:");
     for (const [sev, count] of Object.entries(r.bySeverity).sort((a, b) => b[1] - a[1])) {
-      console.log(`    ${sev.padEnd(10)} ${count}`);
+      process.stdout.write(`    ${sev.padEnd(10)} ${count}`);
     }
-    console.log("\n  By category:");
+    process.stdout.write("\n  By category:");
     for (const [cat, count] of Object.entries(r.byCategory).sort((a, b) => b[1] - a[1])) {
-      console.log(`    ${cat.padEnd(18)} ${count}`);
+      process.stdout.write(`    ${cat.padEnd(18)} ${count}`);
     }
-    console.log("\n  Findings:");
+    process.stdout.write("\n  Findings:");
     for (const f of r.findings.slice(0, 20)) {
       const loc = f.line > 0 ? `:${f.line}` : "";
       const file = f.path ?? "<file>";
-      console.log(`    [${f.severity}] ${file}${loc}  ${f.type}  (conf=${(f.confidence * 100).toFixed(0)}%)`);
-      console.log(`        ${f.description.slice(0, 100)}`);
+      process.stdout.write(`    [${f.severity}] ${file}${loc}  ${f.type}  (conf=${(f.confidence * 100).toFixed(0)}%)`);
+      process.stdout.write(`        ${f.description.slice(0, 100)}`);
     }
     if (r.findings.length > 20) {
-      console.log(`    ... and ${r.findings.length - 20} more`);
+      process.stdout.write(`    ... and ${r.findings.length - 20} more`);
     }
-    console.log();
+    process.stdout.write();
   }
   if (r.hallucinations && r.hallucinations.hallucinations.length > 0) {
-    console.log(`  🚨 Phantom imports (${r.hallucinations.hallucinations.length}):`);
+    process.stdout.write(`  🚨 Phantom imports (${r.hallucinations.hallucinations.length}):`);
     for (const h of r.hallucinations.hallucinations.slice(0, 20)) {
-      console.log(`    [${h.severity}] ${h.file}:${h.line}  ${h.phantomName}  (${h.category})`);
-      console.log(`        ${h.recommendation}`);
+      process.stdout.write(`    [${h.severity}] ${h.file}:${h.line}  ${h.phantomName}  (${h.category})`);
+      process.stdout.write(`        ${h.recommendation}`);
     }
     if (r.hallucinations.hallucinations.length > 20) {
-      console.log(`    ... and ${r.hallucinations.hallucinations.length - 20} more`);
+      process.stdout.write(`    ... and ${r.hallucinations.hallucinations.length - 20} more`);
     }
-    console.log();
+    process.stdout.write();
   }
 }
 
@@ -237,8 +351,8 @@ instructions
       console.error(`  Error: ${result.error}`);
       process.exit(1);
     }
-    console.log(`  Translated ${result.source_path} -> ${result.target} (${result.bytes} bytes)`);
-    console.log(`  Wrote: ${result.output_path}`);
+    process.stdout.write(`  Translated ${result.source_path} -> ${result.target} (${result.bytes} bytes)`);
+    process.stdout.write(`  Wrote: ${result.output_path}`);
   }));
 
 instructions
@@ -250,16 +364,16 @@ instructions
     const analysis = analyzeLocalDirectory(dir) as unknown as Record<string, unknown>;
     const suggestions = suggestRules(analysis);
     if (suggestions.length === 0) {
-      console.log("  No rule suggestions — codebase looks clean.");
+      process.stdout.write("  No rule suggestions — codebase looks clean.");
       return;
     }
-    console.log(`\n  ${suggestions.length} rule suggestion(s):\n`);
+    process.stdout.write(`\n  ${suggestions.length} rule suggestion(s):\n`);
     for (const s of suggestions) {
-      console.log(`  [${s.severity.toUpperCase()}] ${s.title}`);
-      console.log(`    Rationale: ${s.rationale}`);
-      console.log(`    Confidence: ${(s.confidence * 100).toFixed(0)}%`);
-      console.log(`    Evidence: ${s.evidence.join("; ")}`);
-      console.log();
+      process.stdout.write(`  [${s.severity.toUpperCase()}] ${s.title}`);
+      process.stdout.write(`    Rationale: ${s.rationale}`);
+      process.stdout.write(`    Confidence: ${(s.confidence * 100).toFixed(0)}%`);
+      process.stdout.write(`    Evidence: ${s.evidence.join("; ")}`);
+      process.stdout.write();
     }
   }));
 
@@ -270,14 +384,15 @@ instructions
   .option("--accept", "Mark the rule as accepted (added to AGENTS.md)")
   .option("--reject", "Mark the rule as rejected (not relevant)")
   .option("--reason <text>", "Optional reason")
-  .action(wrapAsync(async (opts: { rule: string; accept?: boolean; reject?: boolean; reason?: string }) => {
+  .action(wrapAsync(async (opts) => {
+    const params = opts as { rule: string; accept?: boolean; reject?: boolean; reason?: string };
     const { recordFeedback } = await import("./instructions.js");
-    if (opts.accept === opts.reject) {
+    if (params.accept === params.reject) {
       console.error("  Error: specify exactly one of --accept or --reject");
       process.exit(1);
     }
-    const entry = recordFeedback(opts.rule, !!opts.accept, opts.reason);
-    console.log(`  Recorded feedback: ${opts.rule} -> ${entry.accepted ? "ACCEPTED" : "REJECTED"}`);
+    const entry = recordFeedback(params.rule, !!params.accept, params.reason);
+    process.stdout.write(`  Recorded feedback: ${params.rule} -> ${entry.accepted ? "ACCEPTED" : "REJECTED"}`);
   }));
 
 instructions
@@ -286,7 +401,7 @@ instructions
   .action(wrapAsync(async () => {
     const { getFeedbackSummary } = await import("./instructions.js");
     const summary = getFeedbackSummary();
-    console.log(JSON.stringify(summary, null, 2));
+    process.stdout.write(JSON.stringify(summary, null, 2));
   }));
 
 // ─── Phase 5: deploy command ────────────────────────────────────────────────
@@ -308,11 +423,11 @@ deploy
         opts.name,
         { force: opts.force },
       );
-      console.log(`\n  Wrote ${written.length} file(s) for ${provider}:`);
-      for (const f of written) console.log(`    + ${f}`);
+      process.stdout.write(`\n  Wrote ${written.length} file(s) for ${provider}:`);
+      for (const f of written) process.stdout.write(`    + ${f}`);
       if (skipped.length > 0) {
-        console.log(`\n  Skipped ${skipped.length} existing file(s) (use --force to overwrite):`);
-        for (const f of skipped) console.log(`    ~ ${f}`);
+        process.stdout.write(`\n  Skipped ${skipped.length} existing file(s) (use --force to overwrite):`);
+        for (const f of skipped) process.stdout.write(`    ~ ${f}`);
       }
     } catch (e) {
       console.error("  Error:", (e as Error).message);
@@ -328,7 +443,7 @@ deploy
     try {
       const { planDeploy } = await import("./deploy.js");
       const result = planDeploy({ provider: opts.provider as "vercel" | "docker" | "fly" | "static", projectPath: project });
-      console.log(JSON.stringify(result, null, 2));
+      process.stdout.write(JSON.stringify(result, null, 2));
     } catch (e) {
       console.error("Plan failed:", (e as Error).message);
       process.exit(1);
@@ -342,7 +457,7 @@ deploy
     try {
       const { readDeployStatus } = await import("./deploy.js");
       const status = readDeployStatus(project);
-      console.log(JSON.stringify(status, null, 2));
+      process.stdout.write(JSON.stringify(status, null, 2));
     } catch (e) {
       console.error("Status failed:", (e as Error).message);
       process.exit(1);
@@ -365,7 +480,7 @@ deploy
         force: opts.force,
         dryRun: opts.dryRun !== false, // default to dry-run for safety
       });
-      console.log(JSON.stringify(result, null, 2));
+      process.stdout.write(JSON.stringify(result, null, 2));
     } catch (e) {
       console.error("Deploy failed:", (e as Error).message);
       process.exit(1);
@@ -393,5 +508,7 @@ program
       process.exit(1);
     });
   });
+
+registerImportCommand(program);
 
 program.parse(process.argv);

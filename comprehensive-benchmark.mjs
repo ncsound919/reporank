@@ -7,11 +7,13 @@
  */
 
 import { readFileSync, readdirSync, statSync, writeFileSync } from "fs";
-import { join, extname, resolve } from "path";
-import { pathToFileURL } from "url";
+import { join, extname, resolve, dirname } from "path";
+import { fileURLToPath, pathToFileURL } from "url";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 // ─── Configuration ───────────────────────────────────────────
-const REPORANK_DIR = resolve(".");
+const REPORANK_DIR = resolve(__dirname);
 const TARGET_DIR = REPORANK_DIR;
 const GEMINI_KEY = process.env.GEMINI_API_KEY || "";
 const START_TIME = Date.now();
@@ -51,7 +53,8 @@ function readSourceFiles(dir, filePaths, maxFiles = 60) {
 
 // ─── Dynamic TS Import Helper ────────────────────────────────
 async function importTS(relativePath) {
-  const absolute = resolve(REPORANK_DIR, relativePath);
+  const mapped = relativePath.replace("/src/", "/dist/").replace(/\.ts$/, ".js");
+  const absolute = resolve(REPORANK_DIR, mapped);
   return import(pathToFileURL(absolute).href);
 }
 

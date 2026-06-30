@@ -487,36 +487,36 @@ async function main() {
   const repoPath = resolve(args[0]);
   const request = args.slice(1).join(" ");
 
-  console.log(`\n  Refactor orchestrator`);
-  console.log(`  Repo:    ${repoPath}`);
-  console.log(`  Request: ${request}\n`);
+  process.stdout.write(`\n  Refactor orchestrator`);
+  process.stdout.write(`  Repo:    ${repoPath}`);
+  process.stdout.write(`  Request: ${request}\n`);
 
   const plan = await runRefactor(repoPath, request);
 
-  console.log(`  Blast radius: ${plan.blast.total_affected} references across ${plan.blast.files_to_edit.length} file(s)`);
-  console.log(`  Edits:        ${plan.totalEdits} (${plan.estimatedFilesChanged} files will change)`);
-  console.log(`  Risk:         ${plan.risk.toUpperCase()}`);
-  console.log(`  Duration:     ${plan.durationMs}ms\n`);
+  process.stdout.write(`  Blast radius: ${plan.blast.total_affected} references across ${plan.blast.files_to_edit.length} file(s)`);
+  process.stdout.write(`  Edits:        ${plan.totalEdits} (${plan.estimatedFilesChanged} files will change)`);
+  process.stdout.write(`  Risk:         ${plan.risk.toUpperCase()}`);
+  process.stdout.write(`  Duration:     ${plan.durationMs}ms\n`);
 
   if (plan.warnings.length > 0) {
-    console.log(`  ⚠️  Warnings:`);
-    for (const w of plan.warnings) console.log(`     ${w}`);
-    console.log();
+    process.stdout.write(`  ⚠️  Warnings:`);
+    for (const w of plan.warnings) process.stdout.write(`     ${w}`);
+    process.stdout.write();
   }
 
   if (plan.edits.length === 0) {
-    console.log(`  No edits proposed. Nothing to apply.`);
+    process.stdout.write(`  No edits proposed. Nothing to apply.`);
     process.exit(0);
   }
 
   // Print the patch in a unified-diff-ish format
-  console.log(`  ── Proposed edits ──`);
+  process.stdout.write(`  ── Proposed edits ──`);
   for (const e of plan.edits) {
-    console.log(`\n  📝 ${e.filePath}  (${e.symbol}, conf=${(e.confidence * 100).toFixed(0)}%)`);
+    process.stdout.write(`\n  📝 ${e.filePath}  (${e.symbol}, conf=${(e.confidence * 100).toFixed(0)}%)`);
     const findPreview = e.findContent.split("\n").slice(0, 5).join("\n");
     const replacePreview = e.replaceContent.split("\n").slice(0, 5).join("\n");
-    console.log(`     -  ${findPreview.slice(0, 100)}${e.findContent.length > 100 ? "..." : ""}`);
-    console.log(`     +  ${replacePreview.slice(0, 100)}${e.replaceContent.length > 100 ? "..." : ""}`);
+    process.stdout.write(`     -  ${findPreview.slice(0, 100)}${e.findContent.length > 100 ? "..." : ""}`);
+    process.stdout.write(`     +  ${replacePreview.slice(0, 100)}${e.replaceContent.length > 100 ? "..." : ""}`);
   }
 
   // Emit the JSON for the VS Code extension to consume
@@ -531,8 +531,8 @@ async function main() {
   const { writeFileSync, mkdirSync } = await import("node:fs");
   mkdirSync(resolve("."), { recursive: true });
   writeFileSync(patchPath, JSON.stringify(patch, null, 2), "utf-8");
-  console.log(`\n  Patch written to ${patchPath}`);
-  console.log(`  Apply with VS Code command: mutly.applyMultiFile (load the file as args)\n`);
+  process.stdout.write(`\n  Patch written to ${patchPath}`);
+  process.stdout.write(`  Apply with VS Code command: mutly.applyMultiFile (load the file as args)\n`);
 }
 
 // Only run if invoked directly (not when imported).  We detect this by

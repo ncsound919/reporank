@@ -61,9 +61,9 @@ async function main(): Promise<number> {
   });
 
   if (format === "json") {
-    console.log(JSON.stringify(report, null, 2));
+    process.stdout.write(JSON.stringify(report, null, 2));
   } else if (format === "gh-markdown") {
-    console.log(renderGhMarkdown(report));
+    process.stdout.write(renderGhMarkdown(report));
   } else {
     printTextSummary(report);
   }
@@ -147,16 +147,16 @@ function renderGhMarkdown(r: any): string {
 
 function printTextSummary(r: any): void {
   const verdict = r.passed ? "✓ PASS" : "✗ FAIL";
-  console.log(`\n  ${verdict}  Quality score: ${r.qualityScore}/100 (threshold: ${r.config.threshold})`);
-  console.log(`  Files: ${r.filesAnalyzed}  •  LLM: ${r.usedLlm}  •  ${(r.durationMs / 1000).toFixed(2)}s`);
-  if (r.findings.length === 0) console.log("  No findings.");
+  process.stdout.write(`\n  ${verdict}  Quality score: ${r.qualityScore}/100 (threshold: ${r.config.threshold})`);
+  process.stdout.write(`  Files: ${r.filesAnalyzed}  •  LLM: ${r.usedLlm}  •  ${(r.durationMs / 1000).toFixed(2)}s`);
+  if (r.findings.length === 0) process.stdout.write("  No findings.");
   for (const f of r.findings.slice(0, 10)) {
-    console.log(`    [${f.severity}] ${f.path}:${f.line}  ${f.type}`);
+    process.stdout.write(`    [${f.severity}] ${f.path}:${f.line}  ${f.type}`);
   }
   if (r.hallucinations && r.hallucinations.hallucinations.length > 0) {
-    console.log(`\n  🚨 ${r.hallucinations.hallucinations.length} phantom import(s):`);
+    process.stdout.write(`\n  🚨 ${r.hallucinations.hallucinations.length} phantom import(s):`);
     for (const h of r.hallucinations.hallucinations.slice(0, 10)) {
-      console.log(`    [${h.severity}] ${h.phantomName}  ${h.category}`);
+      process.stdout.write(`    [${h.severity}] ${h.phantomName}  ${h.category}`);
     }
   }
 }

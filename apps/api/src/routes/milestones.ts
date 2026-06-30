@@ -37,7 +37,6 @@ router.post("/", authMiddleware, asyncHandler<AuthRequest>(async (req, res) => {
   if (!brief) throw new AppError(404, "Project not found", ErrorCodes.NOT_FOUND);
   if (brief.userId !== req.userId) throw new AppError(403, "Access denied", ErrorCodes.FORBIDDEN);
 
-  // Snapshot acceptance criteria from brief if not provided
   const snapshot = parsed.data.acceptanceCriteriaSnapshot.length > 0
     ? parsed.data.acceptanceCriteriaSnapshot
     : brief.acceptanceCriteria;
@@ -46,7 +45,7 @@ router.post("/", authMiddleware, asyncHandler<AuthRequest>(async (req, res) => {
     data: {
       ...parsed.data,
       targetDate: parsed.data.targetDate ? new Date(parsed.data.targetDate) : null,
-      acceptanceCriteriaSnapshot: snapshot,
+      acceptanceCriteriaSnapshot: Array.isArray(snapshot) ? JSON.stringify(snapshot) : snapshot,
     },
     include: { gates: true },
   });
@@ -63,7 +62,11 @@ router.get("/:id", authMiddleware, asyncHandler<AuthRequest>(async (req, res) =>
   if (!milestone) throw new AppError(404, "Milestone not found", ErrorCodes.NOT_FOUND);
   if (milestone.brief.userId !== req.userId) throw new AppError(403, "Access denied", ErrorCodes.FORBIDDEN);
 
-  res.json({ data: milestone });
+  const data = { ...milestone } as any;
+  if (typeof data.acceptanceCriteriaSnapshot === "string") {
+    try { data.acceptanceCriteriaSnapshot = JSON.parse(data.acceptanceCriteriaSnapshot); } catch {}
+  }
+  res.json({ data });
 }));
 
 // PATCH /api/v1/milestones/:id
@@ -151,7 +154,14 @@ router.get("/project/:projectId", authMiddleware, asyncHandler<AuthRequest>(asyn
     orderBy: { createdAt: "asc" },
   });
 
-  res.json({ data: milestones });
+  const parsedMilestones = milestones.map((m: any) => {
+    const data = { ...m };
+    if (typeof data.acceptanceCriteriaSnapshot === "string") {
+      try { data.acceptanceCriteriaSnapshot = JSON.parse(data.acceptanceCriteriaSnapshot); } catch {}
+    }
+    return data;
+  });
+  res.json({ data: parsedMilestones });
 }));
 
 export default router;

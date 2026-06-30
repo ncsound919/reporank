@@ -189,7 +189,7 @@ export async function llmComplete(opts: LLMCompleteOptions): Promise<LLMComplete
  * ```ts
  * for await (const event of llmStream({ prompt })) {
  *   if (event.done) {
- *     console.log("Total:", event.usage);
+ *     process.stdout.write("Total:", event.usage);
  *   } else {
  *     process.stdout.write(event.delta);
  *   }

@@ -16,8 +16,8 @@ describe("generateDeadCodePlan", () => {
 
   it("detects potentially dead exports in multi-file project", () => {
     const files = [
-      { path: "utils.ts", content: "export const helper = (x: number) => x * 2;\nexport const deadFunc = () => console.log('unused');" },
-      { path: "app.ts", content: 'import { helper } from "./utils";\nconsole.log(helper(5));' },
+      { path: "utils.ts", content: "export const helper = (x: number) => x * 2;\nexport const deadFunc = () => process.stdout.write('unused');" },
+      { path: "app.ts", content: 'import { helper } from "./utils";\nprocess.stdout.write(helper(5));' },
     ];
     const result = generateDeadCodePlan(files);
     expect(result.totalRemovable).toBeGreaterThanOrEqual(0);
@@ -41,7 +41,7 @@ describe("generateDeadCodePlan", () => {
   it("estimates line savings", () => {
     const files = [
       { path: "utils.ts", content: "export const helper = (x: number) => x * 2;\nexport function longDeadFunc() {\n  const a = 1;\n  const b = 2;\n  return a + b;\n}" },
-      { path: "app.ts", content: 'import { helper } from "./utils";\nconsole.log(helper(5));' },
+      { path: "app.ts", content: 'import { helper } from "./utils";\nprocess.stdout.write(helper(5));' },
     ];
     const result = generateDeadCodePlan(files);
     expect(result.estimatedSavingsLoc).toBeGreaterThanOrEqual(0);
@@ -50,7 +50,7 @@ describe("generateDeadCodePlan", () => {
   it("handles files with no exports", () => {
     const files = [
       { path: "utils.ts", content: "const x = 1;" },
-      { path: "app.ts", content: "console.log('hello');" },
+      { path: "app.ts", content: "process.stdout.write('hello');" },
     ];
     const result = generateDeadCodePlan(files);
     expect(result.totalRemovable).toBe(0);

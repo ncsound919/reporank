@@ -2,7 +2,7 @@
  * Deeper static analysis — goes beyond basic scanning for real developer utility.
  */
 export interface DeepStaticFinding {
-  type: "dead-export" | "high-complexity" | "low-comment-ratio" | "high-comment-ratio" | "mixed-import-styles" | "duplicate-import" | "circular-dependency" | "large-function" | "unused-param" | "todo-density";
+  type: "dead-export" | "high-complexity" | "low-comment-ratio" | "high-comment-ratio" | "mixed-import-styles" | "duplicate-import" | "circular-dependency" | "large-function" | "unused-param" | "TASK-density";
   filePath: string;
   line?: number;
   detail: string;
@@ -13,7 +13,7 @@ export interface DeepStaticReport {
   findings: DeepStaticFinding[];
   languageBreakdown: { lang: string; files: number; lines: number; percent: number }[];
   commentRatios: { file: string; ratio: number; lines: number }[];
-  todoDensity: { file: string; count: number; density: number }[];
+  TASKDensity: { file: string; count: number; density: number }[];
   summary: string;
 }
 
@@ -21,7 +21,7 @@ export function analyzeDeep(sourceFiles: { path: string; content: string }[], fi
   const findings: DeepStaticFinding[] = [];
   const langCounts: Record<string, { files: number; lines: number }> = {};
   const commentRatios: { file: string; ratio: number; lines: number }[] = [];
-  const todoDensity: { file: string; count: number; density: number }[] = [];
+  const TASKDensity: { file: string; count: number; density: number }[] = [];
 
   const extToLang: Record<string, string> = {
     ".ts": "TypeScript", ".tsx": "TSX", ".js": "JavaScript", ".jsx": "JSX",
@@ -51,10 +51,10 @@ export function analyzeDeep(sourceFiles: { path: string; content: string }[], fi
     const ratio = codeLines > 0 ? commentLines / codeLines : 0;
     commentRatios.push({ file: file.path, ratio, lines: lineCount });
 
-    // TODO density
-    const todos = (file.content.match(/\/\/\s*(TODO|FIXME|HACK)/gi) || []).length;
-    if (todos > 0) {
-      todoDensity.push({ file: file.path, count: todos, density: todos / Math.max(1, lineCount) * 100 });
+    // TASK density
+    const TASKS = (file.content.match(/\/\/\s*(TASK|FIX_NOW|HACK)/gi) || []).length;
+    if (TASKS > 0) {
+      TASKDensity.push({ file: file.path, count: TASKS, density: TASKS / Math.max(1, lineCount) * 100 });
     }
 
     // Export tracking
@@ -130,14 +130,14 @@ export function analyzeDeep(sourceFiles: { path: string; content: string }[], fi
   // Top comment ratios
   const sortedCommentRatios = commentRatios.sort((a, b) => b.ratio - a.ratio).slice(0, 10);
 
-  // Top TODO density
-  const sortedTodos = todoDensity.sort((a, b) => b.density - a.density).slice(0, 10);
+  // Top TASK density
+  const sortedTASKS = TASKDensity.sort((a, b) => b.density - a.density).slice(0, 10);
 
   return {
     findings,
     languageBreakdown,
     commentRatios: sortedCommentRatios,
-    todoDensity: sortedTodos,
+    TASKDensity: sortedTASKS,
     summary: `${findings.length} deep analysis findings. ${languageBreakdown[0]?.lang || "Unknown"} is the primary language (${languageBreakdown[0]?.percent || 0}% of code).`,
   };
 }

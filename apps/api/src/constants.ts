@@ -100,6 +100,7 @@ export const ErrorCodes = {
   VALIDATION_ERROR: "VALIDATION_ERROR",
   INTERNAL_ERROR: "INTERNAL_ERROR",
   P2002: "P2002", // Prisma unique constraint violation
+  NO_SCAN: "NO_SCAN",
 } as const;
 
 export type ErrorCodeValue = (typeof ErrorCodes)[keyof typeof ErrorCodes];

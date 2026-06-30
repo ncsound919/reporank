@@ -4,7 +4,7 @@ import { runDeepAnalysis } from "../analyzers/index";
 const mockSourceFiles = [
   { path: "src/index.ts", content: `export const greet = (name: string) => \`Hello \${name}\`;` },
   { path: "src/utils.ts", content: `export function add(a: number, b: number) { return a + b; }` },
-  { path: "src/app.ts", content: `import { greet } from "./index";\nconsole.log(greet("World"));` },
+  { path: "src/app.ts", content: `import { greet } from "./index";\nprocess.stdout.write(greet("World"));` },
 ];
 
 describe("runDeepAnalysis", () => {

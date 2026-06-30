@@ -44,7 +44,13 @@ const maxSecrets = parseInt(getArgValue("--max-secrets", "0"), 10);
 const requireTests = args.includes("--require-tests");
 const jsonOutput = args.includes("--json");
 const cliPathArg = getArgValue("--cli-path", null);
-const cliPath = cliPathArg ? resolve(cliPathArg) : resolve(__dirname, "..", "apps", "cli", "src", "index.ts");
+const cliPath = cliPathArg
+  ? resolve(cliPathArg)
+  : resolve(__dirname, "..", "apps", "cli", "src", "index.ts");
+
+if (!cliPathArg && !existsSync(cliPath)) {
+  console.warn(`[quality-gate] RepoRank CLI not found at default path. Use --cli-path to specify.`);
+}
 
 // ─── Run RepoRank Analysis ─────────────────────────────────────
 function runQualityGate() {
@@ -95,14 +101,14 @@ function runQualityGate() {
   // ─── Evaluate Checks ───────────────────────────────────────
   const checks = [];
 
-  // Check 1: Vibe score threshold
-  const scorePassed = score >= threshold;
+  // Check 1: Vibe Coding Index — higher = more AI patterns = WORSE
+  const scorePassed = score <= threshold;
   checks.push({
     name: "Vibe score threshold",
     passed: scorePassed,
     message: scorePassed
-      ? `Score ${score}/${threshold} ✓`
-      : `Score ${score} is below threshold ${threshold}`,
+      ? `Score ${score} ≤ ${threshold} (acceptable AI use) ✓`
+      : `Score ${score} exceeds threshold ${threshold} (too much AI-generated code)`,
     value: score,
     threshold,
   });

@@ -41,11 +41,11 @@ router.post("/:projectId", authMiddleware, asyncHandler<AuthRequest>(async (req,
   const fileTree = report?.architecture ? [] : (clawFindings?.fileTree || []);
 
   const briefInput = {
-    deliverables: brief.deliverables,
-    exclusions: brief.exclusions,
-    constraints: brief.constraints,
-    assumptions: brief.assumptions,
-    intentDocument: typeof brief.intentDocument === 'object' && brief.intentDocument !== null ? (brief.intentDocument as Record<string, unknown>) : null,
+    deliverables: JSON.parse(brief.deliverables) as string[],
+    exclusions: JSON.parse(brief.exclusions) as string[],
+    constraints: JSON.parse(brief.constraints) as string[],
+    assumptions: JSON.parse(brief.assumptions) as string[],
+    intentDocument: brief.intentDocument ? JSON.parse(brief.intentDocument) as Record<string, unknown> : null,
   };
 
   const result = runScopeMatcher({

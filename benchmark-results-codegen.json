@@ -1,0 +1,56 @@
+{
+  "benchmark": "codegen-benchmark",
+  "date": "2026-06-09",
+  "llmProvider": "gemini (gemini-2.5-flash)",
+  "baseline": {
+    "total": 6,
+    "passed": 4,
+    "passRate": 0.667,
+    "results": {
+      "counter-component": { "passed": true, "checks": "8/8", "tokens": 1939 },
+      "login-form": { "passed": true, "checks": "8/8", "tokens": 2565 },
+      "data-fetcher-hook": { "passed": false, "checks": "7/8 (validSyntax fail)", "tokens": 1889 },
+      "todo-manager": { "passed": true, "checks": "8/8", "tokens": 5271 },
+      "api-middleware": { "passed": true, "checks": "8/8", "tokens": 1296 },
+      "debounce-function": { "passed": false, "checks": "3/8 (rate-limit fail)", "tokens": 0 }
+    },
+    "aggregateChecks": {
+      "validSyntax": "5/6 (83%)",
+      "hasExport": "5/6 (83%)",
+      "typedProperly": "5/6 (83%)",
+      "errorHandling": "6/6 (100%)",
+      "requiredKeywords": "5/6 (83%)",
+      "bannedKeywords": "6/6 (100%)",
+      "requiredNames": "5/6 (83%)",
+      "compilesClean": "6/6 (100%)"
+    },
+    "totalTokens": 12960,
+    "totalDurationSeconds": 59.9
+  },
+  "promptImprovements": {
+    "weakest1_debounce-function": {
+      "issue": "Original prompt used '<T extends unknown[]>' which is a poor/unidiomatic generic constraint. Prompt also lacked structure and examples. Additionally, the task ran last and hit Gemini daily rate limit (free tier: 20 req/day).",
+      "improvement": "Rewrote with idiomatic generic '<F extends (...args: never[]) => unknown>', added explicit requirements for leading/trailing options, cancel/flush methods, this-binding passthrough, and a comprehensive few-shot example showing the full implementation pattern.",
+      "expectedImpact": "Should eliminate the type-constraint confusion and produce valid TypeScript with proper export and all required identifiers."
+    },
+    "weakest2_data-fetcher-hook": {
+      "issue": "Generated code failed validSyntax check despite being syntactically plausible — likely a template-literal vs brace-counting false positive. Original prompt was terse with no structure guidance.",
+      "improvement": "Added explicit requirements for state shape, cleanup logic, AbortError handling, initial state values, and a full few-shot example. Added file extension guidance (.ts not .tsx) and explicit JSON output format instruction.",
+      "expectedImpact": "Should produce consistently well-structured code that passes all syntax checks."
+    },
+    "weakest3_login-form": {
+      "issue": "Passed all formal checks but generated code had security issues: logged password to console and used alert() for success feedback. Original prompt focused only on validation, not production quality.",
+      "improvement": "Added explicit security requirements (never log credentials, never use alert()), added specific email regex, per-field error display instructions, clear-error-on-resubmit pattern, try/catch requirement, and a few-shot example of the validate function signature.",
+      "expectedImpact": "Should produce production-quality code without security anti-patterns while still passing all checks."
+    }
+  },
+  "benchmarkConfigChanges": {
+    "addedGeminiProvider": "Added direct Gemini (gemini-2.5-flash) support via @google/genai SDK as primary provider, with VibeServe HTTP as fallback. Provider selected via BENCHMARK_LLM_PROVIDER env var.",
+    "addedEnvLoading": "Auto-loads GEMINI_API_KEY from Mutly-Daemon-Agent/.env for zero-config runs from reporank workspace.",
+    "addedRateLimitDelay": "Added 4-second inter-task delay to handle Gemini free-tier rate limits.",
+    "addedFewShotExamples": "All three improved prompts now include few-shot TypeScript examples guiding correct output structure."
+  },
+  "reRunStatus": "Blocked by Gemini free-tier quota exhaustion (20 req/day limit for gemini-2.5-flash). The VibeServe OpenCode provider also failed (CLI timeout). Re-run will succeed once quota resets or a paid API key is configured.",
+  "instructions": "To re-run: ensure GEMINI_API_KEY is set in Mutly-Daemon-Agent/.env, then: cd reporank/apps/cli && tsx src/codegen-benchmark.ts --output ../../benchmark-results-codegen-v2.json",
+  "compatibility": "The benchmark can also run against VibeServe by setting BENCHMARK_LLM_PROVIDER=vibeserve and VIBESERVE_API_KEY in the environment."
+}

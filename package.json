@@ -3,16 +3,19 @@
   "private": true,
   "scripts": {
     "dev": "turbo dev",
+    "dev:local": "concurrently --kill-others-on-fail --prefix \"[{name}]\" --names \"api,web\" --prefix-colors \"cyan,magenta\" \"pnpm --filter @reporank/api dev\" \"pnpm --filter @reporank/web dev\"",
     "build": "turbo build",
     "lint": "turbo lint",
     "test": "turbo test",
     "clean": "turbo clean",
     "db:generate": "pnpm --filter @reporank/api db:generate",
     "db:push": "pnpm --filter @reporank/api db:push",
-    "db:migrate": "pnpm --filter @reporank/api db:migrate"
+    "db:migrate": "pnpm --filter @reporank/api db:migrate",
+    "db:setup": "pnpm db:generate && pnpm db:push"
   },
   "devDependencies": {
     "@vitest/coverage-v8": "^3.1.0",
+    "concurrently": "^10.0.3",
     "prettier": "^3.5.0",
     "turbo": "^2.5.0",
     "typescript": "^5.8.0"

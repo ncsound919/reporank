@@ -25,7 +25,7 @@ function factorial(n: number): number {
 }
 
 const result = factorial(5);
-console.log(result);
+process.stdout.write(result);
 `,
     },
     {

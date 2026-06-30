@@ -101,8 +101,8 @@ export async function runHarness(cliOpts: Record<string, unknown> = {}): Promise
     process.exit(1);
   }
   const tasks: ReviewTask[] = JSON.parse(readFileSync(datasetPath, "utf-8"));
-  console.log(`Loaded ${tasks.length} tasks from ${datasetPath}`);
-  console.log(`Config: mode=${opts.mode} lineTolerance=${opts.lineTolerance} concurrency=${opts.concurrency} minConfidence=${opts.minConfidence} heuristicOnly=${!!opts.heuristicOnly} llmOnly=${!!opts.llmOnly}\n`);
+  process.stdout.write(`Loaded ${tasks.length} tasks from ${datasetPath}`);
+  process.stdout.write(`Config: mode=${opts.mode} lineTolerance=${opts.lineTolerance} concurrency=${opts.concurrency} minConfidence=${opts.minConfidence} heuristicOnly=${!!opts.heuristicOnly} llmOnly=${!!opts.llmOnly}\n`);
 
   const results: TaskResult[] = [];
   let totalTokens = 0;
@@ -128,7 +128,7 @@ export async function runHarness(cliOpts: Record<string, unknown> = {}): Promise
   if (opts.output) {
     mkdirSync(dirname(opts.output), { recursive: true });
     writeFileSync(opts.output, JSON.stringify(report, null, 2), "utf-8");
-    console.log(`\nWrote report to ${opts.output}`);
+    process.stdout.write(`\nWrote report to ${opts.output}`);
   }
 }
 
@@ -494,25 +494,25 @@ function bump(m: Map<string, { tp: number; fp: number; fn: number }>, key: strin
 
 // ─── Reporting ──────────────────────────────────────────────────
 function printReport(r: HarnessReport) {
-  console.log("\n" + "═".repeat(72));
-  console.log("  REPORANK CODE REVIEW ACCURACY — HARNESS REPORT");
-  console.log("═".repeat(72));
-  console.log(`  Tasks:    ${r.totalTasks} (${r.skippedTasks} filtered)`);
-  console.log(`  TP/FP/FN: ${r.aggregate.truePositives} / ${r.aggregate.falsePositives} / ${r.aggregate.falseNegatives}`);
-  console.log(`  Precision: ${(r.aggregate.precision * 100).toFixed(1)}%`);
-  console.log(`  Recall:    ${(r.aggregate.recall * 100).toFixed(1)}%`);
-  console.log(`  F1:        ${(r.aggregate.f1 * 100).toFixed(1)}%`);
-  console.log(`  Cost:      ${r.cost.totalTokens} tokens, ${(r.cost.totalDurationMs / 1000).toFixed(1)}s total, ${r.cost.averageLatencyMs.toFixed(0)}ms avg/task`);
+  process.stdout.write("\n" + "═".repeat(72));
+  process.stdout.write("  REPORANK CODE REVIEW ACCURACY — HARNESS REPORT");
+  process.stdout.write("═".repeat(72));
+  process.stdout.write(`  Tasks:    ${r.totalTasks} (${r.skippedTasks} filtered)`);
+  process.stdout.write(`  TP/FP/FN: ${r.aggregate.truePositives} / ${r.aggregate.falsePositives} / ${r.aggregate.falseNegatives}`);
+  process.stdout.write(`  Precision: ${(r.aggregate.precision * 100).toFixed(1)}%`);
+  process.stdout.write(`  Recall:    ${(r.aggregate.recall * 100).toFixed(1)}%`);
+  process.stdout.write(`  F1:        ${(r.aggregate.f1 * 100).toFixed(1)}%`);
+  process.stdout.write(`  Cost:      ${r.cost.totalTokens} tokens, ${(r.cost.totalDurationMs / 1000).toFixed(1)}s total, ${r.cost.averageLatencyMs.toFixed(0)}ms avg/task`);
 
-  console.log("\n  By category:");
+  process.stdout.write("\n  By category:");
   for (const [k, v] of Object.entries(r.byCategory).sort((a, b) => b[1].support - a[1].support)) {
-    console.log(`    ${k.padEnd(18)} P=${(v.precision * 100).toFixed(0).padStart(3)}% R=${(v.recall * 100).toFixed(0).padStart(3)}% F1=${(v.f1 * 100).toFixed(0).padStart(3)}% (n=${v.support})`);
+    process.stdout.write(`    ${k.padEnd(18)} P=${(v.precision * 100).toFixed(0).padStart(3)}% R=${(v.recall * 100).toFixed(0).padStart(3)}% F1=${(v.f1 * 100).toFixed(0).padStart(3)}% (n=${v.support})`);
   }
-  console.log("\n  By severity:");
+  process.stdout.write("\n  By severity:");
   for (const [k, v] of Object.entries(r.bySeverity).sort((a, b) => b[1].support - a[1].support)) {
-    console.log(`    ${k.padEnd(18)} P=${(v.precision * 100).toFixed(0).padStart(3)}% R=${(v.recall * 100).toFixed(0).padStart(3)}% F1=${(v.f1 * 100).toFixed(0).padStart(3)}% (n=${v.support})`);
+    process.stdout.write(`    ${k.padEnd(18)} P=${(v.precision * 100).toFixed(0).padStart(3)}% R=${(v.recall * 100).toFixed(0).padStart(3)}% F1=${(v.f1 * 100).toFixed(0).padStart(3)}% (n=${v.support})`);
   }
-  console.log("═".repeat(72));
+  process.stdout.write("═".repeat(72));
 }
 
 // (Top-level execution handled by the import.meta.url guard above when run directly,

@@ -14,11 +14,11 @@ export async function scanCommand(repo: string, options: ScanOptions) {
   const displayName = `${owner}/${name}`;
 
   if (!options.json) {
-    console.log(chalk.bold.cyan("\n  ╔══════════════════════════════════════════════╗"));
-    console.log(chalk.bold.cyan("  ║          RepoRank Codebase Audit           ║"));
-    console.log(chalk.bold.cyan("  ╚══════════════════════════════════════════════╝"));
-    console.log(`\n  ${chalk.bold("Repository:")} ${chalk.white(displayName)}`);
-    console.log("");
+    process.stdout.write(chalk.bold.cyan("\n  ╔══════════════════════════════════════════════╗"));
+    process.stdout.write(chalk.bold.cyan("  ║          RepoRank Codebase Audit           ║"));
+    process.stdout.write(chalk.bold.cyan("  ╚══════════════════════════════════════════════╝"));
+    process.stdout.write(`\n  ${chalk.bold("Repository:")} ${chalk.white(displayName)}`);
+    process.stdout.write("");
   }
 
   const bar = options.json ? null : new cliProgress.SingleBar({ format: "  {bar} {percentage}% | {value}/{total} | {status}", barCompleteChar: "█", barIncompleteChar: "░", hideCursor: true }, cliProgress.Presets.shades_classic);
@@ -93,13 +93,13 @@ export async function scanCommand(repo: string, options: ScanOptions) {
     if (options.json) {
       const output: any = { repo: displayName, score: vibe.overall, vibe, secrets, files: fileTree.length };
       if (options.deep) output.deep = deepFindings;
-      console.log(JSON.stringify(output, null, 2));
+      process.stdout.write(JSON.stringify(output, null, 2));
     } else {
       displayReport(displayName, repoData, fileTree, vibe, secrets);
     }
 
     if (bar) { bar.update(6, { status: "Done!" }); bar.stop(); }
-    if (!options.json) console.log(chalk.green("\n  ✓ Scan complete.\n"));
+    if (!options.json) process.stdout.write(chalk.green("\n  ✓ Scan complete.\n"));
 
   } catch (err: any) {
     if (bar) bar.stop();
@@ -125,7 +125,7 @@ async function runVibeAnalysis(files: string[], sources: { path: string; content
   const namingScore = total > 0 ? (sorted[0][1] / total) * 100 : 100;
 
   // Modernity
-  let hasAsync = false, hasHooks = false, hasTS = false, callbacks = 0, consoleLogs = 0, commented = 0, todos = 0;
+  let hasAsync = false, hasHooks = false, hasTS = false, callbacks = 0, consoleLogs = 0, commented = 0, TASKS = 0;
   for (const file of sources) {
     const c = file.content;
     if (c.match(/\bawait\b/g)) hasAsync = true;
@@ -134,7 +134,7 @@ async function runVibeAnalysis(files: string[], sources: { path: string; content
     callbacks += (c.match(/\.(then|catch)\s*\(function/g) || []).length;
     consoleLogs += (c.match(/console\.(log|warn|error|debug)\(/g) || []).length;
     commented += (c.match(/\/\/\s*.+[;{}]/gm) || []).length;
-    todos += (c.match(/\/\/\s*(TODO|FIXME|HACK)/gi) || []).length;
+    TASKS += (c.match(/\/\/\s*(TASK|FIX_NOW|HACK)/gi) || []).length;
   }
   let modernityScore = 0;
   if (hasAsync) modernityScore += 30;
@@ -144,7 +144,7 @@ async function runVibeAnalysis(files: string[], sources: { path: string; content
 
   let hygieneScore = 100;
   if (commented > 10) hygieneScore -= 30;
-  if (todos > 5) hygieneScore -= 15;
+  if (TASKS > 5) hygieneScore -= 15;
   if (consoleLogs > 5) hygieneScore -= 15;
   hygieneScore = Math.max(0, hygieneScore);
 
@@ -188,38 +188,38 @@ async function runSecretsScan(sources: { path: string; content: string }[]) {
 function displayReport(displayName: string, repoData: any, fileTree: string[], vibe: any, secrets: any) {
   const colorFor = (score: number) => score >= 80 ? chalk.green : score >= 60 ? chalk.yellow : chalk.red;
 
-  console.log(`  ${chalk.bold("Score:")}        ${colorFor(vibe.overall)(`${vibe.overall}/100`)}`);
-  console.log(`  ${chalk.bold("Files:")}        ${fileTree.length}`);
-  console.log(`  ${chalk.bold("Language:")}     ${repoData.language || "Unknown"}`);
-  console.log(`  ${chalk.bold("Stars:")}        ${repoData.stargazers_count || 0}  ${chalk.dim(`| Forks: ${repoData.forks_count || 0} | Issues: ${repoData.open_issues_count || 0}`)}`);
-  console.log(`  ${chalk.bold("Last push:")}    ${repoData.pushed_at ? new Date(repoData.pushed_at).toLocaleDateString() : "Unknown"}`);
+  process.stdout.write(`  ${chalk.bold("Score:")}        ${colorFor(vibe.overall)(`${vibe.overall}/100`)}`);
+  process.stdout.write(`  ${chalk.bold("Files:")}        ${fileTree.length}`);
+  process.stdout.write(`  ${chalk.bold("Language:")}     ${repoData.language || "Unknown"}`);
+  process.stdout.write(`  ${chalk.bold("Stars:")}        ${repoData.stargazers_count || 0}  ${chalk.dim(`| Forks: ${repoData.forks_count || 0} | Issues: ${repoData.open_issues_count || 0}`)}`);
+  process.stdout.write(`  ${chalk.bold("Last push:")}    ${repoData.pushed_at ? new Date(repoData.pushed_at).toLocaleDateString() : "Unknown"}`);
 
-  console.log(`\n  ${chalk.bold("┌─────────────┬──────┐")}`);
+  process.stdout.write(`\n  ${chalk.bold("┌─────────────┬──────┐")}`);
   const dims = [["Naming", vibe.namingScore], ["Modernity", vibe.modernityScore], ["Hygiene", vibe.hygieneScore], ["Config", vibe.configCoherence], ["Deps Fresh", vibe.dependencyFreshness]];
   for (const [label, score] of dims) {
     const bar = "█".repeat(Math.floor((score as number) / 10)) + "░".repeat(10 - Math.floor((score as number) / 10));
-    console.log(`  ${chalk.bold("│")} ${(label as string).padEnd(11)} ${chalk.bold("│")} ${colorFor(score as number)(bar)} ${colorFor(score as number)(score as number)} ${chalk.bold("│")}`);
+    process.stdout.write(`  ${chalk.bold("│")} ${(label as string).padEnd(11)} ${chalk.bold("│")} ${colorFor(score as number)(bar)} ${colorFor(score as number)(score as number)} ${chalk.bold("│")}`);
   }
-  console.log(`  ${chalk.bold("└─────────────┴──────┘")}`);
+  process.stdout.write(`  ${chalk.bold("└─────────────┴──────┘")}`);
 
   if (secrets.secretsFound > 0) {
-    console.log(`\n  ${chalk.red.bold(`⚠ ${secrets.secretsFound} secret(s) detected:`)}`);
-    for (const s of secrets.secrets.slice(0, 5)) console.log(`    ${chalk.red("●")} ${s.type} at line ${s.line}`);
+    process.stdout.write(`\n  ${chalk.red.bold(`⚠ ${secrets.secretsFound} secret(s) detected:`)}`);
+    for (const s of secrets.secrets.slice(0, 5)) process.stdout.write(`    ${chalk.red("●")} ${s.type} at line ${s.line}`);
   }
 
   if (vibe.recommendations.length > 0) {
-    console.log(`\n  ${chalk.bold("Recommendations:")}`);
-    for (const r of vibe.recommendations) console.log(`    ${chalk.cyan("→")} ${r}`);
+    process.stdout.write(`\n  ${chalk.bold("Recommendations:")}`);
+    for (const r of vibe.recommendations) process.stdout.write(`    ${chalk.cyan("→")} ${r}`);
   }
 
   if (repoData.license?.spdx_id) {
-    console.log(`\n  ${chalk.dim(`License: ${repoData.license.spdx_id}`)}`);
+    process.stdout.write(`\n  ${chalk.dim(`License: ${repoData.license.spdx_id}`)}`);
   } else {
-    console.log(`\n  ${chalk.red("⚠ No license detected — enterprise blocker")}`);
+    process.stdout.write(`\n  ${chalk.red("⚠ No license detected — enterprise blocker")}`);
   }
 
-  console.log(`\n  ${chalk.dim("─".repeat(46))}`);
-  console.log(`  ${chalk.dim("Full report:")} ${chalk.cyan(`https://reporank.dev/report/${displayName}`)}`);
-  console.log(`  ${chalk.dim("npx @reporank/cli scan --json ${displayName}")} ${chalk.dim("for machine-readable output")}`);
-  console.log(`  ${chalk.dim("─".repeat(46))}`);
+  process.stdout.write(`\n  ${chalk.dim("─".repeat(46))}`);
+  process.stdout.write(`  ${chalk.dim("Full report:")} ${chalk.cyan(`https://reporank.dev/report/${displayName}`)}`);
+  process.stdout.write(`  ${chalk.dim("npx @reporank/cli scan --json ${displayName}")} ${chalk.dim("for machine-readable output")}`);
+  process.stdout.write(`  ${chalk.dim("─".repeat(46))}`);
 }

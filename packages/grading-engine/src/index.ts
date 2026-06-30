@@ -2,6 +2,12 @@ import { GoogleGenAI } from "@google/genai";
 import type { HealthReport } from "@reporank/shared-types";
 import { buildGradingPrompt } from "./promptBuilder";
 import { parseHealthReport } from "./responseParser";
+import type { ComplexityReport } from "./analyzers/complexity";
+import type { DependencyReport } from "./analyzers/dependency-health";
+import type { ArchitectureReport } from "./analyzers/architecture";
+import type { ProductionReport } from "./analyzers/production";
+import type { CodeHygieneReport } from "./analyzers/code-hygiene";
+import type { EnterpriseReport } from "./analyzers/enterprise";
 
 export interface GradeInput {
   repoUrl: string; repoName: string; repoOwner: string;
@@ -11,7 +17,19 @@ export interface GradeInput {
   fileTree: string[]; sourceFiles: { path: string; content: string }[];
 }
 
-export interface ScannerResults { [key: string]: unknown }
+export interface ScannerResults {
+  complexity?: ComplexityReport;
+  dependencies?: DependencyReport;
+  architecture?: ArchitectureReport;
+  production?: ProductionReport;
+  codeHygiene?: CodeHygieneReport;
+  enterprise?: EnterpriseReport;
+  worstFiles?: { path: string; score: number; reasons: string[] }[];
+  topRecommendations?: string[];
+  rawPromptBlock?: string;
+  perFile?: Record<string, unknown>;
+  [key: string]: unknown;
+}
 
 export class GradingService {
   private ai: GoogleGenAI;
@@ -111,3 +129,25 @@ export {
   type BenchmarkEntry,
   type CalibrationResult,
 } from "./analyzers/benchmark";
+export {
+  parseQualityProfile,
+  parseIssueReport,
+  parseQualityGate,
+  mapProfileToRepoRank,
+  mapIssuesToRepoRank,
+  mapQualityGateToThresholds,
+  generateMigrationReport,
+  generateRepoRankConfig,
+  type SonarQubeSeverity,
+  type RepoRankCategory,
+  type SonarQubeRule,
+  type SonarQubeProfile,
+  type SonarQubeIssue,
+  type SonarQubeIssueReport,
+  type SonarQubeQualityGateCondition,
+  type SonarQubeQualityGate,
+  type RepoRankRuleMapping,
+  type RepoRankIssueMapping,
+  type RepoRankThresholdConfig,
+  type MigrationReport,
+} from "./importers/sonarqube";

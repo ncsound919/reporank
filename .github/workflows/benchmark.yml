@@ -1,5 +1,9 @@
 name: Benchmark
 
+permissions:
+  contents: read
+  actions: read
+
 on:
   schedule:
     - cron: '0 6 * * 1'  # Every Monday at 6am UTC
@@ -15,6 +19,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: step-security/harden-runner@v2
+        with:
+          egress-policy: audit
+          disable-telemetry: true
       - uses: pnpm/action-setup@v4
         with:
           version: 10.8.0
@@ -23,6 +31,11 @@ jobs:
           node-version: 22
           cache: 'pnpm'
       - run: pnpm install
+      - name: Build
+        run: npx turbo run build --cache-dir=.turbo
+        env:
+          TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
+          TURBO_TEAM: ${{ vars.TURBO_TEAM }}
 
       - name: Comprehensive deterministic benchmark
         run: npx tsx comprehensive-benchmark.mjs

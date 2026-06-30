@@ -4,6 +4,8 @@
  */
 import { existsSync, readFileSync } from "node:fs";
 import { join, dirname } from "node:path";
+import { checkStructuredLogging, checkHealthEndpoint, checkHardcodedUrls } from "./shared_checks";
+import { countPatterns } from "./pattern-utils";
 
 // ─── 1. API Contract & Consistency ─────────────────────────────────────
 export interface ApiContractFinding {
@@ -112,8 +114,7 @@ export function analyzeObservability(sourceFiles: { path: string; content: strin
   const allContent = sourceFiles.map(f => f.content).join("\n");
 
   // Structured logging
-  const hasStructuredLogger = allContent.includes("pino") || allContent.includes("winston") || allContent.includes("bunyan") || allContent.includes("log4j");
-  const consoleLogCount = (allContent.match(/console\.(log|warn|error|debug|info)\(/g) || []).length;
+  const { hasStructuredLogger, consoleLogCount } = checkStructuredLogging(sourceFiles);
 
   if (!hasStructuredLogger) {
     findings.push({
@@ -134,10 +135,15 @@ export function analyzeObservability(sourceFiles: { path: string; content: strin
   }
 
   // Health check detail
-  const healthCheckFiles = sourceFiles.filter(f => f.content.includes("/health") || f.content.includes("healthcheck") || f.content.includes("healthCheck"));
+  const hasHealthEndpoint = checkHealthEndpoint(sourceFiles);
+  const healthCheckFiles = sourceFiles.filter(f =>
+    /\/(health|healthz|ready)\b/.test(f.content)
+    || f.content.includes("healthcheck")
+    || f.content.includes("healthCheck")
+  );
   const hasDetailedHealthCheck = healthCheckFiles.some(f => f.content.includes("db") || f.content.includes("database") || f.content.includes("redis") || f.content.includes("status"));
 
-  if (healthCheckFiles.length > 0 && !hasDetailedHealthCheck) {
+  if (hasHealthEndpoint && healthCheckFiles.length > 0 && !hasDetailedHealthCheck) {
     findings.push({
       type: "no-health-check-detail", filePath: healthCheckFiles[0].path, severity: "medium",
       detail: "Health check exists but returns only status+timestamp — no dependency health",
@@ -444,35 +450,26 @@ export function analyzeLongTermDebt(sourceFiles: { path: string; content: string
   ];
 
   for (const { pattern, name, severity, note } of legacyPatterns) {
-    const matches = allContent.match(pattern);
-    if (matches && matches.length > 5) {
+    const matchCount = countPatterns(allContent, pattern);
+    if (matchCount > 5) {
       findings.push({
         type: "legacy-pattern", filePath: "multiple files", severity,
-        detail: `${matches.length} uses of ${name} detected`,
+        detail: `${matchCount} uses of ${name} detected`,
         seniorNote: `${note}. These accumulate as 'pattern debt' that makes onboarding harder.`,
       });
       const deduction = severity === "high" ? 8 : 4;
-      score -= Math.min(deduction, matches.length);
+      score -= Math.min(deduction, matchCount);
     }
   }
 
   // Hardcoded configuration
-  const hardcodedPatterns = [
-    { match: /localhost:\d+/g, label: "hardcoded localhost URLs", sev: "medium" as const },
-    { match: /['"]https?:\/\/[^'"{}]+\.[a-z]+['"]/g, label: "hardcoded external URLs", sev: "medium" as const },
-    { match: /port\s*=\s*\d{4,5}/g, label: "hardcoded port numbers", sev: "low" as const },
-  ];
-
-  for (const { match, label, sev } of hardcodedPatterns) {
-    const hits = allContent.match(match);
-    if (hits && hits.length > 2) {
-      findings.push({
-        type: "hardcoded-config", filePath: "multiple files", severity: sev,
-        detail: `${hits.length} instances of ${label}`,
-        seniorNote: "Hardcoded configs prevent different environments (dev/staging/prod). Extract to env vars or config files.",
-      });
-      score -= 5;
-    }
+  for (const hit of checkHardcodedUrls(allContent)) {
+    findings.push({
+      type: "hardcoded-config", filePath: "multiple files", severity: "medium" as const,
+      detail: hit,
+      seniorNote: "Hardcoded configs prevent different environments (dev/staging/prod). Extract to env vars or config files.",
+    });
+    score -= 5;
   }
 
   // Framework lock-in

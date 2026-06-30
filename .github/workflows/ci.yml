@@ -1,5 +1,9 @@
 name: CI
 
+permissions:
+  contents: read
+  actions: read
+
 on:
   push:
     branches: [master]
@@ -35,6 +39,10 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+      - uses: step-security/harden-runner@v2
+        with:
+          egress-policy: audit
+          disable-telemetry: true
 
       - uses: pnpm/action-setup@v4
         with:
@@ -47,14 +55,27 @@ jobs:
 
       - run: pnpm install
 
-      - run: pnpm build
+      - name: pnpm audit
+        run: pnpm audit --audit-level=high
+
+      - name: Build
+        run: npx turbo run build --cache-dir=.turbo
+        env:
+          TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
+          TURBO_TEAM: ${{ vars.TURBO_TEAM }}
 
       - name: Run deterministic benchmarks
         run: npx tsx comprehensive-benchmark.mjs 2>&1 | tail -20
 
-      - run: pnpm --filter @reporank/grading-engine test
+      - name: Test grading engine
+        run: npx turbo run test --filter=@reporank/grading-engine --cache-dir=.turbo
         env:
+          TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
+          TURBO_TEAM: ${{ vars.TURBO_TEAM }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+
+      - name: Pipeline security tests
+        run: npx vitest run tests/pipeline-security/
 
       - name: Push database schema
         run: pnpm --filter @reporank/api db:push
@@ -63,3 +84,9 @@ jobs:
           REDIS_URL: redis://localhost:6379
           JWT_SECRET: ci-test-secret
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+
+      - uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          directory: packages/
+          fail_ci_if_error: false

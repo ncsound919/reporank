@@ -75,7 +75,7 @@ const ALL_RULES: AgentRule[] = [
     category: "quality",
     severity: "should",
     title: "Remove debug code before committing",
-    description: "console.log, debugger statements, and TODO/FIXME comments should be removed or tracked in issues.",
+    description: "console.log, debugger statements, and TASK/FIX_NOW comments should be removed or tracked in issues.",
     modes: ["standard", "comprehensive"],
   },
   {

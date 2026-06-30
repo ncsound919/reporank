@@ -1,3 +1,5 @@
+import { checkHealthEndpoint, checkStructuredLogging } from "./shared_checks";
+
 export interface ProductionFinding {
   type: "missing-env" | "missing-healthcheck" | "unhandled-rejection" | "missing-timeout" | "sync-blocking" | "no-backpressure" | "config-exposure" | "no-graceful-shutdown" | "insufficient-logging";
   filePath: string;
@@ -113,7 +115,7 @@ export function analyzeProductionReadiness(
   }
 
   // 6. Check for health check endpoint
-  const hasHealthCheck = sourceFiles.some(f => f.content.includes("/health") || f.content.includes("healthcheck") || f.content.includes("healthCheck"));
+  const hasHealthCheck = checkHealthEndpoint(sourceFiles);
   if (!hasHealthCheck) {
     findings.push({
       type: "missing-healthcheck", filePath: "app.ts / server.ts", severity: "high",
@@ -123,8 +125,8 @@ export function analyzeProductionReadiness(
   }
 
   // 7. Check for logging quality
+  const { hasStructuredLogger: hasStructuredLogging, consoleLogCount } = checkStructuredLogging(sourceFiles);
   const loggers = sourceFiles.filter(f => f.content.includes("console.log") || f.content.includes("console.error"));
-  const hasStructuredLogging = sourceFiles.some(f => f.content.includes("pino") || f.content.includes("winston") || f.content.includes("bunyan"));
   if (!hasStructuredLogging && loggers.length > 5) {
     findings.push({
       type: "insufficient-logging", filePath: "multiple files", severity: "low",

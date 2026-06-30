@@ -1,0 +1,1484 @@
+{
+  "C:\\Users\\User\\Desktop\\Coding Trio\\reporank\\apps\\cli\\src\\agents.ts": {
+    "hash": "5a9dac3f6e5825d718879fec2b6ff6bf7b0b1ccb4d30e6440bf8701a9c029207",
+    "findings": [
+      {
+        "category": "quality",
+        "severity": "medium",
+        "line": 32,
+        "type": "any-type-abuse",
+        "description": "Use of `any` defeats TypeScript type safety",
+        "recommendation": "Replace with proper types, generics, or `unknown` for values that need narrowing",
+        "confidence": 0.85,
+        "path": "agents.ts"
+      },
+      {
+        "category": "performance",
+        "severity": "high",
+        "line": 20,
+        "type": "blocking-event-loop",
+        "description": "Synchronous I/O blocks the event loop in async contexts",
+        "recommendation": "Use the async variant (readFile, writeFile, exec) in request handlers",
+        "confidence": 0.6,
+        "path": "agents.ts"
+      },
+      {
+        "category": "quality",
+        "severity": "low",
+        "line": 91,
+        "type": "debug-code",
+        "description": "console.log/debug statements should be removed from production code",
+        "recommendation": "Use a proper logger (pino, winston, structlog) with appropriate log levels",
+        "confidence": 0.5,
+        "path": "agents.ts"
+      },
+      {
+        "category": "maintainability",
+        "severity": "low",
+        "line": 1,
+        "type": "deep-nesting",
+        "description": "Six or more levels of indentation — readability hit",
+        "recommendation": "Use early returns (guard clauses) or extract nested logic into named functions",
+        "confidence": 0.5,
+        "path": "agents.ts"
+      },
+      {
+        "category": "maintainability",
+        "severity": "medium",
+        "line": 9,
+        "type": "long-function",
+        "description": "Function body exceeds ~50 lines — likely doing too much",
+        "recommendation": "Extract cohesive blocks into named helpers; aim for ≤30 lines per function",
+        "confidence": 0.3,
+        "path": "agents.ts"
+      },
+      {
+        "category": "maintainability",
+        "severity": "low",
+        "line": 9,
+        "type": "missing-test-coverage",
+        "description": "Exported function with no obvious test file reference",
+        "recommendation": "Add a test file (e.g. foo.test.ts) covering the happy path and key edge cases",
+        "confidence": 0.2,
+        "path": "agents.ts"
+      }
+    ],
+    "timestamp": 1781024531723
+  },
+  "C:\\Users\\User\\Desktop\\Coding Trio\\reporank\\apps\\cli\\src\\bulk-scanner.ts": {
+    "hash": "defdcc28187737bd87290ec15e7f5a553ad09f2e3e6b42935a6b287fff40124c",
+    "findings": [
+      {
+        "category": "security",
+        "severity": "critical",
+        "line": 10,
+        "type": "code-injection",
+        "description": "eval() executes arbitrary code from a string",
+        "recommendation": "Replace with a safe parser; if dynamic evaluation is required, use a sandboxed VM",
+        "confidence": 0.99,
+        "path": "bulk-scanner.ts"
+      },
+      {
+        "category": "quality",
+        "severity": "medium",
+        "line": 236,
+        "type": "any-type-abuse",
+        "description": "Use of `any` defeats TypeScript type safety",
+        "recommendation": "Replace with proper types, generics, or `unknown` for values that need narrowing",
+        "confidence": 0.85,
+        "path": "bulk-scanner.ts"
+      },
+      {
+        "category": "performance",
+        "severity": "high",
+        "line": 110,
+        "type": "blocking-event-loop",
+        "description": "Synchronous I/O blocks the event loop in async contexts",
+        "recommendation": "Use the async variant (readFile, writeFile, exec) in request handlers",
+        "confidence": 0.6,
+        "path": "bulk-scanner.ts"
+      },
+      {
+        "category": "quality",
+        "severity": "high",
+        "line": 282,
+        "type": "no-error-handling",
+        "description": "await used without try/catch — unhandled rejection will crash the process",
+        "recommendation": "Wrap awaits in try/catch, log the error, and handle failures gracefully",
+        "confidence": 0.6,
+        "path": "bulk-scanner.ts"
+      },
+      {
+        "category": "maintainability",
+        "severity": "low",
+        "line": 1,
+        "type": "deep-nesting",
+        "description": "Six or more levels of indentation — readability hit",
+        "recommendation": "Use early returns (guard clauses) or extract nested logic into named functions",
+        "confidence": 0.5,
+        "path": "bulk-scanner.ts"
+      },
+      {
+        "category": "maintainability",
+        "severity": "medium",
+        "line": 102,
+        "type": "long-function",
+        "description": "Function body exceeds ~50 lines — likely doing too much",
+        "recommendation": "Extract cohesive blocks into named helpers; aim for ≤30 lines per function",
+        "confidence": 0.3,
+        "path": "bulk-scanner.ts"
+      },
+      {
+        "category": "maintainability",
+        "severity": "low",
+        "line": 102,
+        "type": "missing-test-coverage",
+        "description": "Exported function with no obvious test file reference",
+        "recommendation": "Add a test file (e.g. foo.test.ts) covering the happy path and key edge cases",
+        "confidence": 0.2,
+        "path": "bulk-scanner.ts"
+      }
+    ],
+    "timestamp": 1781024531733
+  },
+  "C:\\Users\\User\\Desktop\\Coding Trio\\reporank\\apps\\cli\\src\\chunker.ts": {
+    "hash": "8b6bba9f1e75645632f3dfcd9b8b5add7adbe58b8d40d97391181892cecde93c",
+    "findings": [
+      {
+        "category": "security",
+        "severity": "critical",
+        "line": 7,
+        "type": "code-injection",
+        "description": "eval() executes arbitrary code from a string",
+        "recommendation": "Replace with a safe parser; if dynamic evaluation is required, use a sandboxed VM",
+        "confidence": 0.99,
+        "path": "chunker.ts"
+      },
+      {
+        "category": "maintainability",
+        "severity": "low",
+        "line": 1,
+        "type": "deep-nesting",
+        "description": "Six or more levels of indentation — readability hit",
+        "recommendation": "Use early returns (guard clauses) or extract nested logic into named functions",
+        "confidence": 0.5,
+        "path": "chunker.ts"
+      },
+      {
+        "category": "maintainability",
+        "severity": "medium",
+        "line": 20,
+        "type": "long-function",
+        "description": "Function body exceeds ~50 lines — likely doing too much",
+        "recommendation": "Extract cohesive blocks into named helpers; aim for ≤30 lines per function",
+        "confidence": 0.3,
+        "path": "chunker.ts"
+      },
+      {
+        "category": "maintainability",
+        "severity": "low",
+        "line": 20,
+        "type": "missing-test-coverage",
+        "description": "Exported function with no obvious test file reference",
+        "recommendation": "Add a test file (e.g. foo.test.ts) covering the happy path and key edge cases",
+        "confidence": 0.2,
+        "path": "chunker.ts"
+      }
+    ],
+    "timestamp": 1781024531734
+  },
+  "C:\\Users\\User\\Desktop\\Coding Trio\\reporank\\apps\\cli\\src\\codegen-benchmark.ts": {
+    "hash": "4025906d970f4fa3c98678d5063809d8eb18e42254891435227fbad6b371ea0c",
+    "findings": [
+      {
+        "category": "quality",
+        "severity": "medium",
+        "line": 503,
+        "type": "any-type-abuse",
+        "description": "Use of `any` defeats TypeScript type safety",
+        "recommendation": "Replace with proper types, generics, or `unknown` for values that need narrowing",
+        "confidence": 0.85,
+        "path": "codegen-benchmark.ts"
+      },
+      {
+        "category": "performance",
+        "severity": "high",
+        "line": 337,
+        "type": "blocking-event-loop",
+        "description": "Synchronous I/O blocks the event loop in async contexts",
+        "recommendation": "Use the async variant (readFile, writeFile, exec) in request handlers",
+        "confidence": 0.6,
+        "path": "codegen-benchmark.ts"
+      },
+      {
+        "category": "security",
+        "severity": "medium",
+        "line": 497,
+        "type": "prompt-injection",
+        "description": "Untrusted content interpolated directly into an LLM prompt",
+        "recommendation": "Wrap user content in a clear delimiter and instruct the model to ignore instructions within the content",
+        "confidence": 0.6,
+        "path": "codegen-benchmark.ts"
+      },
+      {
+        "category": "quality",
+        "severity": "high",
+        "line": 134,
+        "type": "no-error-handling",
+        "description": "await used without try/catch — unhandled rejection will crash the process",
+        "recommendation": "Wrap awaits in try/catch, log the error, and handle failures gracefully",
+        "confidence": 0.6,
+        "path": "codegen-benchmark.ts"
+      },
+      {
+        "category": "quality",
+        "severity": "low",
+        "line": 586,
+        "type": "debug-code",
+        "description": "console.log/debug statements should be removed from production code",
+        "recommendation": "Use a proper logger (pino, winston, structlog) with appropriate log levels",
+        "confidence": 0.5,
+        "path": "codegen-benchmark.ts"
+      },
+      {
+        "category": "maintainability",
+        "severity": "low",
+        "line": 1,
+        "type": "deep-nesting",
+        "description": "Six or more levels of indentation — readability hit",
+        "recommendation": "Use early returns (guard clauses) or extract nested logic into named functions",
+        "confidence": 0.5,
+        "path": "codegen-benchmark.ts"
+      },
+      {
+        "category": "quality",
+        "severity": "high",
+        "line": 591,
+        "type": "race-condition",
+        "description": "Read-modify-write on shared state with await in the middle — race condition",
+        "recommendation": "Use atomic operations, a mutex, or move the increment into a single non-interleaved expression",
+        "confidence": 0.45,
+        "path": "codegen-benchmark.ts"
+      }
+    ],
+    "timestamp": 1781024531769
+  },
+  "C:\\Users\\User\\Desktop\\Coding Trio\\reporank\\apps\\cli\\src\\deploy.ts": {
+    "hash": "bf8b8fa8af0a995abbb494dc453331ce259ceae2e36823ff91adcba1e9a33c76",
+    "findings": [
+      {
+        "category": "performance",
+        "severity": "high",
+        "line": 161,
+        "type": "blocking-event-loop",
+        "description": "Synchronous I/O blocks the event loop in async contexts",
+        "recommendation": "Use the async variant (readFile, writeFile, exec) in request handlers",
+        "confidence": 0.6,
+        "path": "deploy.ts"
+      },
+      {
+        "category": "quality",
+        "severity": "high",
+        "line": 10,
+        "type": "no-error-handling",
+        "description": "await used without try/catch — unhandled rejection will crash the process",
+        "recommendation": "Wrap awaits in try/catch, log the error, and handle failures gracefully",
+        "confidence": 0.6,
+        "path": "deploy.ts"
+      },
+      {
+        "category": "maintainability",
+        "severity": "low",
+        "line": 1,
+        "type": "deep-nesting",
+        "description": "Six or more levels of indentation — readability hit",
+        "recommendation": "Use early returns (guard clauses) or extract nested logic into named functions",
+        "confidence": 0.5,
+        "path": "deploy.ts"
+      },
+      {
+        "category": "maintainability",
+        "severity": "medium",
+        "line": 141,
+        "type": "long-function",
+        "description": "Function body exceeds ~50 lines — likely doing too much",
+        "recommendation": "Extract cohesive blocks into named helpers; aim for ≤30 lines per function",
+        "confidence": 0.3,
+        "path": "deploy.ts"
+      },
+      {
+        "category": "maintainability",
+        "severity": "low",
+        "line": 141,
+        "type": "missing-test-coverage",
+        "description": "Exported function with no obvious test file reference",
+        "recommendation": "Add a test file (e.g. foo.test.ts) covering the happy path and key edge cases",
+        "confidence": 0.2,
+        "path": "deploy.ts"
+      }
+    ],
+    "timestamp": 1781024531777
+  },
+  "C:\\Users\\User\\Desktop\\Coding Trio\\reporank\\apps\\cli\\src\\hallucination-detector.ts": {
+    "hash": "c5bac9a3a90d4cf9af9deb16cd69110f7ba882866857807e3cb2c46ce6003f01",
+    "findings": [
+      {
+        "category": "security",
+        "severity": "critical",
+        "line": 12,
+        "type": "code-injection",
+        "description": "eval() executes arbitrary code from a string",
+        "recommendation": "Replace with a safe parser; if dynamic evaluation is required, use a sandboxed VM",
+        "confidence": 0.99,
+        "path": "hallucination-detector.ts"
+      },
+      {
+        "category": "performance",
+        "severity": "high",
+        "line": 206,
+        "type": "blocking-event-loop",
+        "description": "Synchronous I/O blocks the event loop in async contexts",
+        "recommendation": "Use the async variant (readFile, writeFile, exec) in request handlers",
+        "confidence": 0.6,
+        "path": "hallucination-detector.ts"
+      },
+      {
+        "category": "security",
+        "severity": "high",
+        "line": 210,
+        "type": "prototype-pollution",
+        "description": "Recursive merge over Object.keys may allow prototype pollution",
+        "recommendation": "Guard against __proto__, constructor, prototype keys; use Object.create(null) or structuredClone",
+        "confidence": 0.5,
+        "path": "hallucination-detector.ts"
+      },
+      {
+        "category": "maintainability",
+        "severity": "low",
+        "line": 1,
+        "type": "deep-nesting",
+        "description": "Six or more levels of indentation — readability hit",
+        "recommendation": "Use early returns (guard clauses) or extract nested logic into named functions",
+        "confidence": 0.5,
+        "path": "hallucination-detector.ts"
+      },
+      {
+        "category": "maintainability",
+        "severity": "medium",
+        "line": 110,
+        "type": "long-function",
+        "description": "Function body exceeds ~50 lines — likely doing too much",
+        "recommendation": "Extract cohesive blocks into named helpers; aim for ≤30 lines per function",
+        "confidence": 0.3,
+        "path": "hallucination-detector.ts"
+      },
+      {
+        "category": "maintainability",
+        "severity": "low",
+        "line": 110,
+        "type": "missing-test-coverage",
+        "description": "Exported function with no obvious test file reference",
+        "recommendation": "Add a test file (e.g. foo.test.ts) covering the happy path and key edge cases",
+        "confidence": 0.2,
+        "path": "hallucination-detector.ts"
+      }
+    ],
+    "timestamp": 1781024531819
+  },
+  "C:\\Users\\User\\Desktop\\Coding Trio\\reporank\\apps\\cli\\src\\harness.ts": {
+    "hash": "057c61e2934b97d727be7b6bfa9b582555628d71fb6d02da8f561419f1e41ba4",
+    "findings": [
+      {
+        "category": "security",
+        "severity": "critical",
+        "line": 10,
+        "type": "code-injection",
+        "description": "eval() executes arbitrary code from a string",
+        "recommendation": "Replace with a safe parser; if dynamic evaluation is required, use a sandboxed VM",
+        "confidence": 0.99,
+        "path": "harness.ts"
+      },
+      {
+        "category": "performance",
+        "severity": "high",
+        "line": 103,
+        "type": "blocking-event-loop",
+        "description": "Synchronous I/O blocks the event loop in async contexts",
+        "recommendation": "Use the async variant (readFile, writeFile, exec) in request handlers",
+        "confidence": 0.6,
+        "path": "harness.ts"
+      },
+      {
+        "category": "quality",
+        "severity": "high",
+        "line": 117,
+        "type": "no-error-handling",
+        "description": "await used without try/catch — unhandled rejection will crash the process",
+        "recommendation": "Wrap awaits in try/catch, log the error, and handle failures gracefully",
+        "confidence": 0.6,
+        "path": "harness.ts"
+      },
+      {
+        "category": "quality",
+        "severity": "low",
+        "line": 104,
+        "type": "debug-code",
+        "description": "console.log/debug statements should be removed from production code",
+        "recommendation": "Use a proper logger (pino, winston, structlog) with appropriate log levels",
+        "confidence": 0.5,
+        "path": "harness.ts"
+      },
+      {
+        "category": "maintainability",
+        "severity": "low",
+        "line": 1,
+        "type": "deep-nesting",
+        "description": "Six or more levels of indentation — readability hit",
+        "recommendation": "Use early returns (guard clauses) or extract nested logic into named functions",
+        "confidence": 0.5,
+        "path": "harness.ts"
+      },
+      {
+        "category": "maintainability",
+        "severity": "medium",
+        "line": 95,
+        "type": "long-function",
+        "description": "Function body exceeds ~50 lines — likely doing too much",
+        "recommendation": "Extract cohesive blocks into named helpers; aim for ≤30 lines per function",
+        "confidence": 0.3,
+        "path": "harness.ts"
+      },
+      {
+        "category": "maintainability",
+        "severity": "low",
+        "line": 95,
+        "type": "missing-test-coverage",
+        "description": "Exported function with no obvious test file reference",
+        "recommendation": "Add a test file (e.g. foo.test.ts) covering the happy path and key edge cases",
+        "confidence": 0.2,
+        "path": "harness.ts"
+      }
+    ],
+    "timestamp": 1781024531859
+  },
+  "C:\\Users\\User\\Desktop\\Coding Trio\\reporank\\apps\\cli\\src\\heuristic_scanner.ts": {
+    "hash": "c44154c0bd9212ac5e65452dac4c7b9541fabc382c63b8cd2f2492dfb67363bb",
+    "findings": [
+      {
+        "category": "security",
+        "severity": "critical",
+        "line": 7,
+        "type": "code-injection",
+        "description": "eval() executes arbitrary code from a string",
+        "recommendation": "Replace with a safe parser; if dynamic evaluation is required, use a sandboxed VM",
+        "confidence": 0.99,
+        "path": "heuristic_scanner.ts"
+      },
+      {
+        "category": "security",
+        "severity": "critical",
+        "line": 353,
+        "type": "xss",
+        "description": "dangerouslySetInnerHTML used — unsanitized content enables XSS",
+        "recommendation": "Use a sanitizer like DOMPurify, or prefer React's built-in JSX rendering which auto-escapes",
+        "confidence": 0.85,
+        "path": "heuristic_scanner.ts"
+      },
+      {
+        "category": "quality",
+        "severity": "high",
+        "line": 272,
+        "type": "no-error-handling",
+        "description": "await used without try/catch — unhandled rejection will crash the process",
+        "recommendation": "Wrap awaits in try/catch, log the error, and handle failures gracefully",
+        "confidence": 0.6,
+        "path": "heuristic_scanner.ts"
+      },
+      {
+        "category": "maintainability",
+        "severity": "low",
+        "line": 1,
+        "type": "deep-nesting",
+        "description": "Six or more levels of indentation — readability hit",
+        "recommendation": "Use early returns (guard clauses) or extract nested logic into named functions",
+        "confidence": 0.5,
+        "path": "heuristic_scanner.ts"
+      },
+      {
+        "category": "maintainability",
+        "severity": "medium",
+        "line": 382,
+        "type": "long-function",
+        "description": "Function body exceeds ~50 lines — likely doing too much",
+        "recommendation": "Extract cohesive blocks into named helpers; aim for ≤30 lines per function",
+        "confidence": 0.3,
+        "path": "heuristic_scanner.ts"
+      },
+      {
+        "category": "maintainability",
+        "severity": "low",
+        "line": 382,
+        "type": "missing-test-coverage",
+        "description": "Exported function with no obvious test file reference",
+        "recommendation": "Add a test file (e.g. foo.test.ts) covering the happy path and key edge cases",
+        "confidence": 0.2,
+        "path": "heuristic_scanner.ts"
+      }
+    ],
+    "timestamp": 1781024531895
+  },
+  "C:\\Users\\User\\Desktop\\Coding Trio\\reporank\\apps\\cli\\src\\index.ts": {
+    "hash": "aec84c43373a11d66c166d08123f4c1832765fc8c45d401f420b678b77325fb6",
+    "findings": [
+      {
+        "category": "quality",
+        "severity": "medium",
+        "line": 36,
+        "type": "any-type-abuse",
+        "description": "Use of `any` defeats TypeScript type safety",
+        "recommendation": "Replace with proper types, generics, or `unknown` for values that need narrowing",
+        "confidence": 0.85,
+        "path": "index.ts"
+      },
+      {
+        "category": "quality",
+        "severity": "high",
+        "line": 71,
+        "type": "no-error-handling",
+        "description": "await used without try/catch — unhandled rejection will crash the process",
+        "recommendation": "Wrap awaits in try/catch, log the error, and handle failures gracefully",
+        "confidence": 0.6,
+        "path": "index.ts"
+      },
+      {
+        "category": "quality",
+        "severity": "low",
+        "line": 77,
+        "type": "debug-code",
+        "description": "console.log/debug statements should be removed from production code",
+        "recommendation": "Use a proper logger (pino, winston, structlog) with appropriate log levels",
+        "confidence": 0.5,
+        "path": "index.ts"
+      },
+      {
+        "category": "maintainability",
+        "severity": "low",
+        "line": 1,
+        "type": "deep-nesting",
+        "description": "Six or more levels of indentation — readability hit",
+        "recommendation": "Use early returns (guard clauses) or extract nested logic into named functions",
+        "confidence": 0.5,
+        "path": "index.ts"
+      }
+    ],
+    "timestamp": 1781024531931
+  },
+  "C:\\Users\\User\\Desktop\\Coding Trio\\reporank\\apps\\cli\\src\\instructions.ts": {
+    "hash": "251fd75ae1cddf91fc4bd8028835b559e79ad72a94ca7e5db6c5fcd6aa32aeee",
+    "findings": [
+      {
+        "category": "performance",
+        "severity": "high",
+        "line": 100,
+        "type": "blocking-event-loop",
+        "description": "Synchronous I/O blocks the event loop in async contexts",
+        "recommendation": "Use the async variant (readFile, writeFile, exec) in request handlers",
+        "confidence": 0.6,
+        "path": "instructions.ts"
+      },
+      {
+        "category": "maintainability",
+        "severity": "low",
+        "line": 1,
+        "type": "deep-nesting",
+        "description": "Six or more levels of indentation — readability hit",
+        "recommendation": "Use early returns (guard clauses) or extract nested logic into named functions",
+        "confidence": 0.5,
+        "path": "instructions.ts"
+      },
+      {
+        "category": "maintainability",
+        "severity": "medium",
+        "line": 74,
+        "type": "long-function",
+        "description": "Function body exceeds ~50 lines — likely doing too much",
+        "recommendation": "Extract cohesive blocks into named helpers; aim for ≤30 lines per function",
+        "confidence": 0.3,
+        "path": "instructions.ts"
+      },
+      {
+        "category": "maintainability",
+        "severity": "low",
+        "line": 74,
+        "type": "missing-test-coverage",
+        "description": "Exported function with no obvious test file reference",
+        "recommendation": "Add a test file (e.g. foo.test.ts) covering the happy path and key edge cases",
+        "confidence": 0.2,
+        "path": "instructions.ts"
+      }
+    ],
+    "timestamp": 1781024531949
+  },
+  "C:\\Users\\User\\Desktop\\Coding Trio\\reporank\\apps\\cli\\src\\llm-cache.ts": {
+    "hash": "be2143fbde28c1a90eb7bc508c51dcd7004eff9998bdb704e86ee42b09da38dc",
+    "findings": [
+      {
+        "category": "security",
+        "severity": "critical",
+        "line": 7,
+        "type": "code-injection",
+        "description": "eval() executes arbitrary code from a string",
+        "recommendation": "Replace with a safe parser; if dynamic evaluation is required, use a sandboxed VM",
+        "confidence": 0.99,
+        "path": "llm-cache.ts"
+      },
+      {
+        "category": "performance",
+        "severity": "high",
+        "line": 76,
+        "type": "blocking-event-loop",
+        "description": "Synchronous I/O blocks the event loop in async contexts",
+        "recommendation": "Use the async variant (readFile, writeFile, exec) in request handlers",
+        "confidence": 0.6,
+        "path": "llm-cache.ts"
+      },
+      {
+        "category": "maintainability",
+        "severity": "low",
+        "line": 1,
+        "type": "deep-nesting",
+        "description": "Six or more levels of indentation — readability hit",
+        "recommendation": "Use early returns (guard clauses) or extract nested logic into named functions",
+        "confidence": 0.5,
+        "path": "llm-cache.ts"
+      }
+    ],
+    "timestamp": 1781024531953
+  },
+  "C:\\Users\\User\\Desktop\\Coding Trio\\reporank\\apps\\cli\\src\\llm.ts": {
+    "hash": "e57cf9179c2d0a8c044e7bbd6235a893adb7aec0e7257c5b003fe20b6c597945",
+    "findings": [
+      {
+        "category": "security",
+        "severity": "critical",
+        "line": 2,
+        "type": "code-injection",
+        "description": "eval() executes arbitrary code from a string",
+        "recommendation": "Replace with a safe parser; if dynamic evaluation is required, use a sandboxed VM",
+        "confidence": 0.99,
+        "path": "llm.ts"
+      },
+      {
+        "category": "quality",
+        "severity": "medium",
+        "line": 128,
+        "type": "any-type-abuse",
+        "description": "Use of `any` defeats TypeScript type safety",
+        "recommendation": "Replace with proper types, generics, or `unknown` for values that need narrowing",
+        "confidence": 0.85,
+        "path": "llm.ts"
+      },
+      {
+        "category": "quality",
+        "severity": "high",
+        "line": 190,
+        "type": "no-error-handling",
+        "description": "await used without try/catch — unhandled rejection will crash the process",
+        "recommendation": "Wrap awaits in try/catch, log the error, and handle failures gracefully",
+        "confidence": 0.6,
+        "path": "llm.ts"
+      },
+      {
+        "category": "quality",
+        "severity": "low",
+        "line": 192,
+        "type": "debug-code",
+        "description": "console.log/debug statements should be removed from production code",
+        "recommendation": "Use a proper logger (pino, winston, structlog) with appropriate log levels",
+        "confidence": 0.5,
+        "path": "llm.ts"
+      },
+      {
+        "category": "maintainability",
+        "severity": "low",
+        "line": 1,
+        "type": "deep-nesting",
+        "description": "Six or more levels of indentation — readability hit",
+        "recommendation": "Use early returns (guard clauses) or extract nested logic into named functions",
+        "confidence": 0.5,
+        "path": "llm.ts"
+      },
+      {
+        "category": "maintainability",
+        "severity": "medium",
+        "line": 75,
+        "type": "long-function",
+        "description": "Function body exceeds ~50 lines — likely doing too much",
+        "recommendation": "Extract cohesive blocks into named helpers; aim for ≤30 lines per function",
+        "confidence": 0.3,
+        "path": "llm.ts"
+      },
+      {
+        "category": "maintainability",
+        "severity": "low",
+        "line": 75,
+        "type": "missing-test-coverage",
+        "description": "Exported function with no obvious test file reference",
+        "recommendation": "Add a test file (e.g. foo.test.ts) covering the happy path and key edge cases",
+        "confidence": 0.2,
+        "path": "llm.ts"
+      }
+    ],
+    "timestamp": 1781024531984
+  },
+  "C:\\Users\\User\\Desktop\\Coding Trio\\reporank\\apps\\cli\\src\\prompts.ts": {
+    "hash": "67276844d4bd931708fc7b4e5f6f958290d78f46d91ebda49487c0502908cafb",
+    "findings": [
+      {
+        "category": "security",
+        "severity": "critical",
+        "line": 9,
+        "type": "code-injection",
+        "description": "eval() executes arbitrary code from a string",
+        "recommendation": "Replace with a safe parser; if dynamic evaluation is required, use a sandboxed VM",
+        "confidence": 0.99,
+        "path": "prompts.ts"
+      },
+      {
+        "category": "quality",
+        "severity": "medium",
+        "line": 170,
+        "type": "any-type-abuse",
+        "description": "Use of `any` defeats TypeScript type safety",
+        "recommendation": "Replace with proper types, generics, or `unknown` for values that need narrowing",
+        "confidence": 0.85,
+        "path": "prompts.ts"
+      },
+      {
+        "category": "security",
+        "severity": "critical",
+        "line": 243,
+        "type": "xss",
+        "description": "dangerouslySetInnerHTML used — unsanitized content enables XSS",
+        "recommendation": "Use a sanitizer like DOMPurify, or prefer React's built-in JSX rendering which auto-escapes",
+        "confidence": 0.85,
+        "path": "prompts.ts"
+      },
+      {
+        "category": "performance",
+        "severity": "high",
+        "line": 181,
+        "type": "n-plus-1-query",
+        "description": "Database query inside a for-loop — likely N+1",
+        "recommendation": "Use a single query with IN clause, JOIN, or include() to fetch all rows at once",
+        "confidence": 0.7,
+        "path": "prompts.ts"
+      },
+      {
+        "category": "quality",
+        "severity": "high",
+        "line": 226,
+        "type": "resource-leak",
+        "description": "File handle opened with fs.openSync — must be paired with fs.closeSync",
+        "recommendation": "Use fs.promises.open() with try/finally, or wrap in a context manager",
+        "confidence": 0.7,
+        "path": "prompts.ts"
+      },
+      {
+        "category": "quality",
+        "severity": "high",
+        "line": 182,
+        "type": "no-error-handling",
+        "description": "await used without try/catch — unhandled rejection will crash the process",
+        "recommendation": "Wrap awaits in try/catch, log the error, and handle failures gracefully",
+        "confidence": 0.6,
+        "path": "prompts.ts"
+      },
+      {
+        "category": "quality",
+        "severity": "low",
+        "line": 203,
+        "type": "debug-code",
+        "description": "console.log/debug statements should be removed from production code",
+        "recommendation": "Use a proper logger (pino, winston, structlog) with appropriate log levels",
+        "confidence": 0.5,
+        "path": "prompts.ts"
+      },
+      {
+        "category": "maintainability",
+        "severity": "low",
+        "line": 1,
+        "type": "deep-nesting",
+        "description": "Six or more levels of indentation — readability hit",
+        "recommendation": "Use early returns (guard clauses) or extract nested logic into named functions",
+        "confidence": 0.5,
+        "path": "prompts.ts"
+      },
+      {
+        "category": "maintainability",
+        "severity": "medium",
+        "line": 24,
+        "type": "long-function",
+        "description": "Function body exceeds ~50 lines — likely doing too much",
+        "recommendation": "Extract cohesive blocks into named helpers; aim for ≤30 lines per function",
+        "confidence": 0.3,
+        "path": "prompts.ts"
+      }
+    ],
+    "timestamp": 1781024532010
+  },
+  "C:\\Users\\User\\Desktop\\Coding Trio\\reporank\\apps\\cli\\src\\refactor-orchestrator.ts": {
+    "hash": "50ac7d5c03365a5318be37a3bb7b15c279c8699541aada8bb56277b7831e8308",
+    "findings": [
+      {
+        "category": "quality",
+        "severity": "medium",
+        "line": 340,
+        "type": "any-type-abuse",
+        "description": "Use of `any` defeats TypeScript type safety",
+        "recommendation": "Replace with proper types, generics, or `unknown` for values that need narrowing",
+        "confidence": 0.85,
+        "path": "refactor-orchestrator.ts"
+      },
+      {
+        "category": "performance",
+        "severity": "high",
+        "line": 174,
+        "type": "blocking-event-loop",
+        "description": "Synchronous I/O blocks the event loop in async contexts",
+        "recommendation": "Use the async variant (readFile, writeFile, exec) in request handlers",
+        "confidence": 0.6,
+        "path": "refactor-orchestrator.ts"
+      },
+      {
+        "category": "quality",
+        "severity": "high",
+        "line": 139,
+        "type": "no-error-handling",
+        "description": "await used without try/catch — unhandled rejection will crash the process",
+        "recommendation": "Wrap awaits in try/catch, log the error, and handle failures gracefully",
+        "confidence": 0.6,
+        "path": "refactor-orchestrator.ts"
+      },
+      {
+        "category": "quality",
+        "severity": "low",
+        "line": 490,
+        "type": "debug-code",
+        "description": "console.log/debug statements should be removed from production code",
+        "recommendation": "Use a proper logger (pino, winston, structlog) with appropriate log levels",
+        "confidence": 0.5,
+        "path": "refactor-orchestrator.ts"
+      },
+      {
+        "category": "maintainability",
+        "severity": "low",
+        "line": 1,
+        "type": "deep-nesting",
+        "description": "Six or more levels of indentation — readability hit",
+        "recommendation": "Use early returns (guard clauses) or extract nested logic into named functions",
+        "confidence": 0.5,
+        "path": "refactor-orchestrator.ts"
+      },
+      {
+        "category": "maintainability",
+        "severity": "medium",
+        "line": 421,
+        "type": "long-function",
+        "description": "Function body exceeds ~50 lines — likely doing too much",
+        "recommendation": "Extract cohesive blocks into named helpers; aim for ≤30 lines per function",
+        "confidence": 0.3,
+        "path": "refactor-orchestrator.ts"
+      },
+      {
+        "category": "maintainability",
+        "severity": "low",
+        "line": 421,
+        "type": "missing-test-coverage",
+        "description": "Exported function with no obvious test file reference",
+        "recommendation": "Add a test file (e.g. foo.test.ts) covering the happy path and key edge cases",
+        "confidence": 0.2,
+        "path": "refactor-orchestrator.ts"
+      }
+    ],
+    "timestamp": 1781024532036
+  },
+  "C:\\Users\\User\\Desktop\\Coding Trio\\reporank\\apps\\cli\\src\\review_scanner.ts": {
+    "hash": "f0625f0eb774b989626b32a30be7a3a9b3258317c0679f5e7e6ddd4606b70475",
+    "findings": [
+      {
+        "category": "security",
+        "severity": "critical",
+        "line": 9,
+        "type": "code-injection",
+        "description": "eval() executes arbitrary code from a string",
+        "recommendation": "Replace with a safe parser; if dynamic evaluation is required, use a sandboxed VM",
+        "confidence": 0.99,
+        "path": "review_scanner.ts"
+      },
+      {
+        "category": "maintainability",
+        "severity": "low",
+        "line": 1,
+        "type": "deep-nesting",
+        "description": "Six or more levels of indentation — readability hit",
+        "recommendation": "Use early returns (guard clauses) or extract nested logic into named functions",
+        "confidence": 0.5,
+        "path": "review_scanner.ts"
+      },
+      {
+        "category": "quality",
+        "severity": "medium",
+        "line": 85,
+        "type": "no-error-handling",
+        "description": "Async function with awaits but no try/catch or null guard",
+        "recommendation": "Wrap awaits in try/catch; surface errors to the caller or a logger",
+        "confidence": 0.3,
+        "path": "review_scanner.ts"
+      },
+      {
+        "category": "maintainability",
+        "severity": "medium",
+        "line": 85,
+        "type": "long-function",
+        "description": "Function body exceeds ~50 lines — likely doing too much",
+        "recommendation": "Extract cohesive blocks into named helpers; aim for ≤30 lines per function",
+        "confidence": 0.3,
+        "path": "review_scanner.ts"
+      },
+      {
+        "category": "maintainability",
+        "severity": "low",
+        "line": 85,
+        "type": "missing-test-coverage",
+        "description": "Exported function with no obvious test file reference",
+        "recommendation": "Add a test file (e.g. foo.test.ts) covering the happy path and key edge cases",
+        "confidence": 0.2,
+        "path": "review_scanner.ts"
+      }
+    ],
+    "timestamp": 1781024532041
+  },
+  "C:\\Users\\User\\Desktop\\Coding Trio\\reporank\\apps\\cli\\src\\scan.ts": {
+    "hash": "0bf696f9fab35fa04bfd2332c646cd568463a2cd220fe508591e74f7a9b8632e",
+    "findings": [
+      {
+        "category": "quality",
+        "severity": "medium",
+        "line": 46,
+        "type": "any-type-abuse",
+        "description": "Use of `any` defeats TypeScript type safety",
+        "recommendation": "Replace with proper types, generics, or `unknown` for values that need narrowing",
+        "confidence": 0.85,
+        "path": "scan.ts"
+      },
+      {
+        "category": "quality",
+        "severity": "high",
+        "line": 157,
+        "type": "no-error-handling",
+        "description": "await used without try/catch — unhandled rejection will crash the process",
+        "recommendation": "Wrap awaits in try/catch, log the error, and handle failures gracefully",
+        "confidence": 0.6,
+        "path": "scan.ts"
+      },
+      {
+        "category": "quality",
+        "severity": "low",
+        "line": 17,
+        "type": "debug-code",
+        "description": "console.log/debug statements should be removed from production code",
+        "recommendation": "Use a proper logger (pino, winston, structlog) with appropriate log levels",
+        "confidence": 0.5,
+        "path": "scan.ts"
+      },
+      {
+        "category": "maintainability",
+        "severity": "low",
+        "line": 1,
+        "type": "deep-nesting",
+        "description": "Six or more levels of indentation — readability hit",
+        "recommendation": "Use early returns (guard clauses) or extract nested logic into named functions",
+        "confidence": 0.5,
+        "path": "scan.ts"
+      },
+      {
+        "category": "maintainability",
+        "severity": "medium",
+        "line": 9,
+        "type": "long-function",
+        "description": "Function body exceeds ~50 lines — likely doing too much",
+        "recommendation": "Extract cohesive blocks into named helpers; aim for ≤30 lines per function",
+        "confidence": 0.3,
+        "path": "scan.ts"
+      },
+      {
+        "category": "maintainability",
+        "severity": "low",
+        "line": 146,
+        "type": "magic-numbers",
+        "description": "Magic number in a conditional — should be a named constant",
+        "recommendation": "Extract to a `const NAME = ...` at module top with a comment explaining the value",
+        "confidence": 0.25,
+        "path": "scan.ts"
+      },
+      {
+        "category": "maintainability",
+        "severity": "low",
+        "line": 9,
+        "type": "missing-test-coverage",
+        "description": "Exported function with no obvious test file reference",
+        "recommendation": "Add a test file (e.g. foo.test.ts) covering the happy path and key edge cases",
+        "confidence": 0.2,
+        "path": "scan.ts"
+      }
+    ],
+    "timestamp": 1781024532051
+  },
+  "C:\\Users\\User\\Desktop\\Coding Trio\\reporank\\apps\\cli\\src\\scanners\\rule-presets.ts": {
+    "hash": "6d68fae2ac5fa5b034f61b53332e1d5341e6260b8edcb9ebb775197c0411d9c6",
+    "findings": [
+      {
+        "category": "maintainability",
+        "severity": "low",
+        "line": 1,
+        "type": "deep-nesting",
+        "description": "Six or more levels of indentation — readability hit",
+        "recommendation": "Use early returns (guard clauses) or extract nested logic into named functions",
+        "confidence": 0.5,
+        "path": "scanners/rule-presets.ts"
+      }
+    ],
+    "timestamp": 1781024532053
+  },
+  "C:\\Users\\User\\Desktop\\Coding Trio\\reporank\\apps\\cli\\src\\scanners\\semgrep-runner.ts": {
+    "hash": "2a0c0e519b3d3c84c47421ae1ddcaa66df96f2f85ef89a607069e2976ff77a88",
+    "findings": [
+      {
+        "category": "quality",
+        "severity": "medium",
+        "line": 37,
+        "type": "any-type-abuse",
+        "description": "Use of `any` defeats TypeScript type safety",
+        "recommendation": "Replace with proper types, generics, or `unknown` for values that need narrowing",
+        "confidence": 0.85,
+        "path": "scanners/semgrep-runner.ts"
+      },
+      {
+        "category": "maintainability",
+        "severity": "low",
+        "line": 1,
+        "type": "deep-nesting",
+        "description": "Six or more levels of indentation — readability hit",
+        "recommendation": "Use early returns (guard clauses) or extract nested logic into named functions",
+        "confidence": 0.5,
+        "path": "scanners/semgrep-runner.ts"
+      },
+      {
+        "category": "quality",
+        "severity": "medium",
+        "line": 22,
+        "type": "no-error-handling",
+        "description": "Async function with awaits but no try/catch or null guard",
+        "recommendation": "Wrap awaits in try/catch; surface errors to the caller or a logger",
+        "confidence": 0.3,
+        "path": "scanners/semgrep-runner.ts"
+      },
+      {
+        "category": "maintainability",
+        "severity": "low",
+        "line": 22,
+        "type": "missing-test-coverage",
+        "description": "Exported function with no obvious test file reference",
+        "recommendation": "Add a test file (e.g. foo.test.ts) covering the happy path and key edge cases",
+        "confidence": 0.2,
+        "path": "scanners/semgrep-runner.ts"
+      }
+    ],
+    "timestamp": 1781024532055
+  },
+  "C:\\Users\\User\\Desktop\\Coding Trio\\reporank\\apps\\cli\\src\\threshold-sweep.ts": {
+    "hash": "b3abc018ccc86da8213022cbdc87fdcc267119e0e151bb5373d3a975c08e63f1",
+    "findings": [
+      {
+        "category": "performance",
+        "severity": "high",
+        "line": 36,
+        "type": "blocking-event-loop",
+        "description": "Synchronous I/O blocks the event loop in async contexts",
+        "recommendation": "Use the async variant (readFile, writeFile, exec) in request handlers",
+        "confidence": 0.6,
+        "path": "threshold-sweep.ts"
+      },
+      {
+        "category": "quality",
+        "severity": "high",
+        "line": 42,
+        "type": "no-error-handling",
+        "description": "await used without try/catch — unhandled rejection will crash the process",
+        "recommendation": "Wrap awaits in try/catch, log the error, and handle failures gracefully",
+        "confidence": 0.6,
+        "path": "threshold-sweep.ts"
+      },
+      {
+        "category": "quality",
+        "severity": "low",
+        "line": 37,
+        "type": "debug-code",
+        "description": "console.log/debug statements should be removed from production code",
+        "recommendation": "Use a proper logger (pino, winston, structlog) with appropriate log levels",
+        "confidence": 0.5,
+        "path": "threshold-sweep.ts"
+      },
+      {
+        "category": "maintainability",
+        "severity": "low",
+        "line": 1,
+        "type": "deep-nesting",
+        "description": "Six or more levels of indentation — readability hit",
+        "recommendation": "Use early returns (guard clauses) or extract nested logic into named functions",
+        "confidence": 0.5,
+        "path": "threshold-sweep.ts"
+      }
+    ],
+    "timestamp": 1781024532060
+  },
+  "C:\\Users\\User\\Desktop\\Coding Trio\\reporank\\apps\\cli\\src\\util\\dedupe.ts": {
+    "hash": "e07480592482dd10983068f9c984cd6d678885b1aa950025c02a5ad7449b6b46",
+    "findings": [
+      {
+        "category": "maintainability",
+        "severity": "low",
+        "line": 1,
+        "type": "deep-nesting",
+        "description": "Six or more levels of indentation — readability hit",
+        "recommendation": "Use early returns (guard clauses) or extract nested logic into named functions",
+        "confidence": 0.5,
+        "path": "util/dedupe.ts"
+      },
+      {
+        "category": "maintainability",
+        "severity": "low",
+        "line": 3,
+        "type": "missing-test-coverage",
+        "description": "Exported function with no obvious test file reference",
+        "recommendation": "Add a test file (e.g. foo.test.ts) covering the happy path and key edge cases",
+        "confidence": 0.2,
+        "path": "util/dedupe.ts"
+      }
+    ],
+    "timestamp": 1781024532061
+  },
+  "C:\\Users\\User\\Desktop\\Coding Trio\\reporank\\apps\\cli\\src\\util\\incremental-cache.ts": {
+    "hash": "5cb3dce22a5b90c0f1b3890465361eba976c0a5463ef5b12fadd52770c54e7c8",
+    "findings": [
+      {
+        "category": "performance",
+        "severity": "high",
+        "line": 23,
+        "type": "blocking-event-loop",
+        "description": "Synchronous I/O blocks the event loop in async contexts",
+        "recommendation": "Use the async variant (readFile, writeFile, exec) in request handlers",
+        "confidence": 0.6,
+        "path": "util/incremental-cache.ts"
+      },
+      {
+        "category": "maintainability",
+        "severity": "low",
+        "line": 1,
+        "type": "deep-nesting",
+        "description": "Six or more levels of indentation — readability hit",
+        "recommendation": "Use early returns (guard clauses) or extract nested logic into named functions",
+        "confidence": 0.5,
+        "path": "util/incremental-cache.ts"
+      }
+    ],
+    "timestamp": 1781024532062
+  },
+  "C:\\Users\\User\\Desktop\\Coding Trio\\reporank\\apps\\cli\\src\\verify.ts": {
+    "hash": "ef32b78968db1170ad25e2044215085f3f3fe29dd5be509e8a8a8a22f4cd98d6",
+    "findings": [
+      {
+        "category": "security",
+        "severity": "critical",
+        "line": 16,
+        "type": "code-injection",
+        "description": "eval() executes arbitrary code from a string",
+        "recommendation": "Replace with a safe parser; if dynamic evaluation is required, use a sandboxed VM",
+        "confidence": 0.99,
+        "path": "verify.ts"
+      },
+      {
+        "category": "performance",
+        "severity": "high",
+        "line": 275,
+        "type": "blocking-event-loop",
+        "description": "Synchronous I/O blocks the event loop in async contexts",
+        "recommendation": "Use the async variant (readFile, writeFile, exec) in request handlers",
+        "confidence": 0.6,
+        "path": "verify.ts"
+      },
+      {
+        "category": "quality",
+        "severity": "high",
+        "line": 106,
+        "type": "no-error-handling",
+        "description": "await used without try/catch — unhandled rejection will crash the process",
+        "recommendation": "Wrap awaits in try/catch, log the error, and handle failures gracefully",
+        "confidence": 0.6,
+        "path": "verify.ts"
+      },
+      {
+        "category": "maintainability",
+        "severity": "low",
+        "line": 1,
+        "type": "deep-nesting",
+        "description": "Six or more levels of indentation — readability hit",
+        "recommendation": "Use early returns (guard clauses) or extract nested logic into named functions",
+        "confidence": 0.5,
+        "path": "verify.ts"
+      },
+      {
+        "category": "maintainability",
+        "severity": "medium",
+        "line": 98,
+        "type": "long-function",
+        "description": "Function body exceeds ~50 lines — likely doing too much",
+        "recommendation": "Extract cohesive blocks into named helpers; aim for ≤30 lines per function",
+        "confidence": 0.3,
+        "path": "verify.ts"
+      },
+      {
+        "category": "maintainability",
+        "severity": "low",
+        "line": 98,
+        "type": "missing-test-coverage",
+        "description": "Exported function with no obvious test file reference",
+        "recommendation": "Add a test file (e.g. foo.test.ts) covering the happy path and key edge cases",
+        "confidence": 0.2,
+        "path": "verify.ts"
+      }
+    ],
+    "timestamp": 1781024532094
+  },
+  "C:\\Users\\User\\Desktop\\Coding Trio\\reporank\\apps\\cli\\src\\__tests__\\agents-command.test.ts": {
+    "hash": "47dcc95f9f1355f4d1e2958af21cc52270d5167497f1a8247ebd74fdf331fd90",
+    "findings": [
+      {
+        "category": "maintainability",
+        "severity": "low",
+        "line": 1,
+        "type": "deep-nesting",
+        "description": "Six or more levels of indentation — readability hit",
+        "recommendation": "Use early returns (guard clauses) or extract nested logic into named functions",
+        "confidence": 0.5,
+        "path": "__tests__/agents-command.test.ts"
+      }
+    ],
+    "timestamp": 1781024532097
+  },
+  "C:\\Users\\User\\Desktop\\Coding Trio\\reporank\\apps\\cli\\src\\__tests__\\dedupe.test.ts": {
+    "hash": "4fb16ca6abfc0f4f5d0feb367d8ffbb87984eeb759baa88155438c67251ebae4",
+    "findings": [
+      {
+        "category": "maintainability",
+        "severity": "low",
+        "line": 1,
+        "type": "deep-nesting",
+        "description": "Six or more levels of indentation — readability hit",
+        "recommendation": "Use early returns (guard clauses) or extract nested logic into named functions",
+        "confidence": 0.5,
+        "path": "__tests__/dedupe.test.ts"
+      }
+    ],
+    "timestamp": 1781024532098
+  },
+  "C:\\Users\\User\\Desktop\\Coding Trio\\reporank\\apps\\cli\\src\\__tests__\\heuristic_scanner.test.ts": {
+    "hash": "3f06c1a287d922b7a3f58aa3b6e07d3209c8d6f1bde53fec2280eb11cc0f9292",
+    "findings": [
+      {
+        "category": "security",
+        "severity": "critical",
+        "line": 5,
+        "type": "code-injection",
+        "description": "eval() executes arbitrary code from a string",
+        "recommendation": "Replace with a safe parser; if dynamic evaluation is required, use a sandboxed VM",
+        "confidence": 0.99,
+        "path": "__tests__/heuristic_scanner.test.ts"
+      },
+      {
+        "category": "security",
+        "severity": "high",
+        "line": 44,
+        "type": "hardcoded-secret",
+        "description": "Hardcoded API key or credential detected in source",
+        "recommendation": "Move secrets to environment variables; rotate the exposed credential immediately",
+        "confidence": 0.98,
+        "path": "__tests__/heuristic_scanner.test.ts"
+      },
+      {
+        "category": "security",
+        "severity": "medium",
+        "line": 52,
+        "type": "weak-crypto",
+        "description": "MD5 is cryptographically broken",
+        "recommendation": "Use SHA-256 for non-password hashing; use bcrypt/argon2/scrypt for password hashing",
+        "confidence": 0.95,
+        "path": "__tests__/heuristic_scanner.test.ts"
+      },
+      {
+        "category": "security",
+        "severity": "critical",
+        "line": 20,
+        "type": "sql-injection",
+        "description": "User input interpolated into a SQL string (template literal in query/exec)",
+        "recommendation": "Use a parameterised query with placeholders ($1, ?, :name) and a values array",
+        "confidence": 0.9,
+        "path": "__tests__/heuristic_scanner.test.ts"
+      },
+      {
+        "category": "quality",
+        "severity": "medium",
+        "line": 105,
+        "type": "any-type-abuse",
+        "description": "Use of `any` defeats TypeScript type safety",
+        "recommendation": "Replace with proper types, generics, or `unknown` for values that need narrowing",
+        "confidence": 0.85,
+        "path": "__tests__/heuristic_scanner.test.ts"
+      },
+      {
+        "category": "security",
+        "severity": "critical",
+        "line": 34,
+        "type": "xss",
+        "description": "dangerouslySetInnerHTML used — unsanitized content enables XSS",
+        "recommendation": "Use a sanitizer like DOMPurify, or prefer React's built-in JSX rendering which auto-escapes",
+        "confidence": 0.85,
+        "path": "__tests__/heuristic_scanner.test.ts"
+      },
+      {
+        "category": "security",
+        "severity": "medium",
+        "line": 60,
+        "type": "insecure-random",
+        "description": "Math.random/random is not cryptographically secure for token generation",
+        "recommendation": "Use crypto.randomBytes() (Node), secrets module (Python), or crypto.SecureRandom (Java)",
+        "confidence": 0.7,
+        "path": "__tests__/heuristic_scanner.test.ts"
+      },
+      {
+        "category": "quality",
+        "severity": "high",
+        "line": 71,
+        "type": "resource-leak",
+        "description": "setInterval used without clearInterval — memory leak if component unmounts",
+        "recommendation": "Store the interval ID and call clearInterval() in a cleanup function",
+        "confidence": 0.7,
+        "path": "__tests__/heuristic_scanner.test.ts"
+      },
+      {
+        "category": "quality",
+        "severity": "high",
+        "line": 81,
+        "type": "no-error-handling",
+        "description": "await used without try/catch — unhandled rejection will crash the process",
+        "recommendation": "Wrap awaits in try/catch, log the error, and handle failures gracefully",
+        "confidence": 0.6,
+        "path": "__tests__/heuristic_scanner.test.ts"
+      },
+      {
+        "category": "quality",
+        "severity": "low",
+        "line": 113,
+        "type": "debug-code",
+        "description": "console.log/debug statements should be removed from production code",
+        "recommendation": "Use a proper logger (pino, winston, structlog) with appropriate log levels",
+        "confidence": 0.5,
+        "path": "__tests__/heuristic_scanner.test.ts"
+      },
+      {
+        "category": "maintainability",
+        "severity": "low",
+        "line": 1,
+        "type": "deep-nesting",
+        "description": "Six or more levels of indentation — readability hit",
+        "recommendation": "Use early returns (guard clauses) or extract nested logic into named functions",
+        "confidence": 0.5,
+        "path": "__tests__/heuristic_scanner.test.ts"
+      }
+    ],
+    "timestamp": 1781024532104
+  },
+  "C:\\Users\\User\\Desktop\\Coding Trio\\reporank\\apps\\cli\\src\\__tests__\\incremental-cache.test.ts": {
+    "hash": "3964b74509c60f274007609a656a12a39b990848478a7f3080b1a956d9fca10b",
+    "findings": [
+      {
+        "category": "quality",
+        "severity": "medium",
+        "line": 29,
+        "type": "any-type-abuse",
+        "description": "Use of `any` defeats TypeScript type safety",
+        "recommendation": "Replace with proper types, generics, or `unknown` for values that need narrowing",
+        "confidence": 0.85,
+        "path": "__tests__/incremental-cache.test.ts"
+      },
+      {
+        "category": "performance",
+        "severity": "high",
+        "line": 28,
+        "type": "blocking-event-loop",
+        "description": "Synchronous I/O blocks the event loop in async contexts",
+        "recommendation": "Use the async variant (readFile, writeFile, exec) in request handlers",
+        "confidence": 0.6,
+        "path": "__tests__/incremental-cache.test.ts"
+      },
+      {
+        "category": "maintainability",
+        "severity": "low",
+        "line": 1,
+        "type": "deep-nesting",
+        "description": "Six or more levels of indentation — readability hit",
+        "recommendation": "Use early returns (guard clauses) or extract nested logic into named functions",
+        "confidence": 0.5,
+        "path": "__tests__/incremental-cache.test.ts"
+      }
+    ],
+    "timestamp": 1781024532106
+  },
+  "C:\\Users\\User\\Desktop\\Coding Trio\\reporank\\apps\\cli\\src\\__tests__\\semgrep-runner.test.ts": {
+    "hash": "c7dc1d0eb728e2273313a52d2e5ea8ccbb52e37083a2effb27bfca55b709df5f",
+    "findings": [
+      {
+        "category": "quality",
+        "severity": "medium",
+        "line": 5,
+        "type": "any-type-abuse",
+        "description": "Use of `any` defeats TypeScript type safety",
+        "recommendation": "Replace with proper types, generics, or `unknown` for values that need narrowing",
+        "confidence": 0.85,
+        "path": "__tests__/semgrep-runner.test.ts"
+      },
+      {
+        "category": "quality",
+        "severity": "high",
+        "line": 20,
+        "type": "no-error-handling",
+        "description": "await used without try/catch — unhandled rejection will crash the process",
+        "recommendation": "Wrap awaits in try/catch, log the error, and handle failures gracefully",
+        "confidence": 0.6,
+        "path": "__tests__/semgrep-runner.test.ts"
+      },
+      {
+        "category": "maintainability",
+        "severity": "low",
+        "line": 1,
+        "type": "deep-nesting",
+        "description": "Six or more levels of indentation — readability hit",
+        "recommendation": "Use early returns (guard clauses) or extract nested logic into named functions",
+        "confidence": 0.5,
+        "path": "__tests__/semgrep-runner.test.ts"
+      }
+    ],
+    "timestamp": 1781024532107
+  }
+}

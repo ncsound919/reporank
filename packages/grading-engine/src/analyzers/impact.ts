@@ -111,7 +111,11 @@ export function predictImpact(
   const vibeTrend = computeVibeTrend(changes);
 
   // Confidence based on change volume
-  const totalLines = changes.reduce((sum, c) => sum + (c.linesAdded ?? 0) + (c.linesRemoved ?? 0), 0);
+  const totalLines = changes.reduce((sum, c) => {
+    const lines = (c.linesAdded ?? 0) + (c.linesRemoved ?? 0);
+    if (lines > 0) return sum + lines;
+    return sum + Math.ceil((c.content?.length ?? 0) / 50);
+  }, 0);
   const confidence: ImpactReport["confidence"] =
     totalLines < 200 ? "high" : totalLines < 1000 ? "medium" : "low";
 

@@ -20,9 +20,16 @@ export function scanSecrets(content: string) {
         if (m.index === undefined) continue;
         const val = m[0];
         if (val.includes("test") || val.includes("example")) continue;
-        secrets.push({ type: p.name, line: i + 1, column: m.index + 1, redacted: val.slice(0, 4) + "****" + val.slice(-4), severity: p.severity });
+        secrets.push({ type: p.name, line: i + 1, column: m.index + 1, redacted: redactSecret(val), severity: p.severity });
       }
     }
   }
   return { secretsFound: secrets.length, secrets, recommendation: secrets.length > 0 ? `Found ${secrets.length} secret(s) — review immediately.` : "No secrets detected." };
+}
+
+function redactSecret(val: string): string {
+  if (val.length <= 8) {
+    return val[0] + "***";
+  }
+  return val.slice(0, 4) + "****" + val.slice(-4);
 }

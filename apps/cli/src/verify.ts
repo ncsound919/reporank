@@ -23,6 +23,7 @@ import { heuristicScan } from "./heuristic_scanner";
 import { llmScan, type Finding } from "./review_scanner";
 import { dedupeFindings, capFindings } from "./util/dedupe";
 import { IncrementalCache } from "./util/incremental-cache";
+import { applyFixesFromVerify, type ApplyFixesFromVerifyOptions } from "./verify-apply";
 
 const SOURCE_EXTS = new Set([".ts", ".tsx", ".js", ".jsx", ".py", ".go", ".rs", ".java", ".rb"]);
 const SKIP_DIRS = new Set(["node_modules", ".git", "dist", "build", "coverage", ".next", "target", "vendor", ".aether_prime_cache"]);
@@ -154,10 +155,14 @@ export async function runVerify(opts: VerifyOptions): Promise<{ report: VerifyRe
   }
 
   // Analyze each file (with content-hash incremental cache)
-  const cache = new IncrementalCache(".reporank-cache.json");
+  const cache = new IncrementalCache(resolve(rootForRelative, ".reporank-cache.json"));
+  const { createHash } = await import("node:crypto");
   const fileReports: FileReport[] = [];
   for (const file of filesToAnalyze) {
-    const cached = cache.get(file);
+    const content = readFileSync(file, "utf-8");
+    const contentHash = createHash("sha256").update(content).digest("hex").slice(0, 16);
+    const cacheKey = `${file}:${contentHash}`;
+    const cached = cache.get(cacheKey);
     if (cached) {
       fileReports.push({
         path: relative(rootForRelative, file).replace(/\\/g, "/"),
@@ -170,7 +175,7 @@ export async function runVerify(opts: VerifyOptions): Promise<{ report: VerifyRe
       continue;
     }
     const report = await analyzeFile(file, rootForRelative, projectContext, opts);
-    cache.set(file, report.findings);
+    cache.set(cacheKey, report.findings);
     fileReports.push(report);
   }
   cache.flush();
@@ -368,9 +373,13 @@ function collectSourceFiles(rootPath: string): string[] {
 function readStdinSync(): string {
   // Kept for backwards compat but prefer readStdin() async.
   try {
-    return readFileSync(0, "utf-8");
+    return readFileSync("/dev/stdin", "utf-8");
   } catch {
-    return "";
+    try {
+      return readFileSync(0 as any, "utf-8");
+    } catch {
+      return "";
+    }
   }
 }
 
@@ -428,3 +437,4 @@ async function fetchPrDiff(prNumber: number): Promise<string> {
     );
   });
 }
+

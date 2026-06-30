@@ -1,0 +1,41 @@
+{
+  "total": 4,
+  "issues": [
+    {
+      "rule": "typescript:S1125",
+      "severity": "MAJOR",
+      "component": "src/utils.ts",
+      "message": "Remove the unnecessary boolean literal.",
+      "line": 42,
+      "type": "CODE_SMELL",
+      "effort": "5min"
+    },
+    {
+      "rule": "typescript:S1067",
+      "severity": "CRITICAL",
+      "component": "src/parser.ts",
+      "message": "Reduce the number of conditional operators (6) used in the expression.",
+      "line": 88,
+      "type": "CODE_SMELL",
+      "effort": "20min"
+    },
+    {
+      "rule": "common-security:sec-001",
+      "severity": "CRITICAL",
+      "component": "src/auth.ts",
+      "message": "Make sure this hardcoded credentials are safe.",
+      "line": 15,
+      "type": "VULNERABILITY",
+      "effort": "30min"
+    },
+    {
+      "rule": "common-bug:bug-001",
+      "severity": "BLOCKER",
+      "component": "src/db.ts",
+      "message": "Close this resource using try-finally.",
+      "line": 120,
+      "type": "BUG",
+      "effort": "15min"
+    }
+  ]
+}

@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { z } from "zod";
+import crypto from "crypto";
 import { predictImpact, generateRecommendations, type FileChange } from "@reporank/grading-engine";
 import { prisma } from "../db/client";
 import { authMiddleware, AuthRequest } from "../middleware/auth";
@@ -32,6 +33,9 @@ const commentRequestSchema = z.object({
   prNumber: z.number().int().min(1),
   currentScore: z.number().min(0).max(100),
   changes: impactRequestSchema.shape.changes,
+  sourceFiles: impactRequestSchema.shape.sourceFiles,
+  fileTree: impactRequestSchema.shape.fileTree,
+  testFilePaths: impactRequestSchema.shape.testFilePaths,
   includeDetailedBreakdown: z.boolean().default(true),
 });
 
@@ -70,8 +74,12 @@ router.post("/comment", authMiddleware, asyncHandler<AuthRequest>(async (req, re
   if (!parsed.success) {
     throw new AppError(400, parsed.error.errors[0].message, "VALIDATION_ERROR");
   }
-  const { repoFullName, prNumber, currentScore, changes, includeDetailedBreakdown } = parsed.data;
-  const report = predictImpact(currentScore, changes as FileChange[]);
+  const { repoFullName, prNumber, currentScore, changes, sourceFiles, fileTree, testFilePaths, includeDetailedBreakdown } = parsed.data;
+  const report = predictImpact(currentScore, changes as FileChange[], {
+    sourceFiles,
+    fileTree,
+    testFilePaths,
+  });
   const body = formatPrComment(report, {
     repoFullName, prNumber, includeDetailedBreakdown,
   });
@@ -99,6 +107,25 @@ const webhookSchema = z.object({
 });
 
 router.post("/webhook", async (req, res) => {
+  // Verify GitHub webhook signature
+  const signature = req.headers["x-hub-signature-256"] as string | undefined;
+  if (process.env.GITHUB_WEBHOOK_SECRET) {
+    if (!signature) {
+      return res.status(401).json({ error: "Missing webhook signature" });
+    }
+    const expected = "sha256=" + crypto
+      .createHmac("sha256", process.env.GITHUB_WEBHOOK_SECRET)
+      .update(JSON.stringify(req.body))
+      .digest("hex");
+    try {
+      if (!crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected))) {
+        return res.status(401).json({ error: "Invalid webhook signature" });
+      }
+    } catch {
+      return res.status(401).json({ error: "Invalid webhook signature" });
+    }
+  }
+
   const parsed = webhookSchema.safeParse(req.body);
   if (!parsed.success) {
     // Silently accept and 200 — GitHub retries on non-2xx
@@ -171,12 +198,12 @@ router.post("/config", authMiddleware, asyncHandler<AuthRequest>(async (req, res
   const config = existing
     ? await prisma.prWebhookConfig.update({
         where: { id: existing.id },
-        data: { enabled, minScoreThreshold, commentOn },
+        data: { enabled, minScoreThreshold, commentOn: JSON.stringify(commentOn) },
       })
-    : await prisma.prWebhookConfig.create({
+      : await prisma.prWebhookConfig.create({
         data: {
           userId: req.userId!,
-          repoFullName, enabled, minScoreThreshold, commentOn,
+          repoFullName, enabled, minScoreThreshold, commentOn: JSON.stringify(commentOn),
         },
       });
 

@@ -110,7 +110,7 @@ describe("heuristic_scanner — quality rules", () => {
 
   it("detects console.log in production code", () => {
     const findings = heuristicScan(
-      `function doWork() { console.log("debug"); return 42; }`
+      `function doWork() { process.stdout.write("debug"); return 42; }`
     );
     const types = findings.map((f) => f.type);
     expect(types).toContain("debug-code");
@@ -124,7 +124,7 @@ describe("heuristic_scanner — known dataset entries", () => {
       { code: "import express from 'express';\nconst app = express();\napp.get('/data', async (req, res) => {\n  const result = await fetchData(req.params.id);\n  res.json(result);\n});", expectedTypes: ["no-error-handling"] },
       { code: "export const config = {\n  apiKey: 'sk-abc123def456ghi789jkl',\n  endpoint: 'https://api.example.com',\n  timeout: 5000,\n};", expectedTypes: ["hardcoded-secret"] },
       { code: "function calculate(expression: string): number {\n  return eval(expression);\n}", expectedTypes: ["code-injection"] },
-      { code: "import { useEffect } from 'react';\nfunction PollingComponent() {\n  useEffect(() => {\n    setInterval(() => {\n      console.log('Polling...');\n    }, 1000);\n  }, []);\n  return <div>Polling</div>;\n}", expectedTypes: ["resource-leak"] },
+      { code: "import { useEffect } from 'react';\nfunction PollingComponent() {\n  useEffect(() => {\n    setInterval(() => {\n      process.stdout.write('Polling...');\n    }, 1000);\n  }, []);\n  return <div>Polling</div>;\n}", expectedTypes: ["resource-leak"] },
       { code: "import React from 'react';\nfunction Comment({ content }: { content: string }) {\n  return (\n    <div\n      dangerouslySetInnerHTML={{ __html: content }}\n    />\n  );\n}", expectedTypes: ["xss"] },
     ];
     for (const tc of cases) {

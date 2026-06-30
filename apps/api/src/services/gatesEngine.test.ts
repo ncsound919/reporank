@@ -25,7 +25,7 @@ describe("evaluateGate", () => {
     const result = evaluateGate(
       { type: "code-present", criterion: "", milestoneId: null },
       { quality: { testFileCount: 0 } },
-      { sourceFiles: [{ path: "src/index.ts", content: "console.log('hello');" }] }
+      { sourceFiles: [{ path: "src/index.ts", content: "process.stdout.write('hello');" }] }
     );
     expect(result.passed).toBe(true);
   });
@@ -52,7 +52,7 @@ describe("evaluateGate", () => {
     const result = evaluateGate(
       { type: "docs-updated", criterion: "", milestoneId: null },
       {},
-      { sourceFiles: [{ path: "src/index.ts", content: "console.log('hello');" }] }
+      { sourceFiles: [{ path: "src/index.ts", content: "process.stdout.write('hello');" }] }
     );
     expect(result.passed).toBe(false);
   });
@@ -63,7 +63,7 @@ describe("evaluateGate", () => {
       {},
       { sourceFiles: [
         { path: "Dockerfile", content: "FROM node:18" },
-        { path: "src/index.ts", content: "console.log('hello');" }
+        { path: "src/index.ts", content: "process.stdout.write('hello');" }
       ] }
     );
     expect(result.passed).toBe(true);
@@ -75,7 +75,7 @@ describe("evaluateGate", () => {
       {},
       { sourceFiles: [
         { path: ".github/workflows/ci.yml", content: "name: CI" },
-        { path: "src/index.ts", content: "console.log('hello');" }
+        { path: "src/index.ts", content: "process.stdout.write('hello');" }
       ] }
     );
     expect(result.passed).toBe(true);
@@ -85,7 +85,7 @@ describe("evaluateGate", () => {
     const result = evaluateGate(
       { type: "deploy-preview", criterion: "", milestoneId: null },
       {},
-      { sourceFiles: [{ path: "src/index.ts", content: "console.log('hello');" }] }
+      { sourceFiles: [{ path: "src/index.ts", content: "process.stdout.write('hello');" }] }
     );
     expect(result.passed).toBe(false);
   });

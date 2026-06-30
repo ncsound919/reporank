@@ -3,6 +3,7 @@ import chalk from "chalk";
 import { readFileSync, existsSync, writeFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { generateGuidelines, estimateContextWindowFit, checkGuidelinesCompliance, getRulesForAnalysis, type CodebaseAnalysis, type ComplianceViolation } from "@reporank/agent-guidelines";
+// Import from grading-engine's public API — this is a monorepo-internal dependency
 import { runDeepAnalysis, calculateVibeCodingIndex } from "@reporank/grading-engine";
 import { llmAudit, type LLMAuditResult, LLMUnavailableError } from "./llm";
 
@@ -88,12 +89,12 @@ export async function agentsGenerateCommand(dir: string | undefined, options: { 
   const useLlm = !options.noLlm;
 
   if (!options.json) {
-    console.log(chalk.bold.cyan("\n  ╔══════════════════════════════════════════════╗"));
-    console.log(chalk.bold.cyan("  ║       RepoRank AGENTS.md Generator        ║"));
-    console.log(chalk.bold.cyan("  ╚══════════════════════════════════════════════╝"));
-    console.log(`\n  ${chalk.bold("Directory:")} ${chalk.white(targetDir)}`);
-    console.log(`  ${chalk.bold("Mode:")}      ${chalk.white(mode)}`);
-    console.log(`  ${chalk.bold("LLM:")}       ${chalk.white(useLlm ? "enabled" : "disabled (--no-llm)")}\n`);
+    process.stdout.write(chalk.bold.cyan("\n  ╔══════════════════════════════════════════════╗"));
+    process.stdout.write(chalk.bold.cyan("  ║       RepoRank AGENTS.md Generator        ║"));
+    process.stdout.write(chalk.bold.cyan("  ╚══════════════════════════════════════════════╝"));
+    process.stdout.write(`\n  ${chalk.bold("Directory:")} ${chalk.white(targetDir)}`);
+    process.stdout.write(`  ${chalk.bold("Mode:")}      ${chalk.white(mode)}`);
+    process.stdout.write(`  ${chalk.bold("LLM:")}       ${chalk.white(useLlm ? "enabled" : "disabled (--no-llm)")}\n`);
   }
 
   // Phase 0: Optionally run an LLM audit to enrich the heuristic analysis
@@ -117,7 +118,7 @@ export async function agentsGenerateCommand(dir: string | undefined, options: { 
         llmFindings = await llmAudit(sources, `RepoRank audit mode=${mode}`);
         llmStatus = llmFindings ? "ok" : "unavailable";
         if (!options.json && llmFindings) {
-          console.log(chalk.dim(`  LLM: ${llmFindings.findings.length} findings (confidence=${llmFindings.confidence.toFixed(2)})`));
+          process.stdout.write(chalk.dim(`  LLM: ${llmFindings.findings.length} findings (confidence=${llmFindings.confidence.toFixed(2)})`));
         }
       } else {
         llmStatus = "skipped";
@@ -126,7 +127,7 @@ export async function agentsGenerateCommand(dir: string | undefined, options: { 
       llmStatus = "error";
       if (!options.json) {
         const msg = err instanceof LLMUnavailableError ? err.message : (err as Error).message;
-        console.log(chalk.yellow(`  LLM: unavailable (${msg}) — falling back to heuristic analysis`));
+        process.stdout.write(chalk.yellow(`  LLM: unavailable (${msg}) — falling back to heuristic analysis`));
       }
     }
   }
@@ -136,22 +137,22 @@ export async function agentsGenerateCommand(dir: string | undefined, options: { 
   const fit = estimateContextWindowFit(guidelines);
 
   if (options.json) {
-    console.log(JSON.stringify({ guidelines, analysis, contextFit: fit, llm: { status: llmStatus, findings: llmFindings?.findings || [] } }, null, 2));
+    process.stdout.write(JSON.stringify({ guidelines, analysis, contextFit: fit, llm: { status: llmStatus, findings: llmFindings?.findings || [] } }, null, 2));
     return;
   }
 
   if (!fit.fits) {
-    console.log(chalk.yellow(`  ⚠ Warning: ~${fit.tokenEstimate} tokens — may not fit in context window\n`));
+    process.stdout.write(chalk.yellow(`  ⚠ Warning: ~${fit.tokenEstimate} tokens — may not fit in context window\n`));
   }
 
-  console.log(guidelines);
+  process.stdout.write(guidelines);
 
   if (options.output) {
     writeFileSync(options.output, guidelines, "utf-8");
-    console.log(chalk.green(`\n  ✓ Written to ${options.output}\n`));
+    process.stdout.write(chalk.green(`\n  ✓ Written to ${options.output}\n`));
   } else {
-    console.log(chalk.dim(`\n  ~${fit.tokenEstimate} tokens estimated (${fit.fits ? "fits" : "may not fit"})\n`));
-    console.log(chalk.dim(`  Use --output <file> to save to a file.\n`));
+    process.stdout.write(chalk.dim(`\n  ~${fit.tokenEstimate} tokens estimated (${fit.fits ? "fits" : "may not fit"})\n`));
+    process.stdout.write(chalk.dim(`  Use --output <file> to save to a file.\n`));
   }
 }
 
@@ -168,26 +169,26 @@ export async function agentsAuditCommand(file: string, options: { json?: boolean
   const report = checkGuidelinesCompliance(content, violations);
 
   if (options.json) {
-    console.log(JSON.stringify(report, null, 2));
+    process.stdout.write(JSON.stringify(report, null, 2));
     return;
   }
 
-  console.log(chalk.bold.cyan("\n  ╔══════════════════════════════════════════════╗"));
-  console.log(chalk.bold.cyan("  ║         AGENTS.md Compliance Audit         ║"));
-  console.log(chalk.bold.cyan("  ╚══════════════════════════════════════════════╝"));
-  console.log(`\n  ${chalk.bold("File:")} ${chalk.white(file)}`);
-  console.log(`  ${chalk.bold("Score:")} ${report.passed ? chalk.green(report.score + "/100") : chalk.red(report.score + "/100")}`);
-  console.log(`  ${chalk.bold("Status:")} ${report.passed ? chalk.green("PASSED") : chalk.red("FAILED")}`);
-  console.log(`  ${chalk.bold("Violations:")} ${report.violations.length} (${report.criticalCount} critical)\n`);
+  process.stdout.write(chalk.bold.cyan("\n  ╔══════════════════════════════════════════════╗"));
+  process.stdout.write(chalk.bold.cyan("  ║         AGENTS.md Compliance Audit         ║"));
+  process.stdout.write(chalk.bold.cyan("  ╚══════════════════════════════════════════════╝"));
+  process.stdout.write(`\n  ${chalk.bold("File:")} ${chalk.white(file)}`);
+  process.stdout.write(`  ${chalk.bold("Score:")} ${report.passed ? chalk.green(report.score + "/100") : chalk.red(report.score + "/100")}`);
+  process.stdout.write(`  ${chalk.bold("Status:")} ${report.passed ? chalk.green("PASSED") : chalk.red("FAILED")}`);
+  process.stdout.write(`  ${chalk.bold("Violations:")} ${report.violations.length} (${report.criticalCount} critical)\n`);
 
   if (report.violations.length > 0) {
-    console.log(`  ${chalk.bold("Uncovered rules:")}\n`);
+    process.stdout.write(`  ${chalk.bold("Uncovered rules:")}\n`);
     for (const v of report.violations) {
       const icon = v.severity === "must" ? chalk.red("●") : chalk.yellow("●");
-      console.log(`    ${icon} ${v.ruleId}`);
-      console.log(`      ${chalk.dim(v.recommendation)}`);
+      process.stdout.write(`    ${icon} ${v.ruleId}`);
+      process.stdout.write(`      ${chalk.dim(v.recommendation)}`);
     }
-    console.log("");
+    process.stdout.write("");
   }
 }
 

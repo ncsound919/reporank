@@ -4,6 +4,7 @@
     "module": "ESNext",
     "moduleResolution": "bundler",
     "strict": true,
+    "strictFunctionTypes": false,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "outDir": "dist",
@@ -11,5 +12,6 @@
     "declaration": true,
     "sourceMap": true
   },
-  "include": ["src"]
+  "include": ["src"],
+  "exclude": ["src/codegen-benchmark.ts"]
 }

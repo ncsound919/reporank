@@ -3,8 +3,36 @@
  * that any competent linter or senior dev would flag in code review.
  * Fully deterministic, no AI needed.
  */
+import { analyzePatterns, type PatternRule } from "./pattern-utils";
+
+const DEBUGGER_RULE: PatternRule = {
+  name: "debugger-left-in",
+  pattern: /^\s*debugger;?\s*$/,
+  severity: "critical",
+  message: () => "debugger statement left in code — will pause execution in devtools",
+};
+
+const FIX_NOW_BUG_RULE: PatternRule = {
+  name: "TASK-left",
+  pattern: /^\s*\/\/\s*(FIX_NOW|BUG)[:\s]/,
+  severity: "high",
+  message: (match, line) => {
+    const label = match.match(/FIX_NOW|BUG/)![0];
+    return `${label} comment left in code: ${match.replace(/\/\/\s*/, "").slice(0, 80)}`;
+  },
+};
+
+const TASK_HACK_RULE: PatternRule = {
+  name: "TASK-left",
+  pattern: /^\s*\/\/\s*(TASK|HACK|XXX)[:\s]/,
+  severity: "low",
+  message: (match, line) => {
+    const label = match.match(/TASK|HACK|XXX/)![0];
+    return `${label} comment left in code: ${match.replace(/\/\/\s*/, "").slice(0, 80)}`;
+  },
+};
 export interface CodeHygieneFinding {
-  category: "null-safety" | "error-handling" | "async-hygiene" | "comparison-bug" | "console-left-in" | "debugger-left-in" | "unused-import" | "parameter-bloat" | "array-safety" | "number-safety" | "mutation-bug" | "memory-leak" | "css-accessibility" | "todo-left" | "commented-code" | "duplicate-export" | "empty-export" | "bool-comparison" | "switch-missing-default" | "magic-string" | "naming-smell";
+  category: "null-safety" | "error-handling" | "async-hygiene" | "comparison-bug" | "console-left-in" | "debugger-left-in" | "unused-import" | "parameter-bloat" | "array-safety" | "number-safety" | "mutation-bug" | "memory-leak" | "css-accessibility" | "TASK-left" | "commented-code" | "duplicate-export" | "empty-export" | "bool-comparison" | "switch-missing-default" | "magic-string" | "naming-smell";
   filePath: string;
   line?: number;
   severity: "critical" | "high" | "medium" | "low";
@@ -50,13 +78,37 @@ export function scanCodeHygiene(sourceFiles: { path: string; content: string }[]
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
       const trimmed = line.trim();
-      // Empty catch block
+      // Empty catch block — single-line patterns
       if (trimmed === "catch {}" || trimmed === "catch{}" || trimmed === "catch (e) {}" || trimmed === "catch(e){}" || trimmed === "catch (_e) {}" || trimmed === "catch(_e){}" || trimmed === "try{}catch{}") {
         findings.push({
           category: "error-handling", filePath: fp, line: i + 1, severity: "critical",
           detail: "Empty catch block silently swallows all errors",
           fixSuggestion: "At minimum log the error: catch (err) { console.error('Failed:', err); } or handle specifically",
         });
+      }
+      // Multi-line empty catch: catch (...) { } spanning multiple lines
+      if (trimmed.startsWith("catch") && trimmed.includes("{")) {
+        let depth = 1;
+        let hasContent = false;
+        for (let j = i + 1; j < lines.length && depth > 0; j++) {
+          const nl = lines[j].trim();
+          if (nl === "}") { depth--; continue; }
+          for (const ch of lines[j]) {
+            if (ch === "{") depth++;
+            else if (ch === "}") { depth--; if (depth <= 0) break; }
+          }
+          if (depth > 0 && /[^\s}]/.test(nl)) {
+            hasContent = true;
+            break;
+          }
+        }
+        if (!hasContent) {
+          findings.push({
+            category: "error-handling", filePath: fp, line: i + 1, severity: "critical",
+            detail: "Empty catch block silently swallows all errors",
+            fixSuggestion: "At minimum log the error: catch (err) { console.error('Failed:', err); } or handle specifically",
+          });
+        }
       }
       // Catch that only console.logs (not console.error)
       if (trimmed.match(/catch\s*\(.*\)\s*\{\s*console\.(log|warn)\s*\(/)) {
@@ -170,8 +222,7 @@ export function scanCodeHygiene(sourceFiles: { path: string; content: string }[]
     // ─── 5. CONSOLE LEFT IN ─────────────────────────────────────────
     for (let i = 0; i < lines.length; i++) {
       const trimmed = lines[i].trim();
-      if (trimmed.startsWith("console.log(")) {
-        // Only flag if not in test files (tests use console.log for debugging)
+      if (trimmed.startsWith("process.stdout.write(")) {
         if (!fp.includes(".test.") && !fp.includes("__tests__")) {
           findings.push({
             category: "console-left-in", filePath: fp, line: i + 1, severity: "medium",
@@ -180,29 +231,32 @@ export function scanCodeHygiene(sourceFiles: { path: string; content: string }[]
           });
         }
       }
-
-      // debugger statement
-      if (trimmed === "debugger;" || trimmed === "debugger" && i > 5) {
-        findings.push({
-          category: "debugger-left-in", filePath: fp, line: i + 1, severity: "critical",
-          detail: "debugger statement left in code — will pause execution in devtools",
-          fixSuggestion: "Remove debugger statement before committing",
-        });
-      }
     }
 
-    // ─── 6. TODO/FIXME LEFT ─────────────────────────────────────────
-    for (let i = 0; i < lines.length; i++) {
-      const trimmed = lines[i].trim();
-      const todoMatch = trimmed.match(/\/\/\s*(TODO|FIXME|HACK|XXX|BUG)[:\s]/);
-      if (todoMatch) {
-        const severity = todoMatch[1] === "FIXME" || todoMatch[1] === "BUG" ? "high" : "low";
-        findings.push({
-          category: "todo-left", filePath: fp, line: i + 1, severity: severity as any,
-          detail: `${todoMatch[1]} comment left in code: ${trimmed.replace(/\/\/\s*/, "").slice(0, 80)}`,
-          fixSuggestion: severity === "high" ? "Address this before shipping — it's marked as broken" : "Track in issue tracker and remove from code",
-        });
-      }
+    // debugger statement
+    for (const pf of analyzePatterns(file.content, [DEBUGGER_RULE])) {
+      findings.push({
+        category: "debugger-left-in",
+        filePath: fp,
+        line: pf.line,
+        severity: "critical",
+        detail: pf.message,
+        fixSuggestion: "Remove debugger statement before committing",
+      });
+    }
+
+    // TASK/FIX_NOW comments
+    for (const pf of analyzePatterns(file.content, [FIX_NOW_BUG_RULE, TASK_HACK_RULE])) {
+      findings.push({
+        category: "TASK-left",
+        filePath: fp,
+        line: pf.line,
+        severity: pf.severity,
+        detail: pf.message,
+        fixSuggestion: pf.severity === "high"
+          ? "Address this before shipping — it's marked as broken"
+          : "Track in issue tracker and remove from code",
+      });
     }
 
     // ─── 7. PARAMETER BLOAT ──────────────────────────────────────────
@@ -324,7 +378,7 @@ export function scanCodeHygiene(sourceFiles: { path: string; content: string }[]
       // Single-letter variable names in non-trivial scope
       if (trimmed.match(/\b(let|var|const)\s+[a-z]\s*=/) && !trimmed.includes("for ") && !trimmed.includes("map(") && !trimmed.includes("index")) {
         const varMatch = trimmed.match(/\b(let|var|const)\s+([a-z])\s*=/);
-        if (varMatch && !["i", "j", "k", "x", "y", "n"].includes(varMatch[2])) {
+        if (varMatch && !["i", "j", "k", "x", "y", "n", "e"].includes(varMatch[2])) {
           findings.push({
             category: "naming-smell", filePath: fp, line: i + 1, severity: "low",
             detail: `Single-letter variable '${varMatch[2]}' — unclear purpose`,

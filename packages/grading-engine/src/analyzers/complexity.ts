@@ -1,5 +1,6 @@
 import { readFileSync, statSync } from "node:fs";
 import { join, extname, dirname, relative } from "node:path";
+import { countPatterns } from "./pattern-utils";
 
 export interface FileHotSpot {
   filePath: string;
@@ -48,9 +49,9 @@ export function analyzeComplexity(repoPath: string, sourceFiles: { path: string;
     longestFiles.push({ path: file.path, lines: lineCount });
 
     // God-file detection: too many exports/classes for one file
-    const exportCount = (file.content.match(/\bexport\s+(function|const|class|interface|type)\s/g) || []).length;
-    const functionCount = (file.content.match(/\bfunction\s+\w+/g) || []).length;
-    const classCount = (file.content.match(/\bclass\s+\w+/g) || []).length;
+    const exportCount = countPatterns(file.content, /\bexport\s+(function|const|class|interface|type)\s/g);
+    const functionCount = countPatterns(file.content, /\bfunction\s+\w+/g);
+    const classCount = countPatterns(file.content, /\bclass\s+\w+/g);
 
     if (exportCount > 15) {
       score += 25;
@@ -75,7 +76,7 @@ export function analyzeComplexity(repoPath: string, sourceFiles: { path: string;
     }
 
     // Low cohesion: mixed concerns in one file
-    const importCount = (file.content.match(/^import\s/gm) || []).length;
+    const importCount = countPatterns(file.content, /^import\s/gm);
     const topicAreas = detectTopicAreas(file.content);
     if (topicAreas.size > 3 && lineCount > 200) {
       score += 10;
@@ -163,14 +164,15 @@ export function analyzeComplexity(repoPath: string, sourceFiles: { path: string;
 }
 
 function calculateMaxNesting(lines: string[]): number {
-  let maxDepth = 0, currentDepth = 0;
-  const openers = /\b(if|for|while|switch|catch|function\s*\w*\s*\(|=>\s*\{|try)\s*/;
-  const closers = /^\s*\}/;
+  let depth = 0;
+  let maxDepth = 0;
 
   for (const line of lines) {
-    const trimmed = line.trim();
-    if (closers.test(trimmed)) currentDepth = Math.max(0, currentDepth - 1);
-    if (openers.test(trimmed)) { currentDepth++; maxDepth = Math.max(maxDepth, currentDepth); }
+    const opens = (line.match(/\{/g) || []).length;
+    const closes = (line.match(/\}/g) || []).length;
+    depth += opens - closes;
+    if (depth < 0) depth = 0;
+    maxDepth = Math.max(maxDepth, depth);
   }
 
   return maxDepth;
@@ -181,8 +183,6 @@ function detectTopicAreas(content: string): Set<string> {
   const topicKeywords: Record<string, RegExp> = {
     "auth": /\b(login|signup|token|password|session|oauth|jwt)\b/i,
     "database": /\b(query|insert|update|delete|mutation|prisma|sql|model)\b/i,
-    "networking": /\b(fetch|axios|request|response|api|endpoint|route|http)\b/i,
-    "UI": /\b(render|component|jsx|tsx|style|css|html|div|span)\b/i,
     "error-handling": /\b(throw|catch|error|exception|try|finally)\b/i,
     "logging": /\b(console\.log|logger|warn|debug|info|trace)\b/i,
     "file-io": /\b(readFile|writeFile|fs\.|stream|path\.|buffer)\b/i,
@@ -192,6 +192,18 @@ function detectTopicAreas(content: string): Set<string> {
   for (const [topic, regex] of Object.entries(topicKeywords)) {
     if (regex.test(content)) topics.add(topic);
   }
+
+  // Networking: only flag request/response if paired with express/router/middleware on same line
+  const hasNetworkingBase = /\b(fetch|axios|api|endpoint|route|http)\b/i.test(content);
+  const hasNetworkingContext = /\b(request|response)\b/i.test(content)
+    && /\b(express|router|middleware)\b/i.test(content);
+  if (hasNetworkingBase || hasNetworkingContext) topics.add("networking");
+
+  // UI: only flag component if paired with tsx/jsx/render/props
+  const hasUIBase = /\b(render|jsx|tsx|style|css|html|div|span)\b/i.test(content);
+  const hasUIComponentContext = /\bcomponent\b/i.test(content)
+    && /\b(tsx|jsx|render|props)\b/i.test(content);
+  if (hasUIBase || hasUIComponentContext) topics.add("UI");
 
   return topics;
 }

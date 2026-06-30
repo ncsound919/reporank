@@ -1,21 +1,45 @@
 #!/usr/bin/env node
 // WebDev Arena-style benchmark for code generation quality.
 //
-// Runs prompts through the VibeServe architect→code pipeline, then evaluates
-// the generated code on compilation, correctness, and test quality.
+// Runs prompts through the Mutly pipeline's LLM (Gemini via @google/genai)
+// with VibeServe fallback. Evaluates generated code on compilation,
+// correctness, and test quality.
 //
-// Usage: tsx codegen-benchmark.ts [--output report.json]
+// Usage: tsx codegen-benchmark.ts [--output report.json] [--provider vibe]
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
-import { resolve, dirname } from "node:path";
+import { resolve, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { GoogleGenAI } from "@google/genai";
+import { config as dotenvConfig } from "dotenv";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
+// Load .env from Mutly-Daemon-Agent directory if present
+// __dirname is apps/cli/src, so we go up 4 levels to Coding Trio
+const mutlyEnvPath = join(__dirname, "..", "..", "..", "..", "Mutly-Daemon-Agent", ".env");
+if (existsSync(mutlyEnvPath)) {
+  dotenvConfig({ path: mutlyEnvPath });
+} else {
+  dotenvConfig();
+}
+
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
+const LLM_PROVIDER = process.env.BENCHMARK_LLM_PROVIDER || (GEMINI_API_KEY ? "gemini" : "vibeserve");
+
+let _genai: GoogleGenAI | null = null;
+function getGenAI(): GoogleGenAI {
+  if (!_genai) _genai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
+  return _genai;
+}
+
 const VIBESERVE_URL = process.env.VIBESERVE_URL || "http://127.0.0.1:8000";
-const VIBESERVE_API_KEY = process.env.VIBESERVE_API_KEY || "benchmark-secret-2024";
-const AUTH_HEADERS = { "X-VibeServe-API-Key": VIBESERVE_API_KEY };
+const VIBESERVE_API_KEY = process.env.VIBESERVE_API_KEY;
+if (LLM_PROVIDER === "vibeserve" && !VIBESERVE_API_KEY) {
+  throw new Error("VIBESERVE_API_KEY environment variable is required when using the vibeserve provider");
+}
+const AUTH_HEADERS = VIBESERVE_API_KEY ? { "X-VibeServe-API-Key": VIBESERVE_API_KEY } : {};
 
 // ─── Task Dataset ──────────────────────────────────────────
 interface GenTask {
@@ -79,7 +103,35 @@ const TASKS: GenTask[] = [
   },
   {
     id: "login-form",
-    prompt: "Create a login form component with email and password fields. Validate email format, password minimum length. Show validation errors. Prevent double-submission. Use TypeScript. CRITICAL: Export as default `LoginForm`. Use variable names: `email`, `password`, `errors`, `submitting`. Validate with check: length >= 8 for password, regex for email.",
+    prompt: `Create a production-quality login form React component in TypeScript.
+
+REQUIREMENTS:
+- Two controlled input fields: email and password
+- Validate email with regex: /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/
+- Validate password: minimum 8 characters
+- Display per-field validation errors below each input
+- Prevent double-submission with a submitting boolean flag
+- Disable the submit button while submitting
+- NEVER log passwords or credentials to console
+- NEVER use window.alert() — use inline error display only
+- Handle submit with try/catch
+- Clear error state on re-submit attempt
+
+CRITICAL NAMES: Export default as \`LoginForm\`. Use exactly these variable names: \`email\`, \`password\`, \`errors\`, \`submitting\`.
+
+FEW-SHOT EXAMPLE of the validate function signature:
+\`\`\`typescript
+const validate = (): FormErrors => {
+  const newErrors: FormErrors = {};
+  if (!email) newErrors.email = "Email is required";
+  else if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) newErrors.email = "Invalid email";
+  if (!password) newErrors.password = "Password is required";
+  else if (password.length < 8) newErrors.password = "Must be 8+ characters";
+  return newErrors;
+};
+\`\`\`
+
+Return a JSON array with one file object: [{"path": "LoginForm.tsx", "content": "the code", "language": "tsx"}]`,
     language: "typescript",
     expectedFiles: [".tsx"],
     requiredKeywords: ["email", "password", "validat", "submit", "error"],
@@ -89,7 +141,60 @@ const TASKS: GenTask[] = [
   },
   {
     id: "data-fetcher-hook",
-    prompt: "Create a custom React hook `useFetch<T>` that fetches data from a URL with loading, error, and data states. Support abort on unmount. Use TypeScript generics. CRITICAL: Export as named export `useFetch`. Use generic type parameter `<T>`. Use exact hook calls: `useState`, `useEffect`, `useRef` for AbortController. Return `{ data, loading, error }`.",
+    prompt: `Create a custom React hook \`useFetch<T>\` in TypeScript. Output to a .ts file (NOT .tsx).
+
+REQUIREMENTS:
+- Generic type parameter \`<T>\` for the response data type
+- Returns an object: \`{ data: T | null, loading: boolean, error: Error | null }\`
+- Uses \`useState\` for data, loading, and error states
+- Uses \`useEffect\` to trigger fetch when URL changes
+- Uses \`useRef\` to hold an AbortController for cleanup
+- Aborts in-flight requests on unmount or URL change via useEffect return
+- Handles HTTP errors (non-2xx responses) by reading response text and throwing
+- Catches AbortError silently (do NOT set error state for aborted requests)
+- Initial state: \`{ data: null, loading: true, error: null }\`
+
+CRITICAL NAMES: Named export \`useFetch\`. Use exact: \`useState\`, \`useEffect\`, \`useRef\`, \`AbortController\`.
+
+FEW-SHOT EXAMPLE of the hook return and state shape:
+\`\`\`typescript
+interface FetchResult<T> {
+  data: T | null;
+  loading: boolean;
+  error: Error | null;
+}
+
+export const useFetch = <T,>(url: string): FetchResult<T> => {
+  const [data, setData] = useState<T | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    abortRef.current = controller;
+    setLoading(true);
+    setError(null);
+
+    fetch(url, { signal: controller.signal })
+      .then((res) => {
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        return res.json() as Promise<T>;
+      })
+      .then((json) => setData(json))
+      .catch((err) => {
+        if (err.name !== "AbortError") setError(err);
+      })
+      .finally(() => setLoading(false));
+
+    return () => controller.abort();
+  }, [url]);
+
+  return { data, loading, error };
+};
+\`\`\`
+
+Return a JSON array with one file: [{"path": "useFetch.ts", "content": "the full code", "language": "ts"}]`,
     language: "typescript",
     expectedFiles: [".ts"],
     requiredKeywords: ["useState", "useEffect", "useFetch", "loading", "error", "data", "AbortController"],
@@ -98,13 +203,13 @@ const TASKS: GenTask[] = [
     checks: { validSyntax: true, hasExport: true, typedProperly: true, errorHandling: true, compilesClean: true },
   },
   {
-    id: "todo-manager",
-    prompt: "Create a Todo manager React component with add, toggle complete, delete, and filter (all/active/completed). Use useReducer for state. TypeScript. Export as default `TodoApp`. CRITICAL: Name the component `TodoApp`. Use exact dispatch actions: `{ type: 'ADD' }`, `{ type: 'TOGGLE' }`, `{ type: 'DELETE' }`. Use reducer function named `todoReducer`.",
+    id: "TASK-manager",
+    prompt: "Create a TASK manager React component with add, toggle complete, delete, and filter (all/active/completed). Use useReducer for state. TypeScript. Export as default `TASKApp`. CRITICAL: Name the component `TASKApp`. Use exact dispatch actions: `{ type: 'ADD' }`, `{ type: 'TOGGLE' }`, `{ type: 'DELETE' }`. Use reducer function named `TASKReducer`.",
     language: "typescript",
     expectedFiles: [".tsx"],
-    requiredKeywords: ["useReducer", "addTodo", "toggle", "delete", "filter"],
+    requiredKeywords: ["useReducer", "addTASK", "toggle", "delete", "filter"],
     bannedKeywords: ["var", "eval"],
-    requiredNames: ["TodoApp", "todoReducer", "useReducer"],
+    requiredNames: ["TASKApp", "TASKReducer", "useReducer"],
     checks: { validSyntax: true, hasExport: true, typedProperly: true, errorHandling: false, compilesClean: true },
   },
   {
@@ -119,7 +224,68 @@ const TASKS: GenTask[] = [
   },
   {
     id: "debounce-function",
-    prompt: "Create a generic debounce utility function in TypeScript with proper typing. Support leading and trailing options. Export as named export `debounce`. CRITICAL: Export as `debounce`. Use `setTimeout` and `clearTimeout` internally. Use generic type parameter `<T extends unknown[]>`. The function should return a debounced version with a `.cancel()` method.",
+    prompt: `Create a generic debounce utility function in TypeScript. Output to a .ts file.
+
+REQUIREMENTS:
+- Generic type parameter: \`<F extends (...args: never[]) => unknown>\`
+- Accepts a function \`fn: F\` and a \`delayMs: number\`
+- Supports \`leading\` and \`trailing\` boolean options (default both true)
+- Uses \`setTimeout\` and \`clearTimeout\` internally
+- Returns a debounced version of \`fn\` with a \`.cancel()\` method to clear pending timers
+- The debounced function passes through \`this\` context and arguments
+- On leading: invoke immediately on first call, then debounce subsequent calls
+- On trailing: invoke after \`delayMs\` of inactivity since last call
+- Export as named export: \`debounce\`
+
+CRITICAL NAMES: Export \`debounce\`. Use exactly: \`setTimeout\`, \`clearTimeout\`.
+
+FEW-SHOT EXAMPLE of the function signature:
+\`\`\`typescript
+interface DebounceOptions {
+  leading?: boolean;
+  trailing?: boolean;
+}
+
+interface DebouncedFunction<F extends (...args: never[]) => unknown> {
+  (...args: Parameters<F>): ReturnType<F> | undefined;
+  cancel: () => void;
+  flush: () => ReturnType<F> | undefined;
+}
+
+export function debounce<F extends (...args: never[]) => unknown>(
+  fn: F,
+  delayMs: number,
+  options: DebounceOptions = {}
+): DebouncedFunction<F> {
+  const { leading = true, trailing = true } = options;
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  let lastResult: ReturnType<F> | undefined;
+
+  const debounced = function (this: unknown, ...args: Parameters<F>): ReturnType<F> | undefined {
+    if (leading && timer === null) {
+      lastResult = fn.apply(this, args) as ReturnType<F>;
+    }
+    if (timer !== null) clearTimeout(timer);
+    timer = setTimeout(() => {
+      timer = null;
+      if (trailing) lastResult = fn.apply(this, args) as ReturnType<F>;
+    }, delayMs);
+    return lastResult;
+  };
+
+  debounced.cancel = () => {
+    if (timer !== null) { clearTimeout(timer); timer = null; }
+  };
+  debounced.flush = () => {
+    if (timer !== null) { clearTimeout(timer); timer = null; return fn() as ReturnType<F>; }
+    return undefined;
+  };
+
+  return debounced;
+}
+\`\`\`
+
+Return a JSON array with one file: [{"path": "debounce.ts", "content": "the full code", "language": "ts"}]`,
     language: "typescript",
     expectedFiles: [".ts"],
     requiredKeywords: ["debounce", "setTimeout", "clearTimeout"],
@@ -146,6 +312,30 @@ async function apiPost(url: string, body: unknown) {
 }
 
 async function callLLM(prompt: string, responseFormat: "json" | "text" = "json") {
+  if (LLM_PROVIDER === "gemini") {
+    return callGeminiLLM(prompt, responseFormat);
+  }
+  return callVibeServeLLM(prompt, responseFormat);
+}
+
+async function callGeminiLLM(prompt: string, responseFormat: "json" | "text" = "json"): Promise<{ content: string; tokens: number }> {
+  if (!GEMINI_API_KEY) {
+    throw new Error("GEMINI_API_KEY not set — cannot call Gemini");
+  }
+  const response = await getGenAI().models.generateContent({
+    model: "gemini-2.5-flash",
+    contents: prompt,
+    config: {
+      temperature: 0.2,
+      responseMimeType: responseFormat === "json" ? "application/json" : "text/plain",
+    },
+  });
+  const text = response.text || "";
+  const tokens = (response.usageMetadata?.totalTokenCount || 0) as number;
+  return { content: text, tokens };
+}
+
+async function callVibeServeLLM(prompt: string, responseFormat: "json" | "text" = "json") {
   const res = await apiPost(`${VIBESERVE_URL}/v1/llm/complete`, {
     prompt, response_format: responseFormat, temperature: 0.2,
   });
@@ -163,9 +353,22 @@ function checkSyntax(code: string): boolean {
     const counts = { "{": 0, "}": 0, "[": 0, "]": 0, "(": 0, ")": 0 };
     let inString = false;
     let inTemplate = false;
+    let stringChar = "";
+    let escapeNext = false;
     for (const ch of code) {
-      if (ch === '"' || ch === "'") inString = !inString;
-      if (ch === "`") inTemplate = !inTemplate;
+      if (escapeNext) { escapeNext = false; continue; }
+      if (ch === "\\" && (inString || inTemplate)) { escapeNext = true; continue; }
+      if (ch === '"' || ch === "'") {
+        if (!inTemplate && (!inString || ch === stringChar)) {
+          inString = !inString;
+          stringChar = inString ? ch : "";
+        }
+      }
+      if (ch === "`") {
+        if (!inString) {
+          inTemplate = !inTemplate;
+        }
+      }
       if (!inString && !inTemplate) {
         if (ch in counts) (counts as any)[ch]++;
       }
@@ -229,7 +432,7 @@ function checkKeywords(code: string, required: string[]): boolean {
     "debounce": ["debounce", "bounce", "timer", "timeout", "delay"],
     "increment": ["increment", "incre", "plus", "add"],
     "decrement": ["decrement", "decre", "minus", "subtract"],
-    "addTodo": ["addtodo", "add", "todo", "create"],
+    "addTASK": ["addTASK", "add", "TASK", "create"],
     "useReducer": ["usereducer", "reducer", "dispatch"],
     "useState": ["usestate", "state", "state"],
     "useEffect": ["useeffect", "effect"],
@@ -353,9 +556,15 @@ function checkTypeScriptCompiles(content: string, expectedExt: string): boolean 
       include: [fileName],
     }), "utf-8");
 
-    const localTsc = "C:/Users/User/Desktop/Coding Trio/reporank/node_modules/typescript/bin/tsc";
-    const tscBin = existsSync(localTsc) ? localTsc : "tsc";
-    const nodeBin = "C:/Program Files/nodejs/node.exe";
+    let localTsc: string | null = null;
+    try {
+      const tsPkgPath = require.resolve("typescript");
+      localTsc = join(dirname(tsPkgPath), "bin", "tsc");
+    } catch {
+      // typescript not resolvable — fall through
+    }
+    const tscBin = localTsc && existsSync(localTsc) ? localTsc : "tsc";
+    const nodeBin = process.execPath;
     childMod.execFileSync(nodeBin, [tscBin, "--project", pathMod.join(tmpDir, "tsconfig.json")], {
       cwd: tmpDir,
       stdio: ["ignore", "pipe", "pipe"],
@@ -469,7 +678,7 @@ async function callLLMWithRepair(
 }
 
 // ─── Runner ────────────────────────────────────────────────
-async function runTask(task: GenTask): Promise<GenResult> {
+async function runTask(TASK: GenTask): Promise<GenResult> {
   const start = Date.now();
   const errors: string[] = [];
   let totalTokens = 0;
@@ -494,13 +703,13 @@ ${task.requiredNames.map((n) => `  - ${n}`).join("\n")}`
 
       const genPrompt = `You are a senior ${task.language} developer. Generate production-quality code.
 
-Task: ${task.prompt}${requiredNamesBlock}
+TASK: ${task.prompt}${requiredNamesBlock}
 
 ${strictness}`;
       const result = await callLLM(genPrompt, "json");
       totalTokens += result.tokens;
 
-      let parsed: any;
+      let parsed: { path?: string; content?: string; language?: string }[] | { path?: string; content?: string; language?: string } | undefined;
       const repaired = repairJson(result.content);
       // Try increasingly aggressive repairs
       const attempts = [repaired, aggressiveJsonRepair(repaired)];
@@ -519,6 +728,8 @@ ${strictness}`;
           else throw e2;
         }
       }
+
+      if (parsed === undefined) throw new Error("Could not parse LLM output");
 
       if (Array.isArray(parsed)) {
         files = parsed.map((f: any) => ({
@@ -583,9 +794,10 @@ async function main() {
   const args = process.argv.slice(2);
   const outputPath = args.includes("--output") ? resolve(args[args.indexOf("--output") + 1]) : null;
 
-  console.log("\n  ╔═══════════════════════════════════════════════╗");
-  console.log("  ║   WebDev Arena — Code Gen Benchmark         ║");
-  console.log("  ╚═══════════════════════════════════════════════╝\n");
+  process.stdout.write("\n  ╔═══════════════════════════════════════════════╗");
+  process.stdout.write("  ║   WebDev Arena — Code Gen Benchmark         ║");
+  process.stdout.write(`  ║   Provider: ${LLM_PROVIDER.padEnd(32)} ║`);
+  process.stdout.write("  ╚═══════════════════════════════════════════════╝\n");
 
   const results: GenResult[] = [];
   let totalTokens = 0;
@@ -593,6 +805,8 @@ async function main() {
 
   for (let i = 0; i < TASKS.length; i++) {
     const task = TASKS[i];
+    // Rate-limit friendly: 4s gap between TASKS
+    if (i > 0) await new Promise(r => setTimeout(r, 4000));
     process.stdout.write(`  [${i + 1}/${TASKS.length}] ${task.id.padEnd(22)} ...`);
     const result = await runTask(task);
     results.push(result);
@@ -624,22 +838,23 @@ async function main() {
     totalDurationMs: totalDuration,
   };
 
-  console.log(`\n  ── Summary ──`);
-  console.log(`  Tasks:    ${report.total}`);
-  console.log(`  Passed:   ${report.passed}/${report.total} (${(report.passRate * 100).toFixed(1)}%)`);
+  process.stdout.write(`\n  ── Summary ──`);
+  process.stdout.write(`  TASKS:    ${report.total}`);
+  process.stdout.write(`  Passed:   ${report.passed}/${report.total} (${(report.passRate * 100).toFixed(1)}%)`);
   for (const [k, v] of Object.entries(aggregateChecks)) {
-    console.log(`  ${k.padEnd(18)} ${v.passed}/${v.total} (${(v.passed / v.total * 100).toFixed(0)}%)`);
+    process.stdout.write(`  ${k.padEnd(18)} ${v.passed}/${v.total} (${(v.passed / v.total * 100).toFixed(0)}%)`);
   }
-  console.log(`  Tokens:   ${report.totalTokens}`);
-  console.log(`  Duration: ${(report.totalDurationMs / 1000).toFixed(1)}s`);
+  process.stdout.write(`  Tokens:   ${report.totalTokens}`);
+  process.stdout.write(`  Duration: ${(report.totalDurationMs / 1000).toFixed(1)}s`);
 
   if (outputPath) {
     mkdirSync(dirname(outputPath), { recursive: true });
     writeFileSync(outputPath, JSON.stringify(report, null, 2), "utf-8");
-    console.log(`\n  Report: ${outputPath}`);
+    process.stdout.write(`\n  Report: ${outputPath}`);
   }
 
-  process.exit(report.passRate > 0.5 ? 0 : 1);
+  const threshold = parseFloat(process.env.BENCHMARK_THRESHOLD ?? "0.5");
+  process.exit(report.passRate > threshold ? 0 : 1);
 }
 
 main().catch((err) => {

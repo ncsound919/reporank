@@ -77,15 +77,25 @@ export function analyzeArchitecture(
   // Find orphaned files (files with no imports from other files)
   const importGraph = buildImportGraph(sourceFiles);
   const allImportedFiles = new Set<string>();
+  const extensions = [".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"];
+
   for (const [, imports] of importGraph) {
-    for (const imp of imports) allImportedFiles.add(imp);
+    for (const imp of imports) {
+      allImportedFiles.add(imp);
+      // Also register the import with extensions so lookups match
+      for (const ext of extensions) {
+        allImportedFiles.add(imp + ext);
+      }
+    }
   }
 
   for (const [file, imports] of importGraph) {
     if (imports.length === 0 && !file.includes("index.")) {
       const isEntryPoint = ["index.ts", "index.tsx", "main.tsx", "app.ts", "server.ts"].some(e => file.endsWith(e));
       if (!isEntryPoint) {
-        const isImportedByOther = [...importGraph.entries()].some(([_, imps]) => imps.includes(file));
+        const isImportedByOther = extensions.some(ext =>
+          [...importGraph.entries()].some(([_, imps]) => imps.includes(file) || imps.includes(file + ext))
+        );
         if (!isImportedByOther) {
           findings.push({
             type: "orphan", filePath: file, severity: "low",
@@ -161,9 +171,9 @@ export function analyzeArchitecture(
 
 function detectArchetype(files: string[], dirs: Map<string, number>): string {
   const allFiles = files.join(" ");
-  if (allFiles.includes("src/components/") && allFiles.includes("src/pages/")) return "react-app";
-  if (allFiles.includes("src/routes/") && allFiles.includes("src/middleware/")) return "express-api";
-  if (allFiles.includes("app/") && allFiles.includes("next.config")) return "next-app";
+  if (files.some(f => f.includes("src/components/")) && files.some(f => f.includes("src/pages/"))) return "react-app";
+  if (files.some(f => f.includes("src/routes/")) && files.some(f => f.includes("src/middleware/"))) return "express-api";
+  if (files.some(f => f.includes("app/")) && files.some(f => f.includes("next.config"))) return "next-app";
   if (allFiles.includes("src/modules/") && dirs.has("src/modules")) return "agent-sdk";
   if (dirs.has("dist")) return "npm-package";
   return "generic";

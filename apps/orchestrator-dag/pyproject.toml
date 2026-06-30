@@ -1,0 +1,12 @@
+[project]
+name = "orchestrator-dag"
+version = "0.1.0"
+description = "Dagster orchestrator for reporank pipeline"
+requires-python = ">=3.9"
+dependencies = [
+    "dagster",
+    "dagster-webserver",
+]
+
+[tool.dagster]
+module_name = "reporank_pipeline"

@@ -34,18 +34,18 @@ async function main() {
     process.exit(1);
   }
   const tasks: ReviewTask[] = JSON.parse(readFileSync(DEFAULT_DATASET, "utf-8"));
-  console.log(`Sweeping thresholds over ${tasks.length} tasks (${useLlm ? "heuristic + LLM" : "heuristic-only"})\n`);
+  process.stdout.write(`Sweeping thresholds over ${tasks.length} tasks (${useLlm ? "heuristic + LLM" : "heuristic-only"})\n`);
 
   // If --llm, pre-compute LLM findings once (they don't change with threshold)
   const llmCache: Map<string, Finding[]> = new Map();
   if (useLlm) {
     const { llmScan } = await import("./review_scanner");
-    console.log("Computing LLM findings (this may take a moment)...");
+    process.stdout.write("Computing LLM findings (this may take a moment)...");
     for (const task of tasks) {
       const scan = await llmScan({ id: task.id, language: task.language, code: task.code });
       llmCache.set(task.id, scan.findings);
     }
-    console.log("Done. Sweeping...\n");
+    process.stdout.write("Done. Sweeping...\n");
   }
 
   const thresholds = [0.0, 0.3, 0.5, 0.6, 0.7, 0.8, 0.85, 0.9, 0.95];
@@ -79,19 +79,19 @@ async function main() {
     points.push({ threshold: t, tp, fp, fn, precision, recall, f1 });
   }
 
-  console.log("Threshold   TP    FP    FN   Precision   Recall    F1");
-  console.log("─".repeat(58));
+  process.stdout.write("Threshold   TP    FP    FN   Precision   Recall    F1");
+  process.stdout.write("─".repeat(58));
   let best: SweepPoint = points[0];
   for (const p of points) {
     if (p.f1 > best.f1) best = p;
-    console.log(
+    process.stdout.write(
       `  ${p.threshold.toFixed(2)}      ${String(p.tp).padStart(4)} ${String(p.fp).padStart(5)} ${String(p.fn).padStart(5)}   ` +
       `${(p.precision * 100).toFixed(1).padStart(5)}%     ${(p.recall * 100).toFixed(1).padStart(5)}%   ${(p.f1 * 100).toFixed(1).padStart(5)}%` +
       (p === best ? "  ← best F1" : ""),
     );
   }
-  console.log("\nBest operating point: threshold=" + best.threshold + " F1=" + (best.f1 * 100).toFixed(1) + "%");
-  console.log("For 70% F1 target with current heuristics, we need LLM augmentation to fill the gap.");
+  process.stdout.write("\nBest operating point: threshold=" + best.threshold + " F1=" + (best.f1 * 100).toFixed(1) + "%");
+  process.stdout.write("For 70% F1 target with current heuristics, we need LLM augmentation to fill the gap.");
 }
 
 function matchTask(task: ReviewTask, findings: Finding[]): { tp: number; fp: number; fn: number } {

@@ -65,8 +65,73 @@
       },
       "latencyMs": 12670.2,
       "timestamp": 1781020644061
+    },
+    "eaab3084f29908e400c369121fa3b6834141aca06d5b1096aaa60faae559678c": {
+      "promptHash": "eaab3084f29908e400c369121fa3b6834141aca06d5b1096aaa60faae559678c",
+      "content": "{\n  \"reasoning\": \"The code has a critical SQL injection vulnerability due to direct user input in the SQL query. Additionally, error handling for the database query is insufficient, potentially leading to process crashes.\",\n  \"findings\": [\n    {\n      \"category\": \"security\",\n      \"severity\": \"critical\",\n      \"line\": 5,\n      \"type\": \"sql-injection\",\n      \"description\": \"User input from `req.query.id` is directly embedded into the SQL query string without sanitization or parameterization.\",\n      \"recommendation\": \"Use parameterized queries provided by your database driver (e.g., `db.query('SELECT * FROM users WHERE id = ?', [id], ...)`) to prevent SQL injection.\",\n      \"confidence\": 1.0\n    },\n    {\n      \"category\": \"quality\",\n      \"severity\": \"high\",\n      \"line\": 7,\n      \"type\": \"no-error-handling\",\n      \"description\": \"An error from `db.query` is thrown directly in the callback, which will crash the Node.js process if not caught by a global handler, instead of being handled gracefully or passed to Express's error middleware.\",\n      \"recommendation\": \"Instead of `throw err;`, pass the error to Express's `next` function (`return next(err);`) or handle it by sending an appropriate error response to the client (e.g., `res.status(500).json({ error: 'Database error' });`).\",\n      \"confidence\": 0.9\n    }\n  ]\n}",
+      "provider": "Gemini",
+      "model": "default",
+      "usage": {
+        "prompt_tokens": 3180,
+        "completion_tokens": 334,
+        "total_tokens": 3514
+      },
+      "latencyMs": 8526,
+      "timestamp": 1781022181328
+    },
+    "0d149138b1d99a4f85d50851860404898e992152fcf5a4b7a3f285575dae7e95": {
+      "promptHash": "0d149138b1d99a4f85d50851860404898e992152fcf5a4b7a3f285575dae7e95",
+      "content": "{\n  \"reasoning\": \"The async route handler lacks error handling, which can lead to unhandled promise rejections and server crashes. Additionally, `req.params.id` will be undefined for the defined route, likely causing `fetchData` to fail.\",\n  \"findings\": [\n    {\n      \"category\": \"quality\",\n      \"severity\": \"high\",\n      \"line\": 3,\n      \"type\": \"no-error-handling\",\n      \"description\": \"The async route handler for '/data' lacks a try/catch block around the await call, meaning any error from `fetchData` will result in an unhandled promise rejection.\",\n      \"recommendation\": \"Wrap the `await fetchData()` call in a try/catch block to gracefully handle errors and send an appropriate error response (e.g., res.status(500).json({ error: '...' })).\",\n      \"confidence\": 0.95\n    },\n    {\n      \"category\": \"quality\",\n      \"severity\": \"high\",\n      \"line\": 4,\n      \"type\": \"missing-null-check\",\n      \"description\": \"For the route `app.get('/data', ...)`, `req.params.id` will always be `undefined`. Passing `undefined` to `fetchData` is likely an unintended bug.\",\n      \"recommendation\": \"If an ID is expected, either change the route to `app.get('/data/:id', ...)` or use `req.query.id` (e.g., `app.get('/data', async (req, res) => { const id = req.query.id; ... })`) and ensure `id` is validated before use.\",\n      \"confidence\": 0.9\n    }\n  ]\n}",
+      "provider": "Gemini",
+      "model": "default",
+      "usage": {
+        "prompt_tokens": 3150,
+        "completion_tokens": 338,
+        "total_tokens": 3488
+      },
+      "latencyMs": 10974.5,
+      "timestamp": 1781022184138
+    },
+    "15553d78b1bfb5216e42f4ecec80369f8dd68c449579219123e6612d4e0d7a11": {
+      "promptHash": "15553d78b1bfb5216e42f4ecec80369f8dd68c449579219123e6612d4e0d7a11",
+      "content": "{\n  \"reasoning\": \"The use of `eval()` with a string parameter is a severe security risk, as it allows arbitrary code execution if the input is not perfectly controlled.\",\n  \"findings\": [\n    {\n      \"category\": \"security\",\n      \"severity\": \"critical\",\n      \"line\": 2,\n      \"type\": \"code-injection\",\n      \"description\": \"The `eval()` function is used with the `expression` parameter, which could be user-controlled, allowing for arbitrary code execution.\",\n      \"recommendation\": \"Avoid using `eval()`. If dynamic expression evaluation is required, consider a safer alternative like a dedicated expression parser library or a sandboxed environment, ensuring all input is strictly validated and sanitized.\",\n      \"confidence\": 0.99\n    }\n  ]\n}",
+      "provider": "Gemini",
+      "model": "default",
+      "usage": {
+        "prompt_tokens": 3123,
+        "completion_tokens": 186,
+        "total_tokens": 3309
+      },
+      "latencyMs": 3787.4,
+      "timestamp": 1781022184669
+    },
+    "749479f2f6d389e4150bceb31834dce9f17c5146df8c5f83a94b5578393114e1": {
+      "promptHash": "749479f2f6d389e4150bceb31834dce9f17c5146df8c5f83a94b5578393114e1",
+      "content": "{\n  \"reasoning\": \"The API key is hardcoded directly in the source file, which is a critical security vulnerability.\",\n  \"findings\": [\n    {\n      \"category\": \"security\",\n      \"severity\": \"critical\",\n      \"line\": 2,\n      \"type\": \"hardcoded-secret\",\n      \"description\": \"API key 'sk-abc123def456ghi789jkl' is hardcoded in the source file.\",\n      \"recommendation\": \"Move the API key to environment variables (e.g., process.env.API_KEY) or a secure configuration management system. Do not commit secrets to version control.\",\n      \"confidence\": 0.99\n    }\n  ]\n}",
+      "provider": "Gemini",
+      "model": "default",
+      "usage": {
+        "prompt_tokens": 3137,
+        "completion_tokens": 140,
+        "total_tokens": 3277
+      },
+      "latencyMs": 4555.5,
+      "timestamp": 1781022185062
+    },
+    "a47caf90da6f7aae707c4598c86855ef7c9c79b396f6c87d084a93cc6c99ebe2": {
+      "promptHash": "a47caf90da6f7aae707c4598c86855ef7c9c79b396f6c87d084a93cc6c99ebe2",
+      "content": "{\n  \"reasoning\": \"The component uses setInterval in useEffect without a cleanup function, leading to a resource leak. Additionally, a console.log statement is present.\",\n  \"findings\": [\n    {\n      \"category\": \"quality\",\n      \"severity\": \"high\",\n      \"line\": 4,\n      \"type\": \"resource-leak\",\n      \"description\": \"setInterval in useEffect without clearInterval cleanup function. The interval will continue to run even after the component unmounts, leading to memory leaks and potential performance issues.\",\n      \"recommendation\": \"Return a cleanup function from useEffect that calls clearInterval with the ID returned by setInterval.\",\n      \"confidence\": 0.95\n    },\n    {\n      \"category\": \"maintainability\",\n      \"severity\": \"low\",\n      \"line\": 5,\n      \"type\": \"debug-code\",\n      \"description\": \"console.log statement found in component logic, which should typically be removed or replaced with a proper logging solution in production.\",\n      \"recommendation\": \"Remove the console.log statement or replace it with a more robust logging mechanism.\",\n      \"confidence\": 0.8\n    }\n  ]\n}",
+      "provider": "Gemini",
+      "model": "default",
+      "usage": {
+        "prompt_tokens": 3163,
+        "completion_tokens": 274,
+        "total_tokens": 3437
+      },
+      "latencyMs": 6570.5,
+      "timestamp": 1781022362958
     }
   },
-  "hits": 6,
-  "misses": 14
+  "hits": 14,
+  "misses": 66
 }

@@ -52,6 +52,12 @@ app.get("/health", (_req, res) => res.json({
   uptime: process.uptime(),
   timestamp: new Date().toISOString() 
 }));
+app.use("/api", (req, res, next) => {
+  if (!process.env.DATABASE_URL) {
+    return res.status(503).json({ error: "Database not configured" });
+  }
+  next();
+});
 app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/scans", scanRoutes);
 app.use("/api/v1/billing", billingRoutes);

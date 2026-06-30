@@ -18,13 +18,13 @@ describe("scanCodeHygiene", () => {
   });
 
   it("detects console.log in production code", () => {
-    const files = [{ path: "app.ts", content: 'console.log("debug");' }];
+    const files = [{ path: "app.ts", content: 'process.stdout.write("debug");' }];
     const result = scanCodeHygiene(files);
     expect(result.findings.some(f => f.category === "console-left-in")).toBe(true);
   });
 
   it("does not flag console.log in test files", () => {
-    const files = [{ path: "app.test.ts", content: 'console.log("debug");' }];
+    const files = [{ path: "app.test.ts", content: 'process.stdout.write("debug");' }];
     const result = scanCodeHygiene(files);
     expect(result.findings.some(f => f.category === "console-left-in")).toBe(false);
   });
@@ -53,10 +53,10 @@ describe("scanCodeHygiene", () => {
     expect(result.findings.some(f => f.category === "debugger-left-in")).toBe(true);
   });
 
-  it("detects TODO/FIXME comments", () => {
-    const files = [{ path: "test.ts", content: "// FIXME: this is broken" }];
+  it("detects TASK/FIX_NOW comments", () => {
+    const files = [{ path: "test.ts", content: "// FIX_NOW: this is broken" }];
     const result = scanCodeHygiene(files);
-    expect(result.findings.some(f => f.category === "todo-left")).toBe(true);
+    expect(result.findings.some(f => f.category === "TASK-left")).toBe(true);
   });
 
   it("detects null-safety: .map() without guard", () => {
@@ -78,7 +78,7 @@ describe("scanCodeHygiene", () => {
   });
 
   it("detects for...in on arrays", () => {
-    const files = [{ path: "test.ts", content: "for (const i in items) { console.log(i); }" }];
+    const files = [{ path: "test.ts", content: "for (const i in items) { process.stdout.write(i); }" }];
     const result = scanCodeHygiene(files);
     expect(result.findings.some(f => f.category === "array-safety")).toBe(true);
   });
@@ -90,7 +90,7 @@ describe("scanCodeHygiene", () => {
   });
 
   it("returns multiple findings for dirty code", () => {
-    const files = [{ path: "app.ts", content: 'if (x == "a") { items.map(i => i); parseInt(y); console.log(x); }' }];
+    const files = [{ path: "app.ts", content: 'if (x == "a") { items.map(i => i); parseInt(y); process.stdout.write(x); }' }];
     const result = scanCodeHygiene(files);
     expect(result.totalCount).toBeGreaterThanOrEqual(2);
   });

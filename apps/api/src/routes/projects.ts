@@ -33,6 +33,11 @@ router.post("/", authMiddleware, orgAccessMiddleware, asyncHandler<AuthRequest>(
   const brief = await prisma.projectBrief.create({
     data: {
       ...parsed.data,
+      deliverables: JSON.stringify(parsed.data.deliverables),
+      exclusions: JSON.stringify(parsed.data.exclusions),
+      constraints: JSON.stringify(parsed.data.constraints),
+      assumptions: JSON.stringify(parsed.data.assumptions),
+      acceptanceCriteria: JSON.stringify(parsed.data.acceptanceCriteria),
       repoUrl: parsed.data.repoUrl || null,
       deadline: parsed.data.deadline ? new Date(parsed.data.deadline) : null,
       userId: req.userId!,
@@ -55,7 +60,8 @@ router.get("/", authMiddleware, orgAccessMiddleware, asyncHandler<AuthRequest>(a
       _count: { select: { scans: true } },
     },
   });
-  res.json({ data: briefs });
+  const parsedBriefs = briefs.map(parseBriefFields);
+  res.json({ data: parsedBriefs });
 }));
 
 // GET /api/v1/projects/:id — get full brief
@@ -82,7 +88,7 @@ router.get("/:id", authMiddleware, asyncHandler<AuthRequest>(async (req, res) =>
     throw new AppError(403, "Access denied", ErrorCodes.FORBIDDEN);
   }
 
-  res.json({ data: brief });
+  res.json({ data: parseBriefFields(brief) });
 }));
 
 // PATCH /api/v1/projects/:id — update brief (blocked if approved without change request)
@@ -96,6 +102,12 @@ router.patch("/:id", authMiddleware, asyncHandler<AuthRequest>(async (req, res) 
 
   // If brief is approved, create a scope change request instead of silent edit
   if (brief.status === BriefStatus.APPROVED && Object.keys(parsed.data).length > 0) {
+    const normalizedOldScope = { ...(brief as any) };
+    for (const field of ["deliverables", "exclusions", "constraints", "assumptions", "acceptanceCriteria"]) {
+      if (typeof normalizedOldScope[field] === "string") {
+        try { normalizedOldScope[field] = JSON.parse(normalizedOldScope[field]); } catch {}
+      }
+    }
     const changeRequest = await prisma.scopeChangeRequest.create({
       data: {
         projectId: brief.id,
@@ -103,7 +115,7 @@ router.patch("/:id", authMiddleware, asyncHandler<AuthRequest>(async (req, res) 
         description: req.body.changeDescription || "",
         reason: req.body.changeReason || "",
         requestedBy: req.userId!,
-        oldScope: brief as any,
+        oldScope: normalizedOldScope,
         newScope: parsed.data as any,
         status: "pending",
       },
@@ -118,6 +130,11 @@ router.patch("/:id", authMiddleware, asyncHandler<AuthRequest>(async (req, res) 
     where: { id: req.params.id },
     data: {
       ...parsed.data,
+      deliverables: parsed.data.deliverables ? JSON.stringify(parsed.data.deliverables) : undefined,
+      exclusions: parsed.data.exclusions ? JSON.stringify(parsed.data.exclusions) : undefined,
+      constraints: parsed.data.constraints ? JSON.stringify(parsed.data.constraints) : undefined,
+      assumptions: parsed.data.assumptions ? JSON.stringify(parsed.data.assumptions) : undefined,
+      acceptanceCriteria: parsed.data.acceptanceCriteria ? JSON.stringify(parsed.data.acceptanceCriteria) : undefined,
       deadline: parsed.data.deadline ? new Date(parsed.data.deadline) : undefined,
     },
   });
@@ -132,9 +149,18 @@ router.post("/:id/approve", authMiddleware, asyncHandler<AuthRequest>(async (req
   if (brief.userId !== req.userId) throw new AppError(403, "Access denied", ErrorCodes.FORBIDDEN);
 
   // Validate minimum requirements before approval
-   if (brief.deliverables.length === 0) throw new AppError(400, "At least one deliverable required", ConstErrorCodes.VALIDATION_ERROR);
-  if (brief.exclusions.length === 0) throw new AppError(400, "At least one exclusion required", ConstErrorCodes.VALIDATION_ERROR);
-  if (brief.acceptanceCriteria.length === 0) throw new AppError(400, "At least one acceptance criterion required", ConstErrorCodes.VALIDATION_ERROR);
+  // deliverables, exclusions, acceptanceCriteria are stored as JSON.stringify(array)
+  let deliverables: unknown[];
+  try { deliverables = JSON.parse(brief.deliverables); } catch { throw new AppError(400, "Invalid deliverables format", ConstErrorCodes.VALIDATION_ERROR); }
+  if (!Array.isArray(deliverables) || deliverables.length === 0) throw new AppError(400, "At least one deliverable required", ConstErrorCodes.VALIDATION_ERROR);
+
+  let exclusions: unknown[];
+  try { exclusions = JSON.parse(brief.exclusions); } catch { throw new AppError(400, "Invalid exclusions format", ConstErrorCodes.VALIDATION_ERROR); }
+  if (!Array.isArray(exclusions) || exclusions.length === 0) throw new AppError(400, "At least one exclusion required", ConstErrorCodes.VALIDATION_ERROR);
+
+  let acceptanceCriteria: unknown[];
+  try { acceptanceCriteria = JSON.parse(brief.acceptanceCriteria); } catch { throw new AppError(400, "Invalid acceptance criteria format", ConstErrorCodes.VALIDATION_ERROR); }
+  if (!Array.isArray(acceptanceCriteria) || acceptanceCriteria.length === 0) throw new AppError(400, "At least one acceptance criterion required", ConstErrorCodes.VALIDATION_ERROR);
 
   const existingApprovals = await prisma.briefApproval.findMany({ where: { projectBriefId: brief.id } });
   const version = existingApprovals.length + 1;
@@ -153,5 +179,15 @@ router.post("/:id/approve", authMiddleware, asyncHandler<AuthRequest>(async (req
 
   res.json({ data: { brief: updated, approval } });
 }));
+
+function parseBriefFields(record: any): any {
+  const data = { ...record };
+  for (const field of ["deliverables", "exclusions", "constraints", "assumptions", "acceptanceCriteria"]) {
+    if (typeof data[field] === "string") {
+      try { data[field] = JSON.parse(data[field]); } catch {}
+    }
+  }
+  return data;
+}
 
 export default router;

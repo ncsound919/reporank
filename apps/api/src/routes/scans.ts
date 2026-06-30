@@ -20,7 +20,14 @@ export const createLocalScanSchema = z.object({
   files: z.array(z.object({
     path: z.string()
       .max(500)
-      .refine(p => !p.includes("..") && !p.startsWith("/") && !p.startsWith("\\") && !/^[A-Za-z]:[\\/]/.test(p), "Path traversal not allowed")
+      .refine(p =>
+        !p.includes("..") &&
+        !p.includes("..\\") &&
+        !p.includes("%2e%2e") &&
+        !p.includes("%2e%2e%2f") &&
+        !p.startsWith("/") &&
+        !p.startsWith("\\") &&
+        !/^[A-Za-z]:[\\/]/.test(p), "Path traversal not allowed")
       .refine(p => !/[\x00-\x1F\x7F-\x9F]/.test(p), "Control characters in path not allowed"),
     content: z.string().max(500000),
   })).min(1).max(500),
@@ -118,7 +125,7 @@ router.get("/:id", authMiddleware, async (req: AuthRequest, res) => {
       id: scan.id, status: scan.status, progress: scan.progress, message: scan.message,
       result: scan.report, fixPacks: scan.fixPack, clawFindings: scan.clawFindings, error: scan.errorMessage,
       createdAt: scan.createdAt, completedAt: scan.completedAt, duration: scan.duration,
-      trending: trending ? { previousScore, previousScanId, delta: scan.overallScore! - previousScore!, direction: trending } : null,
+      trending: trending ? { previousScore, previousScanId, delta: (scan.overallScore ?? 0) - (previousScore ?? 0), direction: trending } : null,
     },
   });
 });

@@ -99,7 +99,7 @@ export const REACT_GUIDANCE = `Think step-by-step before emitting JSON. Walk thr
 
 /**
  * EXACT type tags the LLM can use.  These match the ground-truth vocabulary
- * in `reporank/benchmarks/code_review/tasks.json`.  Adding a new tag here
+ * in `reporank/benchmarks/code_review/TASKS.json`.  Adding a new tag here
  * requires adding a corresponding ground-truth entry.
  */
 export const STRICT_VOCABULARY = `# Allowed type tags (use EXACTLY one of these, no suffixes).
@@ -143,7 +143,7 @@ export const STRICT_VOCABULARY = `# Allowed type tags (use EXACTLY one of these,
 - long-function            function > 50 lines doing too much
 - magic-numbers           numeric literal in conditional (includes harcoded env keys)
 - duplicated-code         near-identical functions that differ only by constants
-- todo-comment            TODO/FIXME marker
+- TASK-comment            TASK/FIX_NOW marker
 - debug-code              console.log / print debug statement
 - missing-test-coverage   exported function with no test
 
@@ -200,7 +200,7 @@ Output:
 
 ## Example G: Maintainability (debug-code — console.log)
 Input:
-   1 | function doWork() { console.log('starting'); return 42; }
+   1 | function doWork() { process.stdout.write('starting'); return 42; }
 Output:
 {"reasoning":"console.log in production code is debug code that should be removed or replaced with a logger.","findings":[{"category":"maintainability","severity":"low","line":1,"type":"debug-code","description":"console.log in production code","recommendation":"Use a proper logger or remove it","confidence":0.7}]}
 

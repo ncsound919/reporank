@@ -22,6 +22,7 @@ model User {
   apiKeys          ApiKey[]
   scans            Scan[]
   prConfigs        PrWebhookConfig[]
+  projectBriefs    ProjectBrief[]
 }
 
 model Org {
@@ -42,6 +43,7 @@ model Org {
   clawAlerts            ClawAlert[]
   subscriptions         Subscription[]
   webhooks              Webhook[]
+  projectBriefs         ProjectBrief[]
 }
 
 model OrgMember {
@@ -82,11 +84,14 @@ model Scan {
   user             User      @relation(fields: [userId], references: [id])
   orgId            String?
   org              Org?      @relation(fields: [orgId], references: [id])
+  projectBriefId   String?
+  projectBrief     ProjectBrief? @relation(fields: [projectBriefId], references: [id])
 
   @@index([orgId])
   @@index([userId])
   @@index([repoUrl])
   @@index([status])
+  @@index([projectBriefId])
 }
 
 model ApiKey {
@@ -192,5 +197,165 @@ model PrEvent {
   @@index([configId])
   @@index([status])
 }
+
+model ProjectBrief {
+  id                 String              @id @default(cuid())
+  name               String
+  repoUrl            String?
+  buildSource        String              @default("github")
+  objective          String
+  targetUsers        String?
+  deliverables       String              // JSON string for SQLite compatibility
+  exclusions         String              // JSON string for SQLite compatibility
+  constraints        String              @default("[]") // JSON string for SQLite compatibility
+  assumptions        String              @default("[]") // JSON string for SQLite compatibility
+  acceptanceCriteria String              // JSON string for SQLite compatibility
+  deadline           DateTime?
+  timebox            String?
+  status             String              @default("pending")
+  intentDocument     String?             // JSON string for SQLite compatibility
+  createdAt          DateTime            @default(now())
+  userId             String
+  user               User                @relation(fields: [userId], references: [id])
+  orgId              String?
+  org                Org?                @relation(fields: [orgId], references: [id])
+  approvals          BriefApproval[]
+  milestones         Milestone[]
+  changeRequests     ScopeChangeRequest[]
+  scans              Scan[]
+
+  @@index([userId])
+  @@index([orgId])
+  @@index([status])
+}
+
+model Milestone {
+  id                         String       @id @default(cuid())
+  name                       String
+  type                       String       @default("feature-complete")
+  targetDate                 DateTime?
+  goal                       String?
+  acceptanceCriteriaSnapshot String       @default("[]") // JSON string for SQLite compatibility
+  status                     String       @default("pending")
+  createdAt                  DateTime     @default(now())
+  scanId                     String?
+  projectId                  String
+  brief                      ProjectBrief @relation(fields: [projectId], references: [id])
+  gates                      AcceptanceGate[]
+
+  @@index([projectId])
+}
+
+model AcceptanceGate {
+  id             String    @id @default(cuid())
+  milestoneId    String
+  milestone      Milestone @relation(fields: [milestoneId], references: [id])
+  projectId      String?
+  criterion      String
+  type           String
+  status         String    @default("pending")
+  evidence       String?
+  overrideReason String?
+  approvedBy     String?
+  createdAt      DateTime  @default(now())
+
+  @@index([milestoneId])
+}
+
+model ScopeChangeRequest {
+  id              String       @id @default(cuid())
+  projectId       String
+  brief           ProjectBrief @relation(fields: [projectId], references: [id])
+  title           String
+  description     String       @default("")
+  reason          String       @default("")
+  requestedBy     String
+  impactTime      String?
+  impactComplexity String?
+  impactCost      String?
+  approvedBy      String?
+  oldScope        String       // JSON string for SQLite compatibility
+  newScope        String       // JSON string for SQLite compatibility
+  status          String       @default("pending")
+  createdAt       DateTime     @default(now())
+
+  @@index([projectId])
+}
+
+model BriefApproval {
+  id             String       @id @default(cuid())
+  projectBriefId String
+  projectBrief   ProjectBrief @relation(fields: [projectBriefId], references: [id])
+  approvedBy     String
+  version        Int
+  notes          String?
+  approvedAt     DateTime     @default(now())
+
+  @@index([projectBriefId])
+}
+
+model AgentsFileVersion {
+  id              String   @id @default(cuid())
+  userId          String
+  repoFullName    String
+  mode            String
+  content         String
+  contentHash     String
+  estimatedTokens Int
+  ruleCount       Int
+  generatedBy     String
+  scanId          String?
+  createdAt       DateTime @default(now())
+
+  @@unique([userId, repoFullName, contentHash])
+  @@index([userId, repoFullName])
+}
+
+model Course {
+  id           String       @id @default(cuid())
+  name         String
+  slug         String       @unique
+  description  String?
+  lmsType      String       @default("custom")
+  lmsCourseId  String?
+  instructorId String
+  createdAt    DateTime     @default(now())
+  assignments  Assignment[]
+}
+
+model Assignment {
+  id          String              @id @default(cuid())
+  courseId    String
+  course      Course              @relation(fields: [courseId], references: [id])
+  title       String
+  description String?
+  language    String              @default("typescript")
+  guidelines  String              @default("[]") // JSON string for SQLite compatibility
+  rubric      String?             // JSON string for SQLite compatibility
+  dueAt       DateTime?
+  createdAt   DateTime            @default(now())
+  submissions StudentSubmission[]
+}
+
+model StudentSubmission {
+  id               String     @id @default(cuid())
+  assignmentId     String
+  assignment       Assignment @relation(fields: [assignmentId], references: [id])
+  studentEmail     String
+  studentName      String?
+  repoUrl          String?
+  sourceFiles      String     // JSON string for SQLite compatibility
+  session          String?    // JSON string for SQLite compatibility
+  auditReport      String?    // JSON string for SQLite compatibility
+  sessionAnalysis  String?    // JSON string for SQLite compatibility
+  overallScore     Int?
+  overallGrade     String?
+  aiContamination  Int?
+  submittedAt      DateTime   @default(now())
+
+  @@index([assignmentId])
+  @@index([studentEmail])
+}
+
 
 

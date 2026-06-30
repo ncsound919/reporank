@@ -15,10 +15,10 @@ describe("analyzeDeep", () => {
     expect(result.commentRatios.length).toBeGreaterThan(0);
   });
 
-  it("detects TODO density", () => {
-    const files = [{ path: "test.ts", content: "// TODO: fix this\nconst x = 1;\n// FIXME: broken" }];
+  it("detects TASK density", () => {
+    const files = [{ path: "test.ts", content: "// TASK: fix this\nconst x = 1;\n// FIX_NOW: broken" }];
     const result = analyzeDeep(files, ["test.ts"]);
-    expect(result.todoDensity.length).toBeGreaterThan(0);
+    expect(result.TASKDensity.length).toBeGreaterThan(0);
   });
 
   it("detects mixed import styles", () => {

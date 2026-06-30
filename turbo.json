@@ -1,12 +1,21 @@
 {
   "$schema": "https://turbo.build/schema.json",
   "tasks": {
-    "build": { "dependsOn": ["^build"], "outputs": ["dist/**"] },
+    "build": { "dependsOn": ["^build"], "outputs": ["dist/**", ".next/**"] },
     "dev": { "cache": false, "persistent": true },
-    "lint": {},
-    "test": { "dependsOn": ["build"] },
+    "lint": { "outputs": [] },
+    "test": { "dependsOn": ["build"], "outputs": ["coverage/**"], "cache": true },
     "db:generate": { "cache": false },
     "db:push": { "cache": false },
-    "clean": { "cache": false }
+    "clean": { "cache": false },
+    "orchestrator:run": {
+      "dependsOn": [
+        "@reporank/project-analyzer#build",
+        "@reporank/tool-adapters#build",
+        "@reporank/static-analysis#build",
+        "@reporank/report-generator#build"
+      ],
+      "cache": false
+    }
   }
 }

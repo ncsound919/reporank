@@ -5,7 +5,7 @@
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "scripts": { "build": "tsc", "lint": "tsc --noEmit" },
+  "scripts": { "build": "tsc", "test": "vitest run", "lint": "tsc --noEmit" },
   "dependencies": { "@reporank/shared-types": "workspace:*" },
   "devDependencies": { "typescript": "^5.8.0", "vitest": "^3.1.0" }
 }

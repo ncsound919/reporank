@@ -94,7 +94,7 @@ router.patch("/changes/:id", authMiddleware, asyncHandler<AuthRequest>(async (re
 
   // If approved, apply new scope fields to the brief
   if (parsed.data.status === "approved" && change.newScope) {
-    const newScope = change.newScope as Record<string, unknown>;
+    const newScope = JSON.parse(change.newScope) as Record<string, unknown>;
     const allowedFields = [
       "name", "objective", "targetUsers", "deliverables", "exclusions",
       "constraints", "assumptions", "acceptanceCriteria", "deadline", "timebox",
