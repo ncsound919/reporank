@@ -1,29 +1,17 @@
 #!/usr/bin/env node
-// SWE-bench-style harness for RepoRank code review accuracy.
-//
-// Loads a task dataset, runs the LLM-augmented scanner against each task,
-// scores the findings against ground truth, and reports precision/recall/F1.
-//
-// Per AGENTS.md:
-//  - Files under 300 lines (split: this file is the orchestrator)
-//  - No hardcoded URLs (env-driven)
-//  - No eval()
-//  - Proper async error handling
-//  - No debug console.log in production paths
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
-
-import { llmScan, type ScanResult, type Finding } from "./review_scanner";
 import { heuristicScan } from "./heuristic_scanner";
-import { dedupeFindings, capFindings } from "./util/dedupe";
+import { llmScan, type Finding, type ScanResult } from "./review_scanner";
 import type { PromptMode } from "./prompts";
+import { capFindings, dedupeFindings } from "./util/dedupe";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+const DEFAULT_DATASET = resolve(__dirname, "../../../benchmarks/code_review/tasks.json");
 
-// ─── Types ──────────────────────────────────────────────────────
 export interface GroundTruthFinding {
   category: string;
   severity: "critical" | "high" | "medium" | "low" | "info";
@@ -43,6 +31,12 @@ export interface ReviewTask {
   expected_recommendation_keywords?: string[];
 }
 
+export interface MatchedPair {
+  predicted: Finding;
+  groundTruth: GroundTruthFinding;
+  matchScore: number;
+}
+
 export interface TaskResult {
   id: string;
   groundTruthCount: number;
@@ -53,12 +47,6 @@ export interface TaskResult {
   durationMs: number;
   tokens: number;
   warnings: string[];
-}
-
-export interface MatchedPair {
-  predicted: Finding;
-  groundTruth: GroundTruthFinding;
-  matchScore: number;
 }
 
 export interface HarnessReport {
@@ -89,101 +77,6 @@ export interface HarnessReport {
   };
 }
 
-// ─── CLI ────────────────────────────────────────────────────────
-const DEFAULT_DATASET = resolve(__dirname, "../../../benchmarks/code_review/tasks.json");
-
-export async function runHarness(cliOpts: Record<string, unknown> = {}): Promise<void> {
-  const opts = parseArgs(cliOpts);
-
-  const datasetPath = opts.dataset ?? DEFAULT_DATASET;
-  if (!existsSync(datasetPath)) {
-    console.error(`Dataset not found: ${datasetPath}`);
-    process.exit(1);
-  }
-  const tasks: ReviewTask[] = JSON.parse(readFileSync(datasetPath, "utf-8"));
-  process.stdout.write(`Loaded ${tasks.length} tasks from ${datasetPath}`);
-  process.stdout.write(`Config: mode=${opts.mode} lineTolerance=${opts.lineTolerance} concurrency=${opts.concurrency} minConfidence=${opts.minConfidence} heuristicOnly=${!!opts.heuristicOnly} llmOnly=${!!opts.llmOnly}\n`);
-
-  const results: TaskResult[] = [];
-  let totalTokens = 0;
-  let totalDuration = 0;
-
-  // Simple concurrency control — LLM endpoint is rate-limited
-  const queue = [...tasks];
-  const inflight: Promise<void>[] = [];
-  for (let i = 0; i < opts.concurrency; i++) {
-    inflight.push(worker(queue, results, opts, (t) => { totalTokens += t; }, (d) => { totalDuration += d; }));
-  }
-  await Promise.all(inflight);
-
-  const report = scoreAll(results, opts);
-  report.cost = {
-    totalTokens,
-    totalDurationMs: totalDuration,
-    averageLatencyMs: totalDuration / Math.max(1, results.length),
-  };
-
-  printReport(report);
-
-  if (opts.output) {
-    mkdirSync(dirname(opts.output), { recursive: true });
-    writeFileSync(opts.output, JSON.stringify(report, null, 2), "utf-8");
-    process.stdout.write(`\nWrote report to ${opts.output}`);
-  }
-}
-
-// Allow direct invocation: `tsx harness.ts --filter foo`
-if (import.meta.url.endsWith("/harness.ts") || import.meta.url === `file:///${__filename.replace(/\\/g, "/")}`) {
-  const args = process.argv.slice(2);
-  runHarness(parseCommanderArgs(args)).catch((err) => {
-    console.error("Harness crashed:", err);
-    process.exit(1);
-  });
-}
-
-/** Convert ["--filter", "foo", "--heuristic-only"] into {filter: "foo", heuristicOnly: true}. */
-function parseCommanderArgs(args: string[]): Record<string, unknown> {
-  const out: Record<string, unknown> = {};
-  for (let i = 0; i < args.length; i++) {
-    const a = args[i];
-    if (a.startsWith("--")) {
-      const key = a.slice(2).replace(/-([a-z])/g, (_, c) => c.toUpperCase());
-      const next = args[i + 1];
-      if (next && !next.startsWith("--")) {
-        const asNum = Number(next);
-        if (!Number.isNaN(asNum) && next.trim() !== "") {
-          out[key] = asNum;
-        } else {
-          out[key] = next;
-        }
-        i++;
-      } else {
-        out[key] = true;
-      }
-    }
-  }
-  return out;
-}
-
-async function worker(
-  queue: ReviewTask[],
-  results: TaskResult[],
-  opts: HarnessOptions,
-  onTokens: (n: number) => void,
-  onDuration: (d: number) => void,
-): Promise<void> {
-  while (queue.length > 0) {
-    const task = queue.shift();
-    if (!task) return;
-    const result = await runTask(task, opts);
-    results.push(result);
-    onTokens(result.tokens);
-    onDuration(result.durationMs);
-    process.stdout.write(`  ${result.id.padEnd(28)} TP=${result.truePositives.length} FP=${result.falsePositives.length} FN=${result.falseNegatives.length} (${result.durationMs}ms)\n`);
-  }
-}
-
-// ─── Runner ─────────────────────────────────────────────────────
 interface HarnessOptions {
   dataset?: string;
   output?: string;
@@ -196,12 +89,53 @@ interface HarnessOptions {
   maxChunkTokens?: number;
   temperature?: number;
   filter?: string;
-  /** Run only the heuristic scanner (skip LLM) */
   heuristicOnly?: boolean;
-  /** Run only the LLM scanner (skip heuristic) */
   llmOnly?: boolean;
-  /** Drop findings below this confidence threshold (0..1) */
   minConfidence: number;
+}
+
+type Bucket = { tp: number; fp: number; fn: number };
+
+function fail(message: string): never {
+  throw new Error(message);
+}
+
+function toFiniteNumber(value: unknown, fallback: number): number {
+  const num = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(num) ? num : fallback;
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
+
+function parseCommanderArgs(args: string[]): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+
+  for (let i = 0; i < args.length; i++) {
+    const current = args[i];
+    if (!current.startsWith("--")) continue;
+
+    const [rawKey, inlineValue] = current.slice(2).split("=", 2);
+    const key = rawKey.replace(/-([a-z])/g, (_m, c: string) => c.toUpperCase());
+
+    if (inlineValue !== undefined) {
+      const asNum = Number(inlineValue);
+      out[key] = inlineValue.trim() !== "" && !Number.isNaN(asNum) ? asNum : inlineValue;
+      continue;
+    }
+
+    const next = args[i + 1];
+    if (next && !next.startsWith("--")) {
+      const asNum = Number(next);
+      out[key] = next.trim() !== "" && !Number.isNaN(asNum) ? asNum : next;
+      i++;
+    } else {
+      out[key] = true;
+    }
+  }
+
+  return out;
 }
 
 function parseArgs(args: Record<string, unknown> | string[]): HarnessOptions {
@@ -212,40 +146,90 @@ function parseArgs(args: Record<string, unknown> | string[]): HarnessOptions {
     lineMatchWeight: 0.3,
     descriptionSimilarityWeight: 0.1,
     concurrency: 2,
-    minConfidence: 0.0,
+    minConfidence: 0,
   };
-  // Accept either a commander options object (Record) or a string[] (legacy)
-  if (Array.isArray(args)) {
-    for (let i = 0; i < args.length; i++) {
-      const a = args[i];
-      if (a === "--dataset") opts.dataset = resolve(args[++i]);
-      else if (a === "--output") opts.output = resolve(args[++i]);
-      else if (a === "--mode") opts.mode = args[++i] as PromptMode;
-      else if (a === "--line-tolerance") opts.lineTolerance = parseInt(args[++i], 10);
-      else if (a === "--concurrency") opts.concurrency = parseInt(args[++i], 10);
-      else if (a === "--max-chunk-tokens") opts.maxChunkTokens = parseInt(args[++i], 10);
-      else if (a === "--temperature") opts.temperature = parseFloat(args[++i]);
-      else if (a === "--filter") opts.filter = args[++i];
-      else if (a === "--heuristic-only") opts.heuristicOnly = true;
-      else if (a === "--llm-only") opts.llmOnly = true;
-      else if (a === "--min-confidence") opts.minConfidence = parseFloat(args[++i]);
-    }
-    return opts;
+
+  const source = Array.isArray(args) ? parseCommanderArgs(args) : args;
+
+  if (typeof source.dataset === "string") opts.dataset = resolve(source.dataset);
+  if (typeof source.output === "string") opts.output = resolve(source.output);
+  if (typeof source.mode === "string") opts.mode = source.mode as PromptMode;
+  if (typeof source.filter === "string") opts.filter = source.filter;
+
+  if (source.maxChunkTokens !== undefined) opts.maxChunkTokens = toFiniteNumber(source.maxChunkTokens, 0);
+  if (source.temperature !== undefined) opts.temperature = toFiniteNumber(source.temperature, 0);
+  opts.lineTolerance = Math.max(0, toFiniteNumber(source.lineTolerance, opts.lineTolerance));
+  opts.concurrency = Math.max(1, Math.floor(toFiniteNumber(source.concurrency, opts.concurrency)));
+  opts.minConfidence = clamp(toFiniteNumber(source.minConfidence, opts.minConfidence), 0, 1);
+
+  if (source.heuristicOnly === true) opts.heuristicOnly = true;
+  if (source.llmOnly === true) opts.llmOnly = true;
+  if (opts.heuristicOnly && opts.llmOnly) fail("Options --heuristic-only and --llm-only cannot be used together.");
+
+  return opts;
+}
+
+export async function runHarness(cliOpts: Record<string, unknown> = {}): Promise<void> {
+  const opts = parseArgs(cliOpts);
+  const datasetPath = opts.dataset ?? DEFAULT_DATASET;
+
+  if (!existsSync(datasetPath)) fail(`Dataset not found: ${datasetPath}`);
+
+  let tasks: ReviewTask[];
+  try {
+    const parsed = JSON.parse(readFileSync(datasetPath, "utf-8")) as unknown;
+    if (!Array.isArray(parsed)) fail("Dataset must be a JSON array.");
+    tasks = parsed as ReviewTask[];
+  } catch (error) {
+    fail(`Failed to load dataset: ${(error as Error).message}`);
   }
 
-  // Commander-style — accept numbers passed as strings
-  if (typeof args.dataset === "string") opts.dataset = resolve(args.dataset);
-  if (typeof args.output === "string") opts.output = resolve(args.output);
-  if (typeof args.mode === "string") opts.mode = args.mode as PromptMode;
-  if (args.lineTolerance !== undefined) opts.lineTolerance = Number(args.lineTolerance);
-  if (args.concurrency !== undefined) opts.concurrency = Number(args.concurrency);
-  if (args.maxChunkTokens !== undefined) opts.maxChunkTokens = Number(args.maxChunkTokens);
-  if (args.temperature !== undefined) opts.temperature = Number(args.temperature);
-  if (typeof args.filter === "string") opts.filter = args.filter;
-  if (args.minConfidence !== undefined) opts.minConfidence = Number(args.minConfidence);
-  if (args.heuristicOnly === true) opts.heuristicOnly = true;
-  if (args.llmOnly === true) opts.llmOnly = true;
-  return opts;
+  process.stdout.write(`Loaded ${tasks.length} tasks from ${datasetPath}\n`);
+  process.stdout.write(
+    `Config: mode=${opts.mode} lineTolerance=${opts.lineTolerance} concurrency=${opts.concurrency} minConfidence=${opts.minConfidence} heuristicOnly=${!!opts.heuristicOnly} llmOnly=${!!opts.llmOnly}\n`,
+  );
+
+  const queue = [...tasks];
+  const resultMap = new Map<string, TaskResult>();
+  let totalTokens = 0;
+  let totalDurationMs = 0;
+
+  await Promise.all(
+    Array.from({ length: opts.concurrency }, async () => {
+      while (queue.length > 0) {
+        const task = queue.shift();
+        if (!task) return;
+
+        const result = await runTask(task, opts);
+        resultMap.set(task.id, result);
+        totalTokens += result.tokens;
+        totalDurationMs += result.durationMs;
+
+        process.stdout.write(
+          `  ${result.id.padEnd(28)} TP=${result.truePositives.length} FP=${result.falsePositives.length} FN=${result.falseNegatives.length} (${result.durationMs}ms)\n`,
+        );
+      }
+    }),
+  );
+
+  const orderedResults = tasks
+    .map((task) => resultMap.get(task.id))
+    .filter((result): result is TaskResult => Boolean(result));
+
+  const report = scoreAll(orderedResults, opts);
+  report.cost = {
+    totalTokens,
+    totalDurationMs,
+    averageLatencyMs: totalDurationMs / Math.max(1, orderedResults.filter((r) => !r.warnings.includes("filtered")).length),
+  };
+
+  printReport(report);
+
+  if (opts.output) {
+    mkdirSync(dirname(opts.output), { recursive: true });
+    writeFileSync(opts.output, `${JSON.stringify(report, null, 2)}\n`, "utf-8");
+    process.stdout.write(`\nWrote report to ${opts.output}\n`);
+  }
 }
 
 async function runTask(task: ReviewTask, opts: HarnessOptions): Promise<TaskResult> {
@@ -268,27 +252,27 @@ async function runTask(task: ReviewTask, opts: HarnessOptions): Promise<TaskResu
   let totalDuration = 0;
   let totalTokens = 0;
 
-  if (!opts.llmOnly) {
-    const heuristic = heuristicScan(task.code);
-    findings.push(...heuristic);
+  try {
+    if (!opts.llmOnly) {
+      findings.push(...heuristicScan(task.code));
+    }
+
+    if (!opts.heuristicOnly) {
+      const scan = await llmScan(
+        { id: task.id, language: task.language, code: task.code, filePath: `task/${task.id}` },
+        { promptMode: opts.mode, temperature: opts.temperature, maxChunkTokens: opts.maxChunkTokens },
+      );
+
+      findings.push(...scan.findings);
+      warnings.push(...scan.warnings);
+      totalDuration += scan.durationMs;
+      totalTokens += scan.tokens;
+    }
+  } catch (error) {
+    warnings.push(`scan-failed: ${(error as Error).message}`);
   }
 
-  if (!opts.heuristicOnly) {
-    const scan = await llmScan(
-      { id: task.id, language: task.language, code: task.code, filePath: `task/${task.id}` },
-      { promptMode: opts.mode, temperature: opts.temperature, maxChunkTokens: opts.maxChunkTokens },
-    );
-    findings.push(...scan.findings);
-    warnings.push(...scan.warnings);
-    totalDuration += scan.durationMs;
-    totalTokens += scan.tokens;
-  }
-
-  // Confidence filter: drop findings below threshold.
-  // The LLM (gemma3:12b at temp 0.1) returns almost all findings at confidence
-  // 0.85-0.95, so blanket thresholding hurts recall. We only apply the user-
-  // provided min-confidence cutoff and rely on dedupe to collapse duplicates.
-  const filtered = findings.filter((f) => f.confidence >= opts.minConfidence);
+  const filtered = findings.filter((finding) => (finding.confidence ?? 0) >= opts.minConfidence);
 
   const synthetic: ScanResult = {
     taskId: task.id,
@@ -302,9 +286,6 @@ async function runTask(task: ReviewTask, opts: HarnessOptions): Promise<TaskResu
   return matchFindings(task, synthetic, opts);
 }
 
-
-
-// ─── Matching ───────────────────────────────────────────────────
 function matchFindings(task: ReviewTask, scan: ScanResult, opts: HarnessOptions): TaskResult {
   const predictions = scan.findings;
   const truth = task.ground_truth;
@@ -312,35 +293,37 @@ function matchFindings(task: ReviewTask, scan: ScanResult, opts: HarnessOptions)
   const usedTruth = new Set<number>();
   const truePositives: MatchedPair[] = [];
 
-  // For each ground truth, find the best matching prediction
   for (let t = 0; t < truth.length; t++) {
-    let bestP = -1;
+    let bestPredictionIndex = -1;
     let bestScore = 0;
+
     for (let p = 0; p < predictions.length; p++) {
       if (usedPredictions.has(p)) continue;
       const score = matchScore(truth[t], predictions[p], opts);
-      if (score > bestScore && score >= 0.5) {
+      if (score >= 0.5 && score > bestScore) {
         bestScore = score;
-        bestP = p;
+        bestPredictionIndex = p;
       }
     }
-    if (bestP >= 0) {
-      usedPredictions.add(bestP);
+
+    if (bestPredictionIndex >= 0) {
+      usedPredictions.add(bestPredictionIndex);
       usedTruth.add(t);
-      truePositives.push({ predicted: predictions[bestP], groundTruth: truth[t], matchScore: bestScore });
+      truePositives.push({
+        predicted: predictions[bestPredictionIndex],
+        groundTruth: truth[t],
+        matchScore: bestScore,
+      });
     }
   }
-
-  const falsePositives = predictions.filter((_, i) => !usedPredictions.has(i));
-  const falseNegatives = truth.filter((_, i) => !usedTruth.has(i));
 
   return {
     id: task.id,
     groundTruthCount: truth.length,
     predictedCount: predictions.length,
     truePositives,
-    falsePositives,
-    falseNegatives,
+    falsePositives: predictions.filter((_p, index) => !usedPredictions.has(index)),
+    falseNegatives: truth.filter((_t, index) => !usedTruth.has(index)),
     durationMs: scan.durationMs,
     tokens: scan.tokens,
     warnings: scan.warnings,
@@ -350,131 +333,123 @@ function matchFindings(task: ReviewTask, scan: ScanResult, opts: HarnessOptions)
 function matchScore(truth: GroundTruthFinding, pred: Finding, opts: HarnessOptions): number {
   let score = 0;
 
-  // Type match: exact on kebab-case tag (with fuzzy fallback)
   if (pred.type && truth.type) {
-    const pt = canonicalizeType(pred.type);
-    const tt = canonicalizeType(truth.type);
-    if (pt === tt) {
-      // Exact match after canonicalization (suffix stripping)
+    const predictedType = canonicalizeType(pred.type);
+    const truthType = canonicalizeType(truth.type);
+
+    if (predictedType === truthType) {
       score += opts.typeMatchWeight;
-    } else if (prefixMatch(pt, tt) || prefixMatch(tt, pt)) {
-      // One is a prefix of the other (e.g. "sql-injection" vs "sql-injection-vulnerability")
+    } else if (prefixMatch(predictedType, truthType)) {
       score += opts.typeMatchWeight * 0.7;
     } else {
-      // Word-level overlap
-      const pWords = new Set(pt.split("-"));
-      const tWords = new Set(tt.split("-"));
-      const inter = [...pWords].filter((w) => tWords.has(w)).length;
-      const minSize = Math.min(pWords.size, tWords.size);
-      if (minSize > 0 && inter / minSize >= 0.5) {
-        // At least half the words match (e.g. "race-condition" vs "race-conditions")
+      const predictedWords = new Set(predictedType.split("-"));
+      const truthWords = new Set(truthType.split("-"));
+      const overlap = [...predictedWords].filter((word) => truthWords.has(word)).length;
+      const minSize = Math.min(predictedWords.size, truthWords.size);
+
+      if (minSize > 0 && overlap / minSize >= 0.5) {
         score += opts.typeMatchWeight * 0.4;
       } else {
-        // First word matches (e.g. "code-injection" prefix in either direction)
-        const pFirst = pWords.values().next().value as string | undefined;
-        const tFirst = tWords.values().next().value as string | undefined;
-        if ((pFirst && tWords.has(pFirst)) || (tFirst && pWords.has(tFirst))) {
+        const firstPredicted = predictedWords.values().next().value as string | undefined;
+        const firstTruth = truthWords.values().next().value as string | undefined;
+        if ((firstPredicted && truthWords.has(firstPredicted)) || (firstTruth && predictedWords.has(firstTruth))) {
           score += opts.typeMatchWeight * 0.2;
         }
       }
     }
   }
 
-  // Line match: within tolerance (ground truth line vs predicted line)
-  if (pred.line > 0 && truth.line > 0) {
-    const dist = Math.abs(pred.line - truth.line);
-    if (dist <= opts.lineTolerance) {
-      score += opts.lineMatchWeight * (1 - dist / (opts.lineTolerance + 1));
+  const predictedLine = typeof pred.line === "number" ? pred.line : 0;
+  if (predictedLine > 0 && truth.line > 0) {
+    const distance = Math.abs(predictedLine - truth.line);
+    if (distance <= opts.lineTolerance) {
+      score += opts.lineMatchWeight * (1 - distance / (opts.lineTolerance + 1));
     }
-  } else if (pred.line === 0 && truth.line === 0) {
-    // Both are file-level findings — count as a match
+  } else if (predictedLine === 0 && truth.line === 0) {
     score += opts.lineMatchWeight;
   }
 
-  // Description similarity: simple token overlap (no embeddings, deterministic)
-  const tTokens = new Set(tokenize(truth.description));
-  const pTokens = new Set(tokenize(pred.description));
-  const inter = [...tTokens].filter((x) => pTokens.has(x)).length;
-  const union = new Set([...tTokens, ...pTokens]).size || 1;
-  const jaccard = inter / union;
-  score += opts.descriptionSimilarityWeight * jaccard;
+  const truthTokens = new Set(tokenize(truth.description));
+  const predictedTokens = new Set(tokenize(pred.description));
+  const intersection = [...truthTokens].filter((token) => predictedTokens.has(token)).length;
+  const union = new Set([...truthTokens, ...predictedTokens]).size || 1;
+  score += opts.descriptionSimilarityWeight * (intersection / union);
 
   return score;
 }
 
-/**
- * Canonicalize a kebab-case type tag by stripping common suffixes
- * like "vulnerability", "issue", "error", "warning".
- *
- * "sql-injection-vulnerability" → "sql-injection"
- * "race-condition-issue"       → "race-condition"
- */
-function canonicalizeType(t: string): string {
-  const SUFFIXES = [
-    "vulnerability", "issue", "error", "warning", "bug", "smell", "pattern", "antipattern",
-  ];
-  const parts = t.toLowerCase().split("-");
-  while (parts.length > 1 && SUFFIXES.includes(parts[parts.length - 1])) {
+function canonicalizeType(value: string): string {
+  const suffixes = new Set(["vulnerability", "issue", "error", "warning", "bug", "smell", "pattern", "antipattern"]);
+  const parts = value.toLowerCase().split("-").filter(Boolean);
+
+  while (parts.length > 1 && suffixes.has(parts[parts.length - 1])) {
     parts.pop();
   }
+
   return parts.join("-");
 }
 
-/** True if a is a prefix of b (or b is a prefix of a). */
 function prefixMatch(a: string, b: string): boolean {
-  return a.startsWith(b + "-") || b.startsWith(a + "-");
+  return a.startsWith(`${b}-`) || b.startsWith(`${a}-`);
 }
 
-function tokenize(s: string): string[] {
-  return s.toLowerCase().replace(/[^a-z0-9 ]/g, " ").split(/\s+/).filter((w) => w.length > 2);
+function tokenize(value: string): string[] {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9 ]/g, " ")
+    .split(/\s+/)
+    .filter((word) => word.length > 2);
 }
 
-// ─── Scoring ────────────────────────────────────────────────────
 function scoreAll(results: TaskResult[], opts: HarnessOptions): HarnessReport {
-  let tp = 0, fp = 0, fn = 0;
-  const byCategory = new Map<string, { tp: number; fp: number; fn: number }>();
-  const bySeverity = new Map<string, { tp: number; fp: number; fn: number }>();
+  const activeResults = results.filter((result) => !result.warnings.includes("filtered"));
+  const byCategory = new Map<string, Bucket>();
+  const bySeverity = new Map<string, Bucket>();
+  let tp = 0;
+  let fp = 0;
+  let fn = 0;
 
-  for (const r of results) {
-    tp += r.truePositives.length;
-    fp += r.falsePositives.length;
-    fn += r.falseNegatives.length;
-    for (const pair of r.truePositives) {
-      bump(byCategory, pair.groundTruth.category, "tp");
-      bump(bySeverity, pair.groundTruth.severity, "tp");
+  for (const result of activeResults) {
+    tp += result.truePositives.length;
+    fp += result.falsePositives.length;
+    fn += result.falseNegatives.length;
+
+    for (const pair of result.truePositives) {
+      bump(byCategory, pair.groundTruth.category || "unknown", "tp");
+      bump(bySeverity, pair.groundTruth.severity || "unknown", "tp");
     }
-    for (const f of r.falsePositives) {
-      bump(byCategory, f.category, "fp");
-      bump(bySeverity, f.severity, "fp");
+    for (const finding of result.falsePositives) {
+      bump(byCategory, finding.category || "unknown", "fp");
+      bump(bySeverity, finding.severity || "unknown", "fp");
     }
-    for (const f of r.falseNegatives) {
-      bump(byCategory, f.category, "fn");
-      bump(bySeverity, f.severity, "fn");
+    for (const finding of result.falseNegatives) {
+      bump(byCategory, finding.category || "unknown", "fn");
+      bump(bySeverity, finding.severity || "unknown", "fn");
     }
   }
 
   const precision = tp + fp > 0 ? tp / (tp + fp) : 0;
   const recall = tp + fn > 0 ? tp / (tp + fn) : 0;
-  const f1 = precision + recall > 0 ? 2 * precision * recall / (precision + recall) : 0;
+  const f1 = precision + recall > 0 ? (2 * precision * recall) / (precision + recall) : 0;
 
-  const computeBucket = (m: Map<string, { tp: number; fp: number; fn: number }>) => {
+  const bucketize = (bucket: Map<string, Bucket>) => {
     const out: Record<string, { precision: number; recall: number; f1: number; support: number }> = {};
-    for (const [k, v] of m) {
-      const p = v.tp + v.fp > 0 ? v.tp / (v.tp + v.fp) : 0;
-      const r = v.tp + v.fn > 0 ? v.tp / (v.tp + v.fn) : 0;
-      const f = p + r > 0 ? 2 * p * r / (p + r) : 0;
-      out[k] = { precision: p, recall: r, f1: f, support: v.tp + v.fn };
+    for (const [key, value] of bucket) {
+      const p = value.tp + value.fp > 0 ? value.tp / (value.tp + value.fp) : 0;
+      const r = value.tp + value.fn > 0 ? value.tp / (value.tp + value.fn) : 0;
+      const score = p + r > 0 ? (2 * p * r) / (p + r) : 0;
+      out[key] = { precision: p, recall: r, f1: score, support: value.tp + value.fn };
     }
     return out;
   };
 
   return {
     totalTasks: results.length,
-    skippedTasks: results.filter((r) => r.warnings.includes("filtered")).length,
+    skippedTasks: results.filter((result) => result.warnings.includes("filtered")).length,
     aggregate: { truePositives: tp, falsePositives: fp, falseNegatives: fn, precision, recall, f1 },
     perTask: results,
-    byCategory: computeBucket(byCategory),
-    bySeverity: computeBucket(bySeverity),
+    byCategory: bucketize(byCategory),
+    bySeverity: bucketize(bySeverity),
     cost: { totalTokens: 0, totalDurationMs: 0, averageLatencyMs: 0 },
     config: {
       promptMode: opts.mode,
@@ -486,34 +461,50 @@ function scoreAll(results: TaskResult[], opts: HarnessOptions): HarnessReport {
   };
 }
 
-function bump(m: Map<string, { tp: number; fp: number; fn: number }>, key: string, field: "tp" | "fp" | "fn") {
-  const slot = m.get(key) ?? { tp: 0, fp: 0, fn: 0 };
-  slot[field]++;
-  m.set(key, slot);
+function bump(map: Map<string, Bucket>, key: string, field: keyof Bucket): void {
+  const bucket = map.get(key) ?? { tp: 0, fp: 0, fn: 0 };
+  bucket[field] += 1;
+  map.set(key, bucket);
 }
 
-// ─── Reporting ──────────────────────────────────────────────────
-function printReport(r: HarnessReport) {
-  process.stdout.write("\n" + "═".repeat(72));
-  process.stdout.write("  REPORANK CODE REVIEW ACCURACY — HARNESS REPORT");
-  process.stdout.write("═".repeat(72));
-  process.stdout.write(`  Tasks:    ${r.totalTasks} (${r.skippedTasks} filtered)`);
-  process.stdout.write(`  TP/FP/FN: ${r.aggregate.truePositives} / ${r.aggregate.falsePositives} / ${r.aggregate.falseNegatives}`);
-  process.stdout.write(`  Precision: ${(r.aggregate.precision * 100).toFixed(1)}%`);
-  process.stdout.write(`  Recall:    ${(r.aggregate.recall * 100).toFixed(1)}%`);
-  process.stdout.write(`  F1:        ${(r.aggregate.f1 * 100).toFixed(1)}%`);
-  process.stdout.write(`  Cost:      ${r.cost.totalTokens} tokens, ${(r.cost.totalDurationMs / 1000).toFixed(1)}s total, ${r.cost.averageLatencyMs.toFixed(0)}ms avg/task`);
+function printReport(report: HarnessReport): void {
+  process.stdout.write(`\n${"═".repeat(72)}\n`);
+  process.stdout.write("  REPORANK CODE REVIEW ACCURACY — HARNESS REPORT\n");
+  process.stdout.write(`${"═".repeat(72)}\n`);
+  process.stdout.write(`  Tasks:    ${report.totalTasks} (${report.skippedTasks} filtered)\n`);
+  process.stdout.write(
+    `  TP/FP/FN: ${report.aggregate.truePositives} / ${report.aggregate.falsePositives} / ${report.aggregate.falseNegatives}\n`,
+  );
+  process.stdout.write(`  Precision: ${(report.aggregate.precision * 100).toFixed(1)}%\n`);
+  process.stdout.write(`  Recall:    ${(report.aggregate.recall * 100).toFixed(1)}%\n`);
+  process.stdout.write(`  F1:        ${(report.aggregate.f1 * 100).toFixed(1)}%\n`);
+  process.stdout.write(
+    `  Cost:      ${report.cost.totalTokens} tokens, ${(report.cost.totalDurationMs / 1000).toFixed(1)}s total, ${report.cost.averageLatencyMs.toFixed(0)}ms avg/task\n`,
+  );
 
-  process.stdout.write("\n  By category:");
-  for (const [k, v] of Object.entries(r.byCategory).sort((a, b) => b[1].support - a[1].support)) {
-    process.stdout.write(`    ${k.padEnd(18)} P=${(v.precision * 100).toFixed(0).padStart(3)}% R=${(v.recall * 100).toFixed(0).padStart(3)}% F1=${(v.f1 * 100).toFixed(0).padStart(3)}% (n=${v.support})`);
+  process.stdout.write("\n  By category:\n");
+  for (const [key, value] of Object.entries(report.byCategory).sort((a, b) => b[1].support - a[1].support)) {
+    process.stdout.write(
+      `    ${key.padEnd(18)} P=${(value.precision * 100).toFixed(0).padStart(3)}% R=${(value.recall * 100).toFixed(0).padStart(3)}% F1=${(value.f1 * 100).toFixed(0).padStart(3)}% (n=${value.support})\n`,
+    );
   }
-  process.stdout.write("\n  By severity:");
-  for (const [k, v] of Object.entries(r.bySeverity).sort((a, b) => b[1].support - a[1].support)) {
-    process.stdout.write(`    ${k.padEnd(18)} P=${(v.precision * 100).toFixed(0).padStart(3)}% R=${(v.recall * 100).toFixed(0).padStart(3)}% F1=${(v.f1 * 100).toFixed(0).padStart(3)}% (n=${v.support})`);
+
+  process.stdout.write("\n  By severity:\n");
+  for (const [key, value] of Object.entries(report.bySeverity).sort((a, b) => b[1].support - a[1].support)) {
+    process.stdout.write(
+      `    ${key.padEnd(18)} P=${(value.precision * 100).toFixed(0).padStart(3)}% R=${(value.recall * 100).toFixed(0).padStart(3)}% F1=${(value.f1 * 100).toFixed(0).padStart(3)}% (n=${value.support})\n`,
+    );
   }
-  process.stdout.write("═".repeat(72));
+
+  process.stdout.write(`${"═".repeat(72)}\n`);
 }
 
-// (Top-level execution handled by the import.meta.url guard above when run directly,
-//  or by the commander action callback in index.ts when invoked via the CLI.)
+const isDirectRun =
+  typeof process.argv[1] === "string" && import.meta.url === pathToFileURL(resolve(process.argv[1])).href;
+
+if (isDirectRun) {
+  runHarness(parseCommanderArgs(process.argv.slice(2))).catch((error) => {
+    process.stderr.write(`Harness crashed: ${error instanceof Error ? error.message : String(error)}\n`);
+    process.exitCode = 1;
+  });
+}
