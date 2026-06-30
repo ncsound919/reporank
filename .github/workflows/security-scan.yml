@@ -11,76 +11,146 @@ on:
   pull_request:
     branches: [master]
   schedule:
-    - cron: '0 8 * * 1'
+    - cron: "0 8 * * 1"
+  workflow_dispatch:
+
+concurrency:
+  group: security-scan-${{ github.event.pull_request.number || github.ref || github.run_id }}
+  cancel-in-progress: true
 
 jobs:
   pnpm-audit:
+    name: Dependency audit
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+
     steps:
-      - uses: actions/checkout@v4
-      - uses: step-security/harden-runner@v2
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Harden runner
+        uses: step-security/harden-runner@v2
         with:
           egress-policy: audit
           disable-telemetry: true
-      - uses: pnpm/action-setup@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
         with:
           version: 10.8.0
-      - uses: actions/setup-node@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: pnpm
-      - run: pnpm install --frozen-lockfile
+          cache-dependency-path: |
+            pnpm-lock.yaml
+            apps/**/package.json
+            packages/**/package.json
+            services/**/package.json
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
       - name: Audit dependencies
         run: pnpm audit --audit-level=high
 
   sbom:
+    name: Generate SBOM
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+
     steps:
-      - uses: actions/checkout@v4
-      - uses: step-security/harden-runner@v2
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Harden runner
+        uses: step-security/harden-runner@v2
         with:
           egress-policy: audit
           disable-telemetry: true
-      - uses: anchore/sbom-action@v0
+
+      - name: Generate CycloneDX SBOM
+        uses: anchore/sbom-action@v0
         with:
           format: cyclonedx-json
           output-file: sbom-reporank.cdx.json
           path: .
-      - uses: actions/upload-artifact@v4
+
+      - name: Upload SBOM artifact
+        uses: actions/upload-artifact@v4
         with:
           name: sbom-reporank
           path: sbom-reporank.cdx.json
+          if-no-files-found: error
 
   codeql:
+    name: CodeQL
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
+      contents: read
       security-events: write
+
     steps:
-      - uses: actions/checkout@v4
-      - uses: step-security/harden-runner@v2
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Harden runner
+        uses: step-security/harden-runner@v2
         with:
           egress-policy: audit
           disable-telemetry: true
-      - uses: github/codeql-action/init@v3
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v4
         with:
           languages: javascript-typescript
-      - uses: github/codeql-action/analyze@v3
+
+      - name: Analyze
+        uses: github/codeql-action/analyze@v4
 
   license-check:
+    name: License policy
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+
     steps:
-      - uses: actions/checkout@v4
-      - uses: step-security/harden-runner@v2
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Harden runner
+        uses: step-security/harden-runner@v2
         with:
           egress-policy: audit
           disable-telemetry: true
-      - uses: pnpm/action-setup@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
         with:
           version: 10.8.0
-      - uses: actions/setup-node@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: pnpm
-      - run: pnpm install --frozen-lockfile
+          cache-dependency-path: |
+            pnpm-lock.yaml
+            apps/**/package.json
+            packages/**/package.json
+            services/**/package.json
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install license-checker
+        run: pnpm dlx license-checker --version
+
       - name: Check licenses
-        run: npx license-checker --production --summary --onlyAllow "MIT;ISC;Apache-2.0;BSD-2-Clause;BSD-3-Clause;0BSD;Unlicense;CC0-1.0;BlueOak-1.0.0"
+        run: >
+          pnpm dlx license-checker
+          --production
+          --summary
+          --onlyAllow "MIT;ISC;Apache-2.0;BSD-2-Clause;BSD-3-Clause;0BSD;Unlicense;CC0-1.0;BlueOak-1.0.0"

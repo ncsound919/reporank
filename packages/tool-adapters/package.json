@@ -14,11 +14,11 @@
     "lint": "tsc --noEmit"
   },
   "dependencies": {
-    "commander": "^13.1.0",
+    "commander": "^15.0.0",
     "execa": "^9.5.0"
   },
   "devDependencies": {
-    "@types/node": "^22.0.0",
+    "@types/node": "^26.0.1",
     "typescript": "^5.8.0"
   }
 }

@@ -1,8 +1,8 @@
 import { useEffect, useRef, useCallback } from "react";
 import type { WsEvent, AgentSession } from "./types";
 
-const WS_URL = "ws://127.0.0.1:8001/ws/agents";
-const API_KEY = "benchmark-secret-2024";
+const WS_URL = import.meta.env.VITE_WS_URL || "ws://127.0.0.1:8001/ws/agents";
+const API_KEY = import.meta.env.VITE_API_KEY || "";
 
 const STORAGE_KEY = "orchestrator_sessions";
 

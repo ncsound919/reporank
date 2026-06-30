@@ -1,18 +1,37 @@
+# Dependencies
 node_modules/
+.pnpm-store/
+
+# Build systems / app outputs
 dist/
 build/
-.turbo/
+out/
 .next/
-.cache/
+.turbo/
 coverage/
+.nyc_output/
+playwright-report/
+playwright/.cache/
+test-results/
+
+# General caches / temp
+.cache/
 .temp/
 .tmp/
+.history/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+__pycache__/
+*.pyc
+*.tsbuildinfo
 
 # Environment files
 .env
 .env.*
 !.env.example
 !.env.sample
+!.env.test.example
 *.env.local
 
 # Logs
@@ -39,36 +58,25 @@ Desktop.ini
 *.sublime-project
 *.sublime-workspace
 
-# Build artifacts
-*.tsbuildinfo
+# Local-only outputs / state
 *.local
-out/
+promptfoo.db
+.promptfoo/
+output/
 
-# Test outputs
-playwright-report/
-playwright/.cache/
-test-results/
-.nyc_output/
-
-# Database files
+# Databases
 *.db
 *.sqlite
 *.sqlite3
-
-# Prisma artifacts
 apps/api/src/db/prisma/migrations/dev.db*
 
-# Caches
-.mypy_cache/
-.pytest_cache/
-.ruff_cache/
-__pycache__/
-*.pyc
+# Optional platform artifacts
+.vercel/
 
-# Tooling state
-.history/
+# Debug / scratch artifacts
+.llm-cache.json
+.reporank-cache.json
+refactor-patch.json
 
-# promptfoo output
-promptfoo.db
-output/
-.promptfoo/
+# Python / JS mixed-runtime leftovers
+.coverage

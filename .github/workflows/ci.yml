@@ -10,9 +10,15 @@ on:
   pull_request:
     branches: [master]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build-and-test:
+    name: Build and test
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     services:
       postgres:
@@ -21,71 +27,84 @@ jobs:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: reporank
-        ports: ["5432:5432"]
+        ports:
+          - "5432:5432"
         options: >-
-          --health-cmd pg_isready
+          --health-cmd "pg_isready -U postgres -d reporank"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
 
       redis:
         image: redis:7-alpine
-        ports: ["6379:6379"]
+        ports:
+          - "6379:6379"
         options: >-
           --health-cmd "redis-cli ping"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
 
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/reporank
+      REDIS_URL: redis://localhost:6379
+      JWT_SECRET: ci-test-secret
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
+      TURBO_TEAM: ${{ vars.TURBO_TEAM }}
+
     steps:
-      - uses: actions/checkout@v4
-      - uses: step-security/harden-runner@v2
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Harden runner
+        uses: step-security/harden-runner@v2
         with:
           egress-policy: audit
           disable-telemetry: true
 
-      - uses: pnpm/action-setup@v4
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
         with:
           version: 10.8.0
 
-      - uses: actions/setup-node@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: "pnpm"
+          cache: pnpm
+          cache-dependency-path: |
+            pnpm-lock.yaml
+            apps/**/package.json
+            packages/**/package.json
+            services/**/package.json
 
-      - run: pnpm install
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
 
-      - name: pnpm audit
+      - name: Audit dependencies
         run: pnpm audit --audit-level=high
 
-      - name: Build
-        run: npx turbo run build --cache-dir=.turbo
-        env:
-          TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
-          TURBO_TEAM: ${{ vars.TURBO_TEAM }}
-
-      - name: Run deterministic benchmarks
-        run: npx tsx comprehensive-benchmark.mjs 2>&1 | tail -20
-
-      - name: Test grading engine
-        run: npx turbo run test --filter=@reporank/grading-engine --cache-dir=.turbo
-        env:
-          TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
-          TURBO_TEAM: ${{ vars.TURBO_TEAM }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-
-      - name: Pipeline security tests
-        run: npx vitest run tests/pipeline-security/
+      - name: Generate database client
+        run: pnpm db:generate
 
       - name: Push database schema
-        run: pnpm --filter @reporank/api db:push
-        env:
-          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/reporank
-          REDIS_URL: redis://localhost:6379
-          JWT_SECRET: ci-test-secret
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: pnpm db:push
 
-      - uses: codecov/codecov-action@v5
+      - name: Build
+        run: pnpm build
+
+      - name: Run grading engine tests
+        run: pnpm --filter @reporank/grading-engine test
+
+      - name: Run pipeline security tests
+        run: pnpm exec vitest run tests/pipeline-security/
+
+      - name: Run deterministic benchmarks
+        run: pnpm exec tsx comprehensive-benchmark.mjs 2>&1 | tail -20
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v7
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           directory: packages/

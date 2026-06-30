@@ -1,13 +1,21 @@
 {
   "name": "reporank",
   "private": true,
+  "packageManager": "pnpm@10.8.0",
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "dev": "turbo dev",
     "dev:local": "concurrently --kill-others-on-fail --prefix \"[{name}]\" --names \"api,web\" --prefix-colors \"cyan,magenta\" \"pnpm --filter @reporank/api dev\" \"pnpm --filter @reporank/web dev\"",
     "build": "turbo build",
     "lint": "turbo lint",
     "test": "turbo test",
+    "typecheck": "turbo typecheck",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "clean": "turbo clean",
+    "ci": "pnpm lint && pnpm typecheck && pnpm test && pnpm build",
     "db:generate": "pnpm --filter @reporank/api db:generate",
     "db:push": "pnpm --filter @reporank/api db:push",
     "db:migrate": "pnpm --filter @reporank/api db:migrate",
@@ -28,9 +36,5 @@
       "esbuild",
       "msgpackr-extract"
     ]
-  },
-  "engines": {
-    "node": ">=22"
-  },
-  "packageManager": "pnpm@10.8.0"
+  }
 }
