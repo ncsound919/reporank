@@ -15,7 +15,7 @@ const changeSchema = z.object({
   impactTime: z.string().max(200).optional(),
   impactComplexity: z.enum(["low", "medium", "high", "unknown"]).optional(),
   impactCost: z.string().max(200).optional(),
-  newScope: z.record(z.unknown()).optional(),
+  newScope: z.record(z.string(), z.unknown()).optional(),
 });
 
 // POST /api/v1/projects/:id/changes — raise a scope change request
@@ -25,7 +25,7 @@ router.post("/projects/:id/changes", authMiddleware, asyncHandler<AuthRequest>(a
   if (brief.userId !== req.userId) throw new AppError(403, "Access denied", ConstErrorCodes.FORBIDDEN);
 
   const parsed = changeSchema.safeParse(req.body);
-  if (!parsed.success) throw new AppError(400, parsed.error.errors[0].message, ConstErrorCodes.VALIDATION_ERROR);
+  if (!parsed.success) throw new AppError(400, parsed.error.issues[0].message, ConstErrorCodes.VALIDATION_ERROR);
 
   const changeRequest = await prisma.scopeChangeRequest.create({
     data: {
@@ -85,7 +85,7 @@ router.patch("/changes/:id", authMiddleware, asyncHandler<AuthRequest>(async (re
     notes: z.string().max(500).optional(),
   });
   const parsed = statusSchema.safeParse(req.body);
-  if (!parsed.success) throw new AppError(400, parsed.error.errors[0].message, ConstErrorCodes.VALIDATION_ERROR);
+  if (!parsed.success) throw new AppError(400, parsed.error.issues[0].message, ConstErrorCodes.VALIDATION_ERROR);
 
   const updated = await prisma.scopeChangeRequest.update({
     where: { id: req.params.id },

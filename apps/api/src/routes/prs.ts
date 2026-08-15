@@ -43,7 +43,7 @@ const commentRequestSchema = z.object({
 router.post("/impact", authMiddleware, asyncHandler<AuthRequest>(async (req, res) => {
   const parsed = impactRequestSchema.safeParse(req.body);
   if (!parsed.success) {
-    throw new AppError(400, parsed.error.errors[0].message, "VALIDATION_ERROR");
+    throw new AppError(400, parsed.error.issues[0].message, "VALIDATION_ERROR");
   }
   const { currentScore, changes, sourceFiles, fileTree, testFilePaths } = parsed.data;
   const testFilePathsSet = new Set(testFilePaths ?? []);
@@ -57,7 +57,7 @@ router.post("/impact", authMiddleware, asyncHandler<AuthRequest>(async (req, res
 router.post("/recommendations", authMiddleware, asyncHandler<AuthRequest>(async (req, res) => {
   const parsed = impactRequestSchema.safeParse(req.body);
   if (!parsed.success) {
-    throw new AppError(400, parsed.error.errors[0].message, "VALIDATION_ERROR");
+    throw new AppError(400, parsed.error.issues[0].message, "VALIDATION_ERROR");
   }
   const { currentScore, changes, sourceFiles, fileTree, testFilePaths } = parsed.data;
   const testFilePathsSet = new Set(testFilePaths ?? []);
@@ -72,7 +72,7 @@ router.post("/recommendations", authMiddleware, asyncHandler<AuthRequest>(async 
 router.post("/comment", authMiddleware, asyncHandler<AuthRequest>(async (req, res) => {
   const parsed = commentRequestSchema.safeParse(req.body);
   if (!parsed.success) {
-    throw new AppError(400, parsed.error.errors[0].message, "VALIDATION_ERROR");
+    throw new AppError(400, parsed.error.issues[0].message, "VALIDATION_ERROR");
   }
   const { repoFullName, prNumber, currentScore, changes, sourceFiles, fileTree, testFilePaths, includeDetailedBreakdown } = parsed.data;
   const report = predictImpact(currentScore, changes as FileChange[], {
@@ -187,7 +187,7 @@ const configSchema = z.object({
 router.post("/config", authMiddleware, asyncHandler<AuthRequest>(async (req, res) => {
   const parsed = configSchema.safeParse(req.body);
   if (!parsed.success) {
-    throw new AppError(400, parsed.error.errors[0].message, "VALIDATION_ERROR");
+    throw new AppError(400, parsed.error.issues[0].message, "VALIDATION_ERROR");
   }
   const { repoFullName, enabled, minScoreThreshold, commentOn } = parsed.data;
 

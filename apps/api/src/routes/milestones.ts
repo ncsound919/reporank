@@ -30,7 +30,7 @@ const patchMilestoneSchema = z.object({
 // POST /api/v1/milestones — create milestone
 router.post("/", authMiddleware, asyncHandler<AuthRequest>(async (req, res) => {
   const parsed = milestoneSchema.safeParse(req.body);
-  if (!parsed.success) throw new AppError(400, parsed.error.errors[0].message, ErrorCodes.VALIDATION_ERROR);
+  if (!parsed.success) throw new AppError(400, parsed.error.issues[0].message, ErrorCodes.VALIDATION_ERROR);
 
   // Verify user owns the project
   const brief = await prisma.projectBrief.findUnique({ where: { id: parsed.data.projectId } });
@@ -80,7 +80,7 @@ router.patch("/:id", authMiddleware, asyncHandler<AuthRequest>(async (req, res) 
 
   // Block "achieved" if any non-overridden gates are still pending/failed
   const parsed = patchMilestoneSchema.safeParse(req.body);
-  if (!parsed.success) throw new AppError(400, parsed.error.errors[0].message, ErrorCodes.VALIDATION_ERROR);
+  if (!parsed.success) throw new AppError(400, parsed.error.issues[0].message, ErrorCodes.VALIDATION_ERROR);
 
   if (parsed.data.status === MilestoneStatus.ACHIEVED) {
     const blockingGates = milestone.gates.filter(

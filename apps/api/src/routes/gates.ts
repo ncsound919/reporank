@@ -29,7 +29,7 @@ const patchGateSchema = z.object({
 // POST /api/v1/gates — create a gate on a milestone
 router.post("/", authMiddleware, asyncHandler<AuthRequest>(async (req, res) => {
   const parsed = gateSchema.safeParse(req.body);
-  if (!parsed.success) throw new AppError(400, parsed.error.errors[0].message, ErrorCodes.VALIDATION_ERROR);
+  if (!parsed.success) throw new AppError(400, parsed.error.issues[0].message, ErrorCodes.VALIDATION_ERROR);
 
   const milestone = await prisma.milestone.findUnique({
     where: { id: parsed.data.milestoneId },
@@ -72,7 +72,7 @@ router.patch("/:id", authMiddleware, asyncHandler<AuthRequest>(async (req, res) 
   if (gate.milestone?.brief.userId !== req.userId) throw new AppError(403, "Access denied", ErrorCodes.FORBIDDEN);
 
   const parsed = patchGateSchema.safeParse(req.body);
-  if (!parsed.success) throw new AppError(400, parsed.error.errors[0].message, ErrorCodes.VALIDATION_ERROR);
+  if (!parsed.success) throw new AppError(400, parsed.error.issues[0].message, ErrorCodes.VALIDATION_ERROR);
 
   if (parsed.data.status === GateStatus.OVERRIDDEN && !parsed.data.overrideReason) {
     throw new AppError(400, "Override reason is required", ConstErrorCodes.VALIDATION_ERROR);

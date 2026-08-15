@@ -5,7 +5,7 @@ vi.mock("@prisma/client", () => ({
   PrismaClient: vi.fn().mockImplementation(() => ({ $connect: vi.fn(), $disconnect: vi.fn() })),
 }));
 
-vi.mock("../db/client", () => ({
+vi.mock("../../db/client", () => ({
   prisma: {
     scan: { create: vi.fn(), findMany: vi.fn(), findUnique: vi.fn(), findFirst: vi.fn(), update: vi.fn(), count: vi.fn() },
     $transaction: vi.fn(),

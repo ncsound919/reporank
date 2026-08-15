@@ -28,7 +28,7 @@ const patchBriefSchema = briefSchema.partial();
 // POST /api/v1/projects — create a new project brief
 router.post("/", authMiddleware, orgAccessMiddleware, asyncHandler<AuthRequest>(async (req, res) => {
   const parsed = briefSchema.safeParse(req.body);
-  if (!parsed.success) throw new AppError(400, parsed.error.errors[0].message, ErrorCodes.VALIDATION_ERROR);
+  if (!parsed.success) throw new AppError(400, parsed.error.issues[0].message, ErrorCodes.VALIDATION_ERROR);
 
   const brief = await prisma.projectBrief.create({
     data: {
@@ -98,7 +98,7 @@ router.patch("/:id", authMiddleware, asyncHandler<AuthRequest>(async (req, res) 
   if (brief.userId !== req.userId) throw new AppError(403, "Access denied", ErrorCodes.FORBIDDEN);
 
   const parsed = patchBriefSchema.safeParse(req.body);
-  if (!parsed.success) throw new AppError(400, parsed.error.errors[0].message, ErrorCodes.VALIDATION_ERROR);
+  if (!parsed.success) throw new AppError(400, parsed.error.issues[0].message, ErrorCodes.VALIDATION_ERROR);
 
   // If brief is approved, create a scope change request instead of silent edit
   if (brief.status === BriefStatus.APPROVED && Object.keys(parsed.data).length > 0) {

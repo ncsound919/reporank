@@ -20,7 +20,7 @@ router.post("/projects/:id/intent", authMiddleware, asyncHandler<AuthRequest>(as
   if (brief.userId !== req.userId) throw new AppError(403, "Access denied", ErrorCodes.FORBIDDEN);
 
   const parsed = intentSchema.safeParse(req.body);
-  if (!parsed.success) throw new AppError(400, parsed.error.errors[0].message, ErrorCodes.VALIDATION_ERROR);
+  if (!parsed.success) throw new AppError(400, parsed.error.issues[0].message, ErrorCodes.VALIDATION_ERROR);
 
   const intentDocument = parseIntent(parsed.data.text, parsed.data.source);
 

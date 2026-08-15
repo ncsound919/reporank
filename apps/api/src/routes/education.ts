@@ -59,7 +59,7 @@ const submitSchema = z.object({
 // POST /api/v1/education/courses — create a course
 router.post("/courses", authMiddleware, asyncHandler<AuthRequest>(async (req, res) => {
   const parsed = createCourseSchema.safeParse(req.body);
-  if (!parsed.success) throw new AppError(400, parsed.error.errors[0].message, ErrorCodes.VALIDATION_ERROR);
+  if (!parsed.success) throw new AppError(400, parsed.error.issues[0].message, ErrorCodes.VALIDATION_ERROR);
   const { name, slug, description, lmsType, lmsCourseId } = parsed.data;
   const course = await prisma.course.create({
     data: { name, slug, description, lmsType, lmsCourseId, instructorId: req.userId! },
@@ -90,7 +90,7 @@ router.get("/courses/:id", authMiddleware, asyncHandler<AuthRequest>(async (req,
 // POST /api/v1/education/assignments — create assignment
 router.post("/assignments", authMiddleware, asyncHandler<AuthRequest>(async (req, res) => {
   const parsed = createAssignmentSchema.safeParse(req.body);
-  if (!parsed.success) throw new AppError(400, parsed.error.errors[0].message, ErrorCodes.VALIDATION_ERROR);
+  if (!parsed.success) throw new AppError(400, parsed.error.issues[0].message, ErrorCodes.VALIDATION_ERROR);
 
   // Verify course ownership
   const course = await prisma.course.findFirst({
@@ -115,7 +115,7 @@ router.post("/assignments", authMiddleware, asyncHandler<AuthRequest>(async (req
 // POST /api/v1/education/submissions — submit work for audit
 router.post("/submissions", authMiddleware, asyncHandler<AuthRequest>(async (req, res) => {
   const parsed = submitSchema.safeParse(req.body);
-  if (!parsed.success) throw new AppError(400, parsed.error.errors[0].message, ErrorCodes.VALIDATION_ERROR);
+  if (!parsed.success) throw new AppError(400, parsed.error.issues[0].message, ErrorCodes.VALIDATION_ERROR);
 
   const assignment = await prisma.assignment.findFirst({
     where: { id: parsed.data.assignmentId, course: { instructorId: req.userId! } },
@@ -204,7 +204,7 @@ router.post("/generate-agents-md", authMiddleware, asyncHandler<AuthRequest>(asy
     assignmentId: z.string().min(1),
     mode: z.enum(["minimal", "standard", "comprehensive"]).default("standard"),
   }).safeParse(req.body);
-  if (!body.success) throw new AppError(400, body.error.errors[0].message, "VALIDATION_ERROR");
+  if (!body.success) throw new AppError(400, body.error.issues[0].message, "VALIDATION_ERROR");
 
   const assignment = await prisma.assignment.findFirst({
     where: { id: body.data.assignmentId, course: { instructorId: req.userId! } },

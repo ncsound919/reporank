@@ -15,7 +15,7 @@ const router: ExpressRouter = Router();
 
 router.post("/", authMiddleware, async (req: AuthRequest, res) => {
   const parsed = createOrgSchema.safeParse(req.body);
-  if (!parsed.success) throw new AppError(400, parsed.error.errors[0].message, ErrorCodes.VALIDATION_ERROR);
+  if (!parsed.success) throw new AppError(400, parsed.error.issues[0].message, ErrorCodes.VALIDATION_ERROR);
 
   const { name, slug } = parsed.data;
   try {

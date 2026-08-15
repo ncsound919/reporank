@@ -43,7 +43,7 @@ export const createLocalScanSchema = z.object({
 // Standard GitHub scan
 router.post("/", authMiddleware, scanLimitMiddleware, orgAccessMiddleware, async (req: AuthRequest, res) => {
   const parsed = createScanSchema.safeParse(req.body);
-  if (!parsed.success) throw new AppError(400, parsed.error.errors[0].message, ErrorCodes.VALIDATION_ERROR);
+  if (!parsed.success) throw new AppError(400, parsed.error.issues[0].message, ErrorCodes.VALIDATION_ERROR);
 
   const match = parsed.data.repoUrl.match(/github\.com\/([^\/]+)\/([^\/\.]+)/);
   if (!match) throw new AppError(400, "Invalid GitHub URL", ErrorCodes.INVALID_URL);
@@ -70,7 +70,7 @@ router.post("/", authMiddleware, scanLimitMiddleware, orgAccessMiddleware, async
 // Local/private scan with file upload
 router.post("/local", authMiddleware, scanLimitMiddleware, orgAccessMiddleware, async (req: AuthRequest, res) => {
   const parsed = createLocalScanSchema.safeParse(req.body);
-  if (!parsed.success) throw new AppError(400, parsed.error.errors[0].message, ErrorCodes.VALIDATION_ERROR);
+  if (!parsed.success) throw new AppError(400, parsed.error.issues[0].message, ErrorCodes.VALIDATION_ERROR);
 
   const scan = await prisma.scan.create({
     data: {

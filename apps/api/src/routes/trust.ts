@@ -32,7 +32,7 @@ const trustRequestSchema = z.object({
 // POST /api/v1/trust — compute trust score for any repo
 router.post("/", authMiddleware, asyncHandler<AuthRequest>(async (req, res) => {
   const parsed = trustRequestSchema.safeParse(req.body);
-  if (!parsed.success) throw new AppError(400, parsed.error.errors[0].message, ErrorCodes.VALIDATION_ERROR);
+  if (!parsed.success) throw new AppError(400, parsed.error.issues[0].message, ErrorCodes.VALIDATION_ERROR);
 
   const trustInput: Parameters<typeof calculateTrustScore>[0] = {
     overallScore: parsed.data.overallScore ?? 0,

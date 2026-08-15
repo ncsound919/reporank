@@ -9,7 +9,7 @@ vi.mock("@prisma/client", () => ({
   })),
 }));
 
-vi.mock("../db/client", () => ({
+vi.mock("../../db/client", () => ({
   prisma: {
     scan: { create: vi.fn(), findMany: vi.fn(), findUnique: vi.fn(), findFirst: vi.fn(), update: vi.fn(), count: vi.fn() },
     user: { findUnique: vi.fn() },

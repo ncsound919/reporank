@@ -92,7 +92,7 @@ router.post(
   asyncHandler(async (req, res) => {
     const parsed = mutlyScanSchema.safeParse(req.body);
     if (!parsed.success) {
-      throw new AppError(400, parsed.error.errors[0].message, ConstErrorCodes.VALIDATION_ERROR);
+      throw new AppError(400, parsed.error.issues[0].message, ConstErrorCodes.VALIDATION_ERROR);
     }
 
     const { files, privateMode, repoName } = parsed.data;

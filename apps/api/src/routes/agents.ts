@@ -38,7 +38,7 @@ const generateSchema = z.object({
 // Generate AGENTS.md from analysis parameters
 router.post("/generate", authMiddleware, asyncHandler<AuthRequest>(async (req, res) => {
   const parsed = generateSchema.safeParse(req.body);
-  if (!parsed.success) throw new AppError(400, parsed.error.errors[0].message, ErrorCodes.VALIDATION_ERROR);
+  if (!parsed.success) throw new AppError(400, parsed.error.issues[0].message, ErrorCodes.VALIDATION_ERROR);
 
   const analysis: CodebaseAnalysis = parsed.data;
   const mode = analysis.isEducation ? "standard" : parsed.data.mode;

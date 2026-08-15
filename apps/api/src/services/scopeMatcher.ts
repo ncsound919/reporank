@@ -203,7 +203,6 @@ function detectOutOfScopeFeatures(
 
     if (inExclusions) {
       outOfScope.push(`${category} (explicitly excluded but found in code)`);
-      continue;
     }
 
     if (!inDeliverables) {
