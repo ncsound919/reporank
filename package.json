@@ -15,6 +15,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "clean": "turbo clean",
+    "qa:suite": "node ../../../packages/quality-suite/src/quality-gate.mjs --project reporank",
     "ci": "pnpm lint && pnpm typecheck && pnpm test && pnpm build",
     "db:generate": "pnpm --filter @reporank/api db:generate",
     "db:push": "pnpm --filter @reporank/api db:push",
