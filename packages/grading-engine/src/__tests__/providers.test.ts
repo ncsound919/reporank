@@ -1,4 +1,16 @@
 import { describe, it, expect, vi } from "vitest";
+
+// Mock at module scope so the factory is hoisted and applies to the dynamic
+// `import("@google/genai")` inside GeminiProvider.generate. A real class (not a
+// vi.fn) is used so `new GoogleGenAI(...)` is unambiguously constructable.
+vi.mock("@google/genai", () => ({
+  GoogleGenAI: class {
+    models = {
+      generateContent: async () => ({ text: '{"score": 85}' }),
+    };
+  },
+}));
+
 import { GeminiProvider, OllamaProvider, LMStudioProvider, createProvider } from "../providers/index";
 
 describe("createProvider", () => {
@@ -23,18 +35,10 @@ describe("createProvider", () => {
 
 describe("GeminiProvider", () => {
   it("generates content via GoogleGenAI", async () => {
-    vi.mock("@google/genai", () => ({
-      GoogleGenAI: vi.fn().mockImplementation(() => ({
-        models: {
-          generateContent: vi.fn().mockResolvedValue({ text: '{"score": 85}' }),
-        },
-      })),
-    }));
-
-    const { GoogleGenAI } = await import("@google/genai");
     const provider = new GeminiProvider("fake-key", "gemini-2.5-flash");
     const result = await provider.generate("test prompt");
     expect(typeof result).toBe("string");
+    expect(result).toContain("score");
   });
 });
 

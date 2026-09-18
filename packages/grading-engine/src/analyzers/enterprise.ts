@@ -463,10 +463,11 @@ export function analyzeLongTermDebt(sourceFiles: { path: string; content: string
   }
 
   // Hardcoded configuration
-  for (const hit of checkHardcodedUrls(allContent)) {
+  const hardcoded = checkHardcodedUrls(sourceFiles);
+  for (const hit of hardcoded.findings) {
     findings.push({
-      type: "hardcoded-config", filePath: "multiple files", severity: "medium" as const,
-      detail: hit,
+      type: "hardcoded-config", filePath: hit.file, severity: "medium" as const,
+      detail: `${hit.match} (line ${hit.line})`,
       seniorNote: "Hardcoded configs prevent different environments (dev/staging/prod). Extract to env vars or config files.",
     });
     score -= 5;

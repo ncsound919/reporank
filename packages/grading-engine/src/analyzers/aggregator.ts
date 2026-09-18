@@ -4,6 +4,7 @@ import type { ArchitectureReport } from "./architecture";
 import type { ProductionReport } from "./production";
 import type { CodeHygieneReport } from "./code-hygiene";
 import type { EnterpriseReport } from "./enterprise";
+import type { SecurityGroup } from "./security";
 
 export interface AnalysisResult {
   complexity: ComplexityReport;
@@ -12,6 +13,8 @@ export interface AnalysisResult {
   production: ProductionReport;
   codeHygiene: CodeHygieneReport;
   enterprise: EnterpriseReport;
+  /** Measured security findings from audit-core. Optional for back-compat. */
+  security?: SecurityGroup;
 }
 
 interface FileScoreEntry {
@@ -106,6 +109,20 @@ export function aggregateFileScores(result: AnalysisResult): Map<string, FileSco
     f => f.filePath,
   );
 
+  // Measured security findings (audit-core). File-less findings still count
+  // toward the score via static-grade; they are skipped here where a path key
+  // is required for worst-files ranking.
+  if (result.security) {
+    addFindings(
+      result.security.findings.map(f => ({
+        filePath: f.filePath,
+        severity: f.severity,
+        detail: `[${f.tool}] ${f.detail}`,
+      })),
+      f => f.filePath,
+    );
+  }
+
   return fileScores;
 }
 
@@ -127,6 +144,15 @@ interface RecommendationRule {
 }
 
 const RECOMMENDATION_RULES: RecommendationRule[] = [
+  {
+    condition: (r) =>
+      (r.security?.summary.bySeverity.critical ?? 0) + (r.security?.summary.bySeverity.high ?? 0) > 0,
+    message: (r) => {
+      const s = r.security!.summary;
+      return `🔴 FIX ${s.bySeverity.critical} critical + ${s.bySeverity.high} high security findings (${s.tools.join(", ") || "measured tools"})`;
+    },
+    priority: 0,
+  },
   {
     condition: (r) => r.complexity.worstFiles.length > 0,
     message: (r) => `🔴 REFACTOR ${r.complexity.worstFiles[0].path} — ${r.complexity.worstFiles[0].reasons[0]}`,

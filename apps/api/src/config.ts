@@ -52,6 +52,14 @@ export const config = {
   },
 
   deepScan: process.env.DEEP_SCAN === "true",
+  /** Measured audit-core suite (Semgrep/CodeQL/OSV/Trivy/Gitleaks/Checkov/Syft). */
+  audit: {
+    enabled: process.env.AUDIT_ENABLED !== "false",
+    timeoutMs: parseInt(process.env.AUDIT_TIMEOUT_MS || "900000", 10),
+    gitHistory: process.env.AUDIT_GIT_HISTORY !== "false",
+    codeqlBuild: process.env.AUDIT_CODEQL_BUILD || "",
+    toolsDir: process.env.AUDIT_TOOLS_DIR || "",
+  },
   logLevel: process.env.LOG_LEVEL || "info",
   mutlyApiKey: process.env.MUTLY_API_KEY || "",
 };

@@ -1,6 +1,16 @@
 import { z } from "zod";
 import type { HealthReport } from "@reporank/shared-types";
 
+const clamp100 = (v: number) => Math.min(100, Math.max(0, v));
+
+/**
+ * A 0-100 score that tolerates provider quirks: numeric strings are coerced,
+ * out-of-range values are clamped, and missing/unparseable values fall back to
+ * `def`. Never throws, so a single bad score cannot fail an entire grade.
+ */
+const scoreField = (def: number) => z.coerce.number().transform(clamp100).catch(def).default(def);
+
+
 const partialSecuritySchema = z.object({
   secretsFound: z.number().default(0),
   secretsCritical: z.number().default(0),
@@ -17,7 +27,7 @@ const partialSecuritySchema = z.object({
   })).default([]),
   dependencyCves: z.number().default(0),
   hasSastScan: z.boolean().default(false),
-  score: z.number().min(0).max(100).default(50),
+  score: scoreField(50),
 });
 
 const partialQualitySchema = z.object({
@@ -28,7 +38,7 @@ const partialQualitySchema = z.object({
   duplicationPercent: z.number().default(0),
   hasLintConfig: z.boolean().default(false),
   hasCiConfig: z.boolean().default(false),
-  score: z.number().min(0).max(100).default(50),
+  score: scoreField(50),
 });
 
 const partialVibeSchema = z.object({
@@ -47,7 +57,7 @@ const partialArchitectureSchema = z.object({
   complexityRating: z.enum(["low", "medium", "high", "very-high"]).default("medium"),
   fileCount: z.number().default(0),
   avgFileLength: z.number().default(0),
-  score: z.number().min(0).max(100).default(50),
+  score: scoreField(50),
 });
 
 const partialDeploymentSchema = z.object({
@@ -58,7 +68,7 @@ const partialDeploymentSchema = z.object({
   hasHealthcheck: z.boolean().default(false),
   hasLogging: z.boolean().default(false),
   loggingFramework: z.string().nullable().default(null),
-  score: z.number().min(0).max(100).default(0),
+  score: scoreField(0),
 });
 
 const partialDocumentationSchema = z.object({
@@ -68,7 +78,7 @@ const partialDocumentationSchema = z.object({
   hasArchitectureDiagram: z.boolean().default(false),
   hasContributingGuide: z.boolean().default(false),
   hasLicenseFile: z.boolean().default(false),
-  score: z.number().min(0).max(100).default(0),
+  score: scoreField(0),
 });
 
 const partialLicenseSchema = z.object({
@@ -76,7 +86,7 @@ const partialLicenseSchema = z.object({
   isCopyleft: z.boolean().default(false),
   licenseConflicts: z.array(z.string()).default([]),
   hasLicenseFile: z.boolean().default(false),
-  score: z.number().min(0).max(100).default(50),
+  score: scoreField(50),
 });
 
 const partialMarketSchema = z.object({
@@ -84,7 +94,7 @@ const partialMarketSchema = z.object({
   percentileRank: z.number().default(50),
   competitorCount: z.number().default(0),
   recentActivity: z.enum(["active", "stale", "inactive"]).default("active"),
-  score: z.number().min(0).max(100).default(50),
+  score: scoreField(50),
 });
 
 const quickWinSchema = z.object({
@@ -113,7 +123,7 @@ const implementationStepSchema = z.object({
 });
 
 const healthReportSchema = z.object({
-  overallScore: z.number().min(0).max(100).default(50),
+  overallScore: scoreField(50),
   gradeCategory: z.enum(["A+", "A", "B+", "B", "C", "D", "F"]).default("C"),
   maturityLevel: z.enum(["Prototype", "MVP", "Beta", "Production", "Enterprise"]).default("Prototype"),
   summary: z.string().default("No summary provided."),
@@ -126,20 +136,20 @@ const healthReportSchema = z.object({
     documentation: z.number().default(50),
     license: z.number().default(50),
     market: z.number().default(50),
-  }).default({}),
-  security: partialSecuritySchema.default({}),
-  quality: partialQualitySchema.default({}),
-  vibe: partialVibeSchema.default({}),
-  architecture: partialArchitectureSchema.default({}),
-  deployment: partialDeploymentSchema.default({}),
-  documentation: partialDocumentationSchema.default({}),
-  license: partialLicenseSchema.default({}),
-  market: partialMarketSchema.default({}),
+  }).prefault({}),
+  security: partialSecuritySchema.prefault({}),
+  quality: partialQualitySchema.prefault({}),
+  vibe: partialVibeSchema.prefault({}),
+  architecture: partialArchitectureSchema.prefault({}),
+  deployment: partialDeploymentSchema.prefault({}),
+  documentation: partialDocumentationSchema.prefault({}),
+  license: partialLicenseSchema.prefault({}),
+  market: partialMarketSchema.prefault({}),
   valuation: z.object({
     replacementCostFMV: z.number().default(0),
     reliefFromRoyaltyValue: z.number().default(0),
     productivityWasteHeuristic: z.number().default(0),
-  }).default({}),
+  }).prefault({}),
   hallucinatedFeatures: z.array(z.string()).default([]),
   bugsAndLeaks: z.array(z.string()).default([]),
   structuralSmells: z.array(z.string()).default([]),
@@ -150,7 +160,15 @@ const healthReportSchema = z.object({
 });
 
 export function parseHealthReport(raw: string): HealthReport {
-  // Non-regex JSON extraction to avoid ReDoS on large LLM responses
+  // Reasoning models (e.g. nemotron) often emit a "thinking" preamble before the
+  // JSON. Prefer an explicit ```json fence when present, then scan every balanced
+  // {...} block and try the LARGEST first (the real HealthReport is the biggest
+  // object) instead of blindly taking the first block. Non-regex so no ReDoS.
+  const fence = raw.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if (fence) {
+    try { return healthReportSchema.parse(JSON.parse(fence[1].trim())) as HealthReport; } catch { /* fall through */ }
+  }
+  const blocks: string[] = [];
   let braceDepth = 0;
   let jsonStart = -1;
   for (let i = 0; i < raw.length; i++) {
@@ -160,11 +178,13 @@ export function parseHealthReport(raw: string): HealthReport {
     } else if (raw[i] === "}") {
       braceDepth--;
       if (braceDepth === 0 && jsonStart >= 0) {
-        const jsonStr = raw.slice(jsonStart, i + 1);
-        try { return healthReportSchema.parse(JSON.parse(jsonStr)) as HealthReport; } catch { /* try next match */ }
+        blocks.push(raw.slice(jsonStart, i + 1));
         jsonStart = -1;
       }
     }
+  }
+  for (const jsonStr of blocks.sort((a, b) => b.length - a.length)) {
+    try { return healthReportSchema.parse(JSON.parse(jsonStr)) as HealthReport; } catch { /* try next block */ }
   }
   throw new Error("No valid JSON found in LLM response");
 }

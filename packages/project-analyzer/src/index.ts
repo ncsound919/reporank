@@ -9,17 +9,17 @@ import { analyzePython } from "./analyzers/python.js";
 import { analyzeRust } from "./analyzers/rust.js";
 import { analyzeGo } from "./analyzers/go.js";
 
-interface AnalyzerResult {
-  found?: boolean;
-  [key: string]: unknown;
-}
+type NodeResult = Awaited<ReturnType<typeof analyzeNode>>;
+type PythonResult = Awaited<ReturnType<typeof analyzePython>>;
+type RustResult = Awaited<ReturnType<typeof analyzeRust>>;
+type GoResult = Awaited<ReturnType<typeof analyzeGo>>;
 
 interface ProjectAnalysisResults {
   stack: { language: string };
-  node: AnalyzerResult;
-  python: AnalyzerResult;
-  rust: AnalyzerResult;
-  go: AnalyzerResult;
+  node: NodeResult;
+  python: PythonResult;
+  rust: RustResult;
+  go: GoResult;
 }
 
 const program = new Command();
@@ -73,10 +73,10 @@ async function assertDirectoryExists(targetPath: string): Promise<void> {
 }
 
 function inferLanguage(stacks: {
-  node: AnalyzerResult;
-  python: AnalyzerResult;
-  rust: AnalyzerResult;
-  go: AnalyzerResult;
+  node: NodeResult;
+  python: PythonResult;
+  rust: RustResult;
+  go: GoResult;
 }): string {
   const detected: string[] = [];
 

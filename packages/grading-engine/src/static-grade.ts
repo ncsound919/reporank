@@ -16,6 +16,7 @@
 import type { GradeInput, ScannerResults } from './index';
 import { aggregateFileScores, buildWorstFiles, generateTopRecommendations } from './analyzers/aggregator';
 import type { AnalysisResult } from './analyzers/aggregator';
+import type { SecurityGroup } from './analyzers/security';
 
 export interface StaticHealthReport {
   repoOwner: string;
@@ -30,6 +31,8 @@ export interface StaticHealthReport {
   staticScore: number;
   worstFiles: { path: string; score: number; reasons: string[] }[];
   topRecommendations: string[];
+  /** Security posture from measured tools, when provided. */
+  security?: SecurityGroup['summary'];
   /** Signals that this report was produced without LLM assistance. */
   mode: 'static';
 }
@@ -75,6 +78,19 @@ export function gradeRepoStatic(
       seniorSummary: '',
       rawPromptBlock: '',
     },
+    security: (scannerResults.security as SecurityGroup) ?? {
+      findings: [],
+      summary: {
+        total: 0,
+        bySeverity: { critical: 0, high: 0, medium: 0, low: 0, info: 0 },
+        byCategory: {},
+        tools: [],
+        excluded: [],
+        toolVersions: {},
+        score: 100,
+        basis: 'measured+deterministic',
+      },
+    },
   };
 
   const fileScores = aggregateFileScores(analysisResult);
@@ -95,6 +111,7 @@ export function gradeRepoStatic(
     ...analysisResult.enterprise.coupling.findings,
     ...analysisResult.enterprise.license.findings,
     ...analysisResult.enterprise.longTermDebt.findings,
+    ...(analysisResult.security?.findings ?? []),
   ] as { severity: string }[];
 
   const PENALTY: Record<string, number> = { critical: 8, high: 4, medium: 2, low: 0.5 };
@@ -113,6 +130,7 @@ export function gradeRepoStatic(
     staticScore,
     worstFiles,
     topRecommendations,
+    security: analysisResult.security?.summary,
     mode: 'static',
   };
 }

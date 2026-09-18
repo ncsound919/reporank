@@ -9,15 +9,17 @@
     "static-analysis": "./dist/index.js"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc -p tsconfig.build.json",
     "clean": "rm -rf dist",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "test": "vitest run"
   },
   "dependencies": {
-    "commander": "^15.0.0"
+    "commander": "^15.0.0",
+    "typescript": "^5.8.0"
   },
   "devDependencies": {
     "@types/node": "^26.0.1",
-    "typescript": "^5.8.0"
+    "vitest": "^4.1.7"
   }
 }

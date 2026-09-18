@@ -126,7 +126,12 @@ export function analyzeProductionReadiness(
 
   // 7. Check for logging quality
   const { hasStructuredLogger: hasStructuredLogging, consoleLogCount } = checkStructuredLogging(sourceFiles);
-  const loggers = sourceFiles.filter(f => f.content.includes("console.log") || f.content.includes("console.error"));
+  const loggers = sourceFiles.filter(f =>
+    f.content.includes("console.log") ||
+    f.content.includes("console.error") ||
+    f.content.includes("process.stdout.write") ||
+    f.content.includes("process.stderr.write")
+  );
   if (!hasStructuredLogging && loggers.length > 5) {
     findings.push({
       type: "insufficient-logging", filePath: "multiple files", severity: "low",

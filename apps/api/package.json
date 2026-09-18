@@ -14,6 +14,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@overlay365/audit-core": "file:../../../../../packages/audit-core",
     "@prisma/client": "^6.5.0",
     "@reporank/claw-protect-core": "workspace:*",
     "@reporank/fix-pack-generator": "workspace:*",

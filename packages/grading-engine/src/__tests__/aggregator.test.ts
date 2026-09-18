@@ -30,13 +30,15 @@ function emptyAnalysisResult(): AnalysisResult {
     },
     dependencies: {
       findings: [],
+      totalDeps: 0,
+      devDeps: 0,
       depHealthScore: 100,
       unusedPatterns: [],
       summary: 'clean',
     },
-    architecture: { findings: [], summary: 'clean' },
+    architecture: { findings: [], directoryBreakdown: [], recommendedStructure: '', summary: 'clean' },
     production: { findings: [], deployBlockers: [], overallReadiness: 'ready', summary: 'clean' },
-    codeHygiene: { findings: [], summary: 'clean' },
+    codeHygiene: { findings: [], totalCount: 0, categoriesFound: [], score: 100, summary: 'clean' },
     enterprise: {
       apiContract:   { findings: [], apiSurface: [], consistencyScore: 100, seniorSummary: '' },
       observability: { findings: [], observabilityScore: 100, seniorSummary: '' },
@@ -106,6 +108,8 @@ describe('aggregateFileScores', () => {
       },
       architecture: {
         findings: [{ filePath, severity: 'medium', detail: 'layer violation', type: 'layer-violation' }],
+        directoryBreakdown: [],
+        recommendedStructure: '',
         summary: '',
       },
     };
@@ -195,7 +199,7 @@ describe('generateTopRecommendations', () => {
     ];
     result.complexity.fileSizeDistribution.xlarge = 3;
     result.dependencies.findings.push({ packageName: 'x', severity: 'critical', detail: 'CVE', type: 'vulnerable' } as any);
-    result.production.deployBlockers = [{ detail: 'missing env', type: 'missing-env', severity: 'critical', filePath: '' }];
+    result.production.deployBlockers = [{ detail: 'missing env', type: 'missing-env', severity: 'critical', filePath: '', fixSuggestion: 'document the required variables' }];
     result.production.overallReadiness = 'not-ready';
     result.enterprise.criticalBlockers = ['no license'];
     result.codeHygiene.findings.push({ severity: 'critical', detail: 'raw sql', filePath: 'db.ts', type: 'sql-injection' } as any);

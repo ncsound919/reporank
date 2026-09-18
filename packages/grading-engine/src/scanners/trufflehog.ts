@@ -5,7 +5,7 @@ export async function runTrufflehog(repoPath: string) {
     const { stdout } = await execa(
       "trufflehog",
       ["filesystem", "--json", "--no-update", repoPath],
-      { encoding: "utf-8", maxBuffer: 10 * 1024 * 1024, timeout: 120000 }
+      { encoding: "utf8", maxBuffer: 10 * 1024 * 1024, timeout: 120000 }
     );
     return stdout.trim().split("\n").filter(Boolean).map(l => {
       try {

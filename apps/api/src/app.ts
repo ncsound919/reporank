@@ -25,6 +25,7 @@ import timeseriesRoutes from "./routes/timeseries";
 import scopeComplianceRoutes from "./routes/scopeCompliance";
 import webhookRoutes from "./routes/webhooks";
 import internalRoutes from "./routes/internal";
+import doctorRoutes from "./routes/doctor";
 
 type RawBodyRequest = Request & {
   rawBody?: Buffer;
@@ -123,6 +124,7 @@ app.use("/api/v1", intentRoutes);
 app.use("/api/v1/dashboards", dashboardRoutes);
 app.use("/api/v1/scans", timeseriesRoutes);
 app.use("/api/v1/scope-compliance", scopeComplianceRoutes);
+app.use("/api/v1/doctor", doctorRoutes);
 app.use("/webhooks", webhookRoutes);
 app.use("/api/v1/internal", internalRoutes);
 

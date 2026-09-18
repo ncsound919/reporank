@@ -20,6 +20,7 @@
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
+    "@overlay365/fleet-client": "file:../../../../../packages/fleet-client",
     "@reporank/shared-types": "workspace:*",
     "fast-xml-parser": "^5.8.0",
     "zod": "^4.4.3"

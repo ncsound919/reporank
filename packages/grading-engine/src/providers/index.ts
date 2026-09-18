@@ -68,7 +68,7 @@ export class LMStudioProvider implements AiProvider {
           { role: "user", content: prompt },
         ],
         temperature: 0.2,
-        max_tokens: 4096,
+        max_tokens: 32768,
       }),
     });
     if (!res.ok) throw new Error(`LM Studio error: ${res.status}`);

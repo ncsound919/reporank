@@ -21,7 +21,14 @@
 
 ---
 
-## 1. Code Review Accuracy (↔ SWE-bench Verified)
+## 1. Code Review Accuracy (INTERNAL 6-task eval — NOT SWE-bench)
+
+> **Honesty gate:** every accuracy number below comes from our OWN internal eval set
+> (7 contamination samples; 6 code-review tasks) — it is NOT SWE-bench Verified
+> (500 tasks). Comparing our raw % to published SWE-bench scores (Antigravity 76.2%)
+> is apples-to-oranges and should not be read as "we're 3-5 points from the leader."
+> A valid comparison requires running our analyzer on SWE-bench Verified, which we
+> have not done.
 
 ### Benchmark: AI Contamination Detection
 | Metric | Mutly Stack | Antigravity | Cursor | VS Code + Copilot |
@@ -39,11 +46,11 @@
 | **LLM (Gemini 2.5 Flash)** | 80.0% | 66.7% | **72.7%** | 13,424 | 55.0s |
 | **LLM (DeepSeek V4 Pro)** | **62.5%** | **83.3%** | **71.4%** | 17,025 | **23.1s** |
 
-**Key findings:** The heuristic scanner (55.6% F1, $0, 0ms) catches 5/6 issue types for free. LLM-powered scanners achieve **71-73% F1** — directly competitive with Antigravity's 76.2% and Cursor's ~60%. Security-critical issues are caught with **100% precision** by both LLMs.
+**Key findings:** The heuristic scanner (55.6% F1, $0, 0ms) catches 5/6 issue types for free on our 6-task internal eval. LLM-powered scanners achieve 71-73% F1 on the same 6 tasks. Security-critical issues are caught with 100% precision by both LLMs on that set. **These are internal-eval numbers, not SWE-bench; do not compare them directly to published SWE-bench leaderboard scores.**
 
 DeepSeek V4 Pro is **2.4× faster** (23.1s vs 55.0s) than Gemini 2.5 Flash with comparable accuracy, making it the better choice for CI/CD pipelines where speed matters.
 
-**vs Competitors:** Antigravity 76.2% SWE-bench (Gemini 3 Pro) vs our 71-73% — gap is ~3-5 points and likely closable with model upgrade or prompt tuning.
+**vs Competitors:** Not directly comparable — Antigravity 76.2% is SWE-bench Verified (500 tasks); our 71-73% is a 6-task internal eval. Any real comparison requires running our analyzer on SWE-bench Verified.
 
 ### Benchmark: Multi-Dimension Vibe Scoring
 | Dimension | Score |
@@ -201,6 +208,8 @@ DeepSeek V4 Pro is **2.4× faster** (23.1s vs 55.0s) than Gemini 2.5 Flash with 
 | **Cross-agent format** | Translation | **✅ 5 formats** | ❌ | ❌ | ❌ |
 | **Editor UX** | Polish | ❌ Needs work | ✅ Best | ✅ Good | ✅ Good |
 | **Multi-file** | Refactoring | ❌ No Composer | ✅ Composer | ✅ Planning | ❌ |
+
+> *All Mutly-stack accuracy figures in this table are from internal evals (7 contamination samples / 6 review tasks), not SWE-bench Verified. Competitor figures are their published benchmarks on different datasets — the rows are illustrative, not directly comparable.*
 
 ---
 

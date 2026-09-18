@@ -14,7 +14,11 @@ export function extractScanTrustInputs(
   scan: ScanLike,
 ): Pick<TrustScoreInput, "overallScore" | "vibeCodingIndex" | "securityFindings"> {
   const report = scan.report as
-    | { vibeCodingIndex?: { overallScore?: number }; software20Score?: { overall?: number } }
+    | {
+        vibeCodingIndex?: { overallScore?: number };
+        vibe?: { overall?: number };
+        software20Score?: { overall?: number };
+      }
     | null
     | undefined;
   const claw = scan.clawFindings as
@@ -23,7 +27,8 @@ export function extractScanTrustInputs(
     | undefined;
   return {
     overallScore: scan.overallScore ?? 0,
-    vibeCodingIndex: report?.vibeCodingIndex?.overallScore ?? 0,
+    // Worker writes `report.vibe.overall`; older rows may carry `vibeCodingIndex`.
+    vibeCodingIndex: report?.vibeCodingIndex?.overallScore ?? report?.vibe?.overall ?? 0,
     securityFindings: claw
       ? {
           critical: claw.critical ?? 0,

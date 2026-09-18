@@ -217,7 +217,7 @@ program
           if (result.failed.length > 0) {
             process.stdout.write(`  Failed: ${result.failed.length}`);
           }
-          process.stdout.write();
+          process.stdout.write("\n");
         }
         process.exit(result.failed.length > 0 ? 1 : 0);
         return;
@@ -274,7 +274,7 @@ function printTextReport(r: import("./verify.js").VerifyReport): void {
     if (r.findings.length > 20) {
       process.stdout.write(`    ... and ${r.findings.length - 20} more`);
     }
-    process.stdout.write();
+    process.stdout.write("\n");
   }
   if (r.hallucinations && r.hallucinations.hallucinations.length > 0) {
     process.stdout.write(`  🚨 Phantom imports (${r.hallucinations.hallucinations.length}):`);
@@ -285,7 +285,7 @@ function printTextReport(r: import("./verify.js").VerifyReport): void {
     if (r.hallucinations.hallucinations.length > 20) {
       process.stdout.write(`    ... and ${r.hallucinations.hallucinations.length - 20} more`);
     }
-    process.stdout.write();
+    process.stdout.write("\n");
   }
 }
 
@@ -373,7 +373,7 @@ instructions
       process.stdout.write(`    Rationale: ${s.rationale}`);
       process.stdout.write(`    Confidence: ${(s.confidence * 100).toFixed(0)}%`);
       process.stdout.write(`    Evidence: ${s.evidence.join("; ")}`);
-      process.stdout.write();
+      process.stdout.write("\n");
     }
   }));
 

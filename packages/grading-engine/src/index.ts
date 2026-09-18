@@ -1,4 +1,4 @@
-import { GoogleGenAI } from "@google/genai";
+import { callLLM } from "@overlay365/fleet-client";
 import type { HealthReport } from "@reporank/shared-types";
 import { buildGradingPrompt } from "./promptBuilder";
 import { parseHealthReport } from "./responseParser";
@@ -32,9 +32,10 @@ export interface ScannerResults {
 }
 
 export class GradingService {
-  private ai: GoogleGenAI;
-  constructor(private apiKey: string, private model: string = "gemini-2.5-flash") {
-    this.ai = new GoogleGenAI({ apiKey });
+  constructor() {
+    // LLM access routes through the fleet chain (@overlay365/fleet-client:
+    // openrouter -> opencode Go -> deepseek -> ollama). No per-agent SDK, no
+    // GEMINI_API_KEY; keys resolve from the environment by the chain client.
   }
 
   async gradeRepo(input: GradeInput, scannerResults?: ScannerResults): Promise<HealthReport> {
@@ -44,14 +45,14 @@ export class GradingService {
 
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
       try {
-        const response = await this.ai.models.generateContent({
-          model: this.model,
-          contents: prompt,
-          config: { temperature: 0.2, responseMimeType: "application/json" },
+        const text = await callLLM({
+          system: "You are a strict repository health grader. Respond with ONLY the JSON object - no prose, no markdown fences.",
+          userMessage: prompt,
+          maxTokens: 4096,
+          temperature: 0.2,
+          responseFormat: { type: 'json_object' },
         });
-
-        const text = response.text;
-        if (!text) throw new Error("Empty response from Gemini");
+        if (!text) throw new Error("Empty response from LLM chain");
 
         const report = parseHealthReport(text);
         report.repoOwner = input.repoOwner;
@@ -71,17 +72,24 @@ export class GradingService {
         }
       }
     }
-    throw lastError || new Error("Gemini request failed after retries");
+    throw lastError || new Error("LLM chain request failed after retries");
   }
 
-  async dispose(): Promise<void> {
-    (this.ai as any) = null;
-  }
+  async dispose(): Promise<void> {}
 }
 
 export { buildGradingPrompt } from "./promptBuilder";
 export { parseHealthReport } from "./responseParser";
 export { runDeepAnalysis } from "./analyzers/index";
+export {
+  securityFromAuditReport,
+  emptySecurityGroup,
+  type SecurityGroup,
+  type SecurityFinding,
+  type SecuritySeverity,
+  type AuditReportLike,
+} from "./analyzers/security";
+export { gradeRepoStatic, type StaticHealthReport } from "./static-grade";
 export { calculateVibeCodingIndex } from "./analyzers/contamination";
 export {
   predictImpact,

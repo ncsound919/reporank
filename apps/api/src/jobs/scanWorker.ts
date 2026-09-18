@@ -3,7 +3,15 @@ import { prisma } from "../db/client";
 import { logger } from "../logger";
 import { ScanStatus } from "../constants";
 import { fetchRepoData, repoDataToGradeInput } from "@reporank/grading-engine/scanners/github";
-import { GradingService, runDeepAnalysis } from "@reporank/grading-engine";
+import {
+  GradingService,
+  runDeepAnalysis,
+  buildGradingPrompt,
+  parseHealthReport,
+  gradeRepoStatic,
+  emptySecurityGroup,
+  type SecurityGroup,
+} from "@reporank/grading-engine";
 import { runNovelAnalysis } from "@reporank/grading-engine/novel";
 import { generateUnstickPlan } from "@reporank/grading-engine/unstick";
 import { detectInvisibleBugs } from "@reporank/grading-engine/invisible-bugs";
@@ -13,78 +21,10 @@ import { generateFixPacks } from "@reporank/fix-pack-generator";
 import { buildRoadmap } from "@reporank/fix-pack-generator";
 import { scanSecrets } from "@reporank/claw-protect-core";
 import { config } from "../config";
-import { execSync } from "node:child_process";
-import { mkdtempSync, rmSync } from "node:fs";
-import { join } from "node:path";
-import { tmpdir } from "node:os";
+import { reportFingerprint, type AuditReport } from "@overlay365/audit-core";
+import { auditLocalFiles, auditRemoteRepo } from "../services/measuredAudit";
 
-const gradingService = new GradingService(config.gemini.apiKey, config.gemini.model);
-
-const SCORING_WEIGHTS = {
-  security: 0.25, quality: 0.20, vibe: 0.15, architecture: 0.15,
-  deployment: 0.10, documentation: 0.05, license: 0.05, market: 0.05,
-};
-
-function calcOverall(report: any, vibeOverall: number): number {
-  return Math.round(
-    report.dimensionScores.security * SCORING_WEIGHTS.security +
-    report.dimensionScores.quality * SCORING_WEIGHTS.quality +
-    vibeOverall * SCORING_WEIGHTS.vibe +
-    report.dimensionScores.architecture * SCORING_WEIGHTS.architecture +
-    report.dimensionScores.deployment * SCORING_WEIGHTS.deployment +
-    report.dimensionScores.documentation * SCORING_WEIGHTS.documentation +
-    report.dimensionScores.license * SCORING_WEIGHTS.license +
-    report.dimensionScores.market * SCORING_WEIGHTS.market
-  );
-}
-
-function parseJson(raw: string): any { try { return JSON.parse(raw); } catch { return raw; } }
-
-function parseSarif(raw: string): any {
-  try {
-    const sarif = JSON.parse(raw);
-    const findings: any[] = [];
-    for (const run of sarif.runs || [])
-      for (const r of run.results || [])
-        findings.push({ checkId: r.ruleId, severity: r.properties?.severity || "WARNING", path: r.locations?.[0]?.physicalLocation?.artifactLocation?.uri || "", message: r.message?.text || "" });
-    return findings;
-  } catch { return raw; }
-}
-
-async function runDeepScanners(owner: string, repo: string): Promise<Record<string, any>> {
-  const results: Record<string, any> = {};
-  const tempDir = mkdtempSync(join(tmpdir(), "reporank-"));
-
-  try {
-    // Reconstruct URL from validated owner/repo only — never use raw user input in shell
-    const safeUrl = `https://github.com/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}.git`;
-    execSync(`git clone --depth 1 "${safeUrl}" .`, { cwd: tempDir, encoding: "utf-8", timeout: 60000, stdio: "pipe" });
-
-    const scanners: { name: string; cmd: string; args: string[]; parser?: (out: string) => any }[] = [
-      { name: "semgrep", cmd: "semgrep", args: ["scan", "--sarif", "--no-rewrite-rule-ids", "--quiet"], parser: parseSarif },
-      { name: "trivy", cmd: "trivy", args: ["filesystem", "--format", "json", "--quiet", "--no-progress", tempDir], parser: parseJson },
-      { name: "trufflehog", cmd: "trufflehog", args: ["filesystem", "--json", "--no-update", tempDir], parser: parseJson },
-      { name: "hadolint", cmd: "hadolint", args: ["Dockerfile", "--format", "json"], parser: parseJson },
-    ];
-
-    for (const scanner of scanners) {
-      try {
-        const out = execSync(`"${scanner.cmd}" ${scanner.args.map(a => `"${a}"`).join(" ")}`, { cwd: tempDir, encoding: "utf-8", maxBuffer: 10*1024*1024, timeout: 120000, stdio: "pipe" });
-        results[scanner.name] = scanner.parser ? scanner.parser(out) : out;
-      } catch (e: any) {
-        logger.warn(`Scanner ${scanner.name} skipped: ${e.message?.slice(0, 80)}`);
-      }
-    }
-
-    logger.info(`Deep scan complete: ${Object.keys(results).length}/${scanners.length} scanners ran`);
-    return results;
-  } catch (e: any) {
-    logger.warn("Deep scan clone failed:", e.message);
-    return {};
-  } finally {
-    try { rmSync(tempDir, { recursive: true, force: true }); } catch { /* cleanup best effort */ }
-  }
-}
+const gradingService = new GradingService();
 
 export function startWorker() {
   scanQueue.process(async (job) => {
@@ -127,12 +67,27 @@ export function startWorker() {
       const clawResults = scanSecrets(allContent);
       const deep = runDeepAnalysis(null, repoData.fileTree, repoData.sourceFiles, repoData.packageJson);
 
-      let scannerResults: Record<string, any> = {};
-      if (config.deepScan) {
-        await prisma.scan.update({ where: { id: scanId }, data: { status: ScanStatus.SCANNING, progress: 50, message: "Running deep scanners..." } });
-        if (!isLocal && input.repoUrl !== "local") {
-          scannerResults = await runDeepScanners(input.repoOwner, input.repoName);
-        }
+      // Phase 2b: measured security audit (real tools, provenance-tagged).
+      // Replaces the old inline scanner block; findings now feed the score.
+      let security: SecurityGroup = emptySecurityGroup("audit disabled");
+      let auditReport: AuditReport | null = null;
+      if (config.audit.enabled) {
+        await prisma.scan.update({ where: { id: scanId }, data: { status: ScanStatus.SCANNING, progress: 50, message: "Running measured security audit..." } });
+        const auditOpts = {
+          timeoutMs: config.audit.timeoutMs,
+          gitHistory: config.audit.gitHistory,
+          codeqlBuild: config.audit.codeqlBuild,
+          toolsDir: config.audit.toolsDir,
+        };
+        const measured = isLocal
+          ? await auditLocalFiles(localFiles!, auditOpts)
+          : await auditRemoteRepo(input.repoOwner, input.repoName, auditOpts);
+        security = measured.group;
+        auditReport = measured.report;
+        logger.info(
+          { scanId, findings: security.summary.total, tools: security.summary.tools, excluded: security.summary.excluded.length },
+          "Measured audit complete",
+        );
       }
 
       // Novel analysis: architecture diagrams, tech debt, dead code, README
@@ -165,15 +120,14 @@ export function startWorker() {
         if (providerType === "gemini") {
           report = await gradingService.gradeRepo(input, {
             vibeAnalysis: vibe, clawSecrets: clawResults, deepAnalysis: deep.rawPromptBlock,
-            topRecommendations: deep.topRecommendations, ...scannerResults,
+            topRecommendations: deep.topRecommendations, measuredSecurity: security.summary,
           } as any);
         } else {
           // Local AI provider (Ollama, LM Studio)
           const provider = createProvider(providerType, config.gemini.apiKey, model, endpoint);
-          const { buildGradingPrompt, parseHealthReport } = await import("@reporank/grading-engine");
           const prompt = buildGradingPrompt(input, {
             vibeAnalysis: vibe, clawSecrets: clawResults, deepAnalysis: deep.rawPromptBlock,
-            topRecommendations: deep.topRecommendations, ...scannerResults,
+            topRecommendations: deep.topRecommendations, measuredSecurity: security.summary,
           } as any);
           const rawResponse = await provider.generate(prompt);
           report = parseHealthReport(rawResponse);
@@ -196,9 +150,18 @@ export function startWorker() {
         recommendations: [...new Set([...vibe.recommendations, ...(report.vibe.recommendations || [])])],
       };
 
+      // Official score is deterministic + measured. LLM dimension scores remain
+      // narrative only and never determine the headline number.
+      const staticReport = gradeRepoStatic(input, { ...deep, security });
+      report.overallScore = staticReport.staticScore;
+      report.staticScore = staticReport.staticScore;
+      report.scoreBasis = "measured+deterministic";
+      report.measuredSecurity = security.summary;
+      report.auditFingerprint = auditReport ? reportFingerprint(auditReport) : null;
+      report.worstFiles = staticReport.worstFiles;
+
       const fixPacks = generateFixPacks(report);
       report.roadmap = buildRoadmap(report.quickWins, report.overallScore);
-      report.overallScore = calcOverall(report, vibe.overall);
 
       // Generate unstick plan from full report data
       const unstick = generateUnstickPlan(
@@ -219,7 +182,19 @@ export function startWorker() {
           overallScore: report.overallScore, gradeCategory: report.gradeCategory,
           maturityLevel: report.maturityLevel, vibeScore: vibe.overall,
           report: report as any, fixPack: fixPacks as any,
-          clawFindings: { secrets: clawResults, scanners: scannerResults, private: isPrivate, novel, unstick, invisible } as any,
+          clawFindings: {
+            critical: security.summary.bySeverity.critical,
+            high: security.summary.bySeverity.high,
+            medium: security.summary.bySeverity.medium,
+            low: security.summary.bySeverity.low,
+            secrets: clawResults,
+            security,
+            audit: auditReport,
+            private: isPrivate,
+            novel,
+            unstick,
+            invisible,
+          } as any,
           completedAt: new Date(), duration: Math.floor((Date.now() - startTime) / 1000),
         },
       });

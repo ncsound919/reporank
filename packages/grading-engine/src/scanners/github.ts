@@ -38,7 +38,25 @@ function stratifiedSample(
 export async function fetchRepoData(owner: string, repo: string, token?: string): Promise<RepoData> {
   const headers: Record<string, string> = { Accept: "application/vnd.github.v3+json" };
   if (token) headers.Authorization = `Bearer ${token}`;
-  const gh = async <T>(path: string): Promise<T> => { const r = await fetch(`https://api.github.com${path}`, { headers }); if (!r.ok) throw new Error(`GitHub API ${r.status}`); return r.json() as Promise<T>; };
+  // Retry/backoff: the GitHub API intermittently answers with a headers
+  // timeout (undici) or 429/5xx. Retry transient failures (1s, 2s) with a
+  // per-request timeout; fail fast on non-transient 4xx (404/401/403).
+  const gh = async <T>(path: string, attempts = 3): Promise<T> => {
+    let lastErr: unknown;
+    for (let attempt = 1; attempt <= attempts; attempt++) {
+      try {
+        const r = await fetch(`https://api.github.com${path}`, { headers, signal: AbortSignal.timeout(30_000) });
+        if (r.ok) return r.json() as Promise<T>;
+        if (r.status < 500 && r.status !== 429) throw new Error(`GitHub API ${r.status} (no retry)`);
+        lastErr = new Error(`GitHub API ${r.status}`);
+      } catch (err) {
+        if (err instanceof Error && err.message.includes('(no retry)')) throw err;
+        lastErr = err;
+      }
+      if (attempt < attempts) await new Promise((res) => setTimeout(res, 1000 * attempt));
+    }
+    throw lastErr;
+  };
 
   const repoData = await gh<any>(`/repos/${owner}/${repo}`);
   let readme = "";

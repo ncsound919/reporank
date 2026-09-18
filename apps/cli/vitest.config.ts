@@ -1,8 +1,10 @@
-import { defineConfig } from "vitest/config";
+import { configDefaults, defineConfig } from "vitest/config";
 
 export default defineConfig({
   test: {
     globals: true,
+    // Only run TypeScript sources; never the compiled copies under dist/.
+    exclude: [...configDefaults.exclude, "**/dist/**"],
     coverage: {
       provider: "v8",
       reporter: ["text", "html", "json"],

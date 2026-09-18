@@ -66,6 +66,7 @@ export function checkHardcodedUrls(sourceFiles: { path: string; content: string 
   const hitCounts: Record<string, number> = {};
 
   for (const file of sourceFiles) {
+    if (!file || typeof file.content !== "string") continue;
     const lines = file.content.split("\n");
     for (let i = 0; i < lines.length; i++) {
       for (const { regex, label } of patterns) {
