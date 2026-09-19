@@ -26,6 +26,7 @@ import scopeComplianceRoutes from "./routes/scopeCompliance";
 import webhookRoutes from "./routes/webhooks";
 import internalRoutes from "./routes/internal";
 import doctorRoutes from "./routes/doctor";
+import portfolioRoutes from "./routes/portfolio";
 
 type RawBodyRequest = Request & {
   rawBody?: Buffer;
@@ -127,6 +128,7 @@ app.use("/api/v1/scope-compliance", scopeComplianceRoutes);
 app.use("/api/v1/doctor", doctorRoutes);
 app.use("/webhooks", webhookRoutes);
 app.use("/api/v1/internal", internalRoutes);
+app.use("/api/v1/portfolio", portfolioRoutes);
 
 app.use((_req: Request, res: Response) => {
   res.status(404).json({ error: "Not found" });

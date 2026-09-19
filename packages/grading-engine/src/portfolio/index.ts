@@ -1,0 +1,117 @@
+export {
+  loadRepoConfig,
+  resolveDriftThreshold,
+  DEFAULT_DRIFT_THRESHOLD,
+  CONFIG_FILENAMES,
+  type RepoRankConfig,
+} from "./config";
+export {
+  createEmptyHistory,
+  loadHistory,
+  saveHistory,
+  resolveHistoryPath,
+  snapshotFromIndex,
+  diffSnapshots,
+  recordSnapshot,
+  HISTORY_VERSION,
+  HISTORY_FILENAME,
+  type HistoryStore,
+  type IndexSnapshot,
+  type ScanCursor,
+  type DriftAlert,
+  type DriftSeverity,
+  type HistoryLocationOptions,
+  type RecordSnapshotResult,
+} from "./history";
+export {
+  planIncrementalScan,
+  normalizeFileList,
+  type IncrementalPlan,
+  type IncrementalPlanInput,
+  type IncrementalReport,
+  type IncrementalScanReport,
+  type GitDeltaInput,
+} from "./incremental";
+export {
+  hashFileContent,
+  resolveFileCachePath,
+  createEmptyFileCache,
+  loadFileCache,
+  saveFileCache,
+  FILE_CACHE_VERSION,
+  FILE_CACHE_FILENAME,
+  type FileCacheEntry,
+  type FileCacheStore,
+  type FileCacheLocationOptions,
+} from "./file-cache";
+export {
+  replayRepoAnalysis,
+  type ReplayInput,
+  type ReplayResult,
+} from "./replay";
+export {
+  evaluateBudget,
+  budgetExitCode,
+  unknownBudgetDimensions,
+  parseDimensionBudgets,
+  type DimensionBudget,
+  type BudgetOptions,
+  type BudgetDriver,
+  type BudgetBreach,
+  type BudgetReport,
+  type ParsedDimensionBudgets,
+} from "./budget";
+export {
+  computeRiskRoi,
+  computeDrivers,
+  DIMENSION_EASE,
+  DEFAULT_EASE,
+  type RiskRoi,
+  type ScoreDriver,
+} from "./score";
+export {
+  benchmarkIndex,
+  percentileOf,
+  cohortKey,
+  languageCohort,
+  DEFAULT_MIN_SAMPLE_SIZE,
+  type BenchmarkResult,
+  type BenchmarkOptions,
+  type BenchmarkSample,
+  type PercentileResult,
+} from "./benchmark";
+export {
+  buildCrossRepoReport,
+  codeFingerprint,
+  normalizeCode,
+  tokenizeCode,
+  type CrossRepoInput,
+  type CrossRepoEdge,
+  type CrossRepoReport,
+  type CrossRepoOptions,
+  type DuplicateFinding,
+  type DuplicateLocation,
+} from "./cross-repo";
+export {
+  loadRepo,
+  discoverRepos,
+  isRepoRoot,
+  inferLanguage,
+  countLoc,
+  analyzeLoadedRepo,
+  SOURCE_EXTENSIONS,
+  type LoadedRepo,
+  type LoadRepoOptions,
+  type RepoAnalysis,
+} from "./loader";
+export {
+  rankPortfolio,
+  analyzePortfolio,
+  scanRepoHistory,
+  type PortfolioRepoInput,
+  type PortfolioEntry,
+  type PortfolioReport,
+  type PortfolioRankOptions,
+  type ScanRepoHistoryOptions,
+  type RepoScanResult,
+} from "./portfolio";

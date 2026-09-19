@@ -3,7 +3,7 @@
  *
  * Usage:
  *   import { gradeRepoStatic } from './static-grade';
- *   const report = await gradeRepoStatic(input, scannerResults);
+ *   const report = gradeRepoStatic(input, scannerResults);
  *
  * CLI flag:
  *   reporank analyze <folder> --no-llm
@@ -11,12 +11,23 @@
  * When --no-llm is set, the GradingService (Gemini) is bypassed entirely.
  * The output is a StaticHealthReport that contains all static-analyzer
  * findings and a deterministic composite score derived solely from
- * aggregator.ts weights — identical across every invocation for the same input.
+ * structural-index.ts — identical across every invocation for the same input.
+ *
+ * The score is an evidence-first index: it decomposes into per-dimension
+ * contributions, each listing the exact findings that produced it. An LLM
+ * grade, if one exists elsewhere, is narrative only and never sets this number.
  */
 import type { GradeInput, ScannerResults } from './index';
 import { aggregateFileScores, buildWorstFiles, generateTopRecommendations } from './analyzers/aggregator';
 import type { AnalysisResult } from './analyzers/aggregator';
 import type { SecurityGroup } from './analyzers/security';
+import type { StructuralReport } from './analyzers/structural';
+import type { DeadCodeReport } from './analyzers/dead-code';
+import {
+  computeStructuralIndex,
+  type DimensionContribution,
+  type IndexNormalization,
+} from './analyzers/structural-index';
 
 export interface StaticHealthReport {
   repoOwner: string;
@@ -27,8 +38,18 @@ export interface StaticHealthReport {
   openIssuesCount: number;
   lastPushedAt: string;
   scannedAt: string;
-  /** Composite score 0-100 derived from static analyzers only — fully deterministic. */
+  /** Composite index 0-100 derived from static analyzers only — fully deterministic. */
   staticScore: number;
+  /** Alias of `staticScore`, named for what it is: the deterministic index. */
+  index: number;
+  /** Per-dimension decomposition: score, weight, raw mass, and the findings behind it. */
+  decomposition: DimensionContribution[];
+  /** Size/language cohort and its expected baseline (see structural-index.ts). */
+  normalization: IndexNormalization;
+  /** Dimensions that could not be measured honestly (excluded from the index). */
+  unmeasured: string[];
+  /** Human-readable formula, so the number is auditable without reading source. */
+  indexFormula: string;
   worstFiles: { path: string; score: number; reasons: string[] }[];
   topRecommendations: string[];
   /** Security posture from measured tools, when provided. */
@@ -38,7 +59,7 @@ export interface StaticHealthReport {
 }
 
 /**
- * Builds a deterministic score from static analyzer results.
+ * Builds a deterministic index from static analyzer results.
  * No LLM calls are made. Every invocation with the same input produces
  * the same output.
  */
@@ -78,45 +99,24 @@ export function gradeRepoStatic(
       seniorSummary: '',
       rawPromptBlock: '',
     },
-    security: (scannerResults.security as SecurityGroup) ?? {
-      findings: [],
-      summary: {
-        total: 0,
-        bySeverity: { critical: 0, high: 0, medium: 0, low: 0, info: 0 },
-        byCategory: {},
-        tools: [],
-        excluded: [],
-        toolVersions: {},
-        score: 100,
-        basis: 'measured+deterministic',
-      },
-    },
+    security: (scannerResults.security as SecurityGroup) ?? undefined,
+    structure: (scannerResults.structure as StructuralReport) ?? undefined,
+    deadCode: (scannerResults.deadCode as DeadCodeReport) ?? undefined,
   };
 
   const fileScores = aggregateFileScores(analysisResult);
   const worstFiles = buildWorstFiles(fileScores, 10);
   const topRecommendations = generateTopRecommendations(analysisResult);
 
-  // Composite score: start at 100, penalise by severity weights.
-  // Critical findings cost 30 pts each (capped at 100 total deduction).
-  const allFindings = [
-    ...analysisResult.complexity.hotSpots,
-    ...analysisResult.dependencies.findings,
-    ...analysisResult.architecture.findings,
-    ...analysisResult.production.findings,
-    ...analysisResult.codeHygiene.findings,
-    ...analysisResult.enterprise.apiContract.findings,
-    ...analysisResult.enterprise.observability.findings,
-    ...analysisResult.enterprise.buildCI.findings,
-    ...analysisResult.enterprise.coupling.findings,
-    ...analysisResult.enterprise.license.findings,
-    ...analysisResult.enterprise.longTermDebt.findings,
-    ...(analysisResult.security?.findings ?? []),
-  ] as { severity: string }[];
+  // Total LOC is used only for cohort normalization, never as a score divisor.
+  const totalLoc = input.sourceFiles.reduce((s, f) => s + f.content.split(/\r?\n/).length, 0);
 
-  const PENALTY: Record<string, number> = { critical: 8, high: 4, medium: 2, low: 0.5 };
-  const totalPenalty = allFindings.reduce((sum, f) => sum + (PENALTY[f.severity] ?? 0), 0);
-  const staticScore = Math.max(0, Math.round(100 - Math.min(totalPenalty, 100)));
+  const index = computeStructuralIndex(analysisResult, {
+    mainLanguage: input.mainLanguage,
+    totalLoc,
+    structure: analysisResult.structure,
+    deadCode: analysisResult.deadCode,
+  });
 
   return {
     repoOwner: input.repoOwner,
@@ -127,7 +127,12 @@ export function gradeRepoStatic(
     openIssuesCount: input.openIssuesCount,
     lastPushedAt: input.lastPushedAt,
     scannedAt: new Date().toISOString(),
-    staticScore,
+    staticScore: index.index,
+    index: index.index,
+    decomposition: index.contributions,
+    normalization: index.normalization,
+    unmeasured: index.unmeasured,
+    indexFormula: index.formula,
     worstFiles,
     topRecommendations,
     security: analysisResult.security?.summary,

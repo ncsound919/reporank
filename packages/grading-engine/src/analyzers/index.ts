@@ -11,6 +11,42 @@ export { analyzeArchitecture, type ArchitectureReport } from "./architecture";
 export { analyzeProductionReadiness, type ProductionReport } from "./production";
 export { scanCodeHygiene, type CodeHygieneReport } from "./code-hygiene";
 export { runEnterpriseAnalysis, type EnterpriseReport } from "./enterprise";
+export {
+  analyzeStructure,
+  parseLayerRules,
+  findImportCycles,
+  findStronglyConnectedComponents,
+  detectLayerViolations,
+  computeModuleCoupling,
+  DEFAULT_LAYER_RULES,
+  type StructuralReport,
+  type StructuralFinding,
+  type StructuralSeverity,
+  type ImportCycle,
+  type ModuleCoupling,
+  type LayerRule,
+  type AnalyzeStructureOptions,
+} from "./structural";
+export {
+  buildModuleGraph,
+  extractImportSpecifiers,
+  resolveSpecifier,
+  normalizePath,
+  dirName,
+  languageOf,
+  type ModuleGraph,
+  type GraphSourceFile,
+  type GraphLanguage,
+} from "./import-graph";
+export {
+  computeStructuralIndex,
+  type StructuralIndex,
+  type StructuralIndexOptions,
+  type DimensionContribution,
+  type IndexFinding,
+  type IndexNormalization,
+  type IndexSeverity,
+} from "./structural-index";
 export { calculateVibeCodingIndex, type VibeCodingReport } from "./contamination";
 export {
   predictImpact,

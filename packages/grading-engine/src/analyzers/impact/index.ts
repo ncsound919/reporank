@@ -27,4 +27,4 @@ export {
   type FixEffort,
   type FixType,
   type RecommendationReport,
-} from '../impact';
+} from '../impact.js';

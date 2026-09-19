@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url = env("DATABASE_URL")
 }
 
@@ -355,6 +355,21 @@ model StudentSubmission {
 
   @@index([assignmentId])
   @@index([studentEmail])
+}
+
+model PortfolioSnapshot {
+  id            String   @id @default(cuid())
+  repoKey       String
+  name          String
+  index         Int
+  cohort        String?
+  dimensions    String   // JSON string for SQLite compatibility
+  normalization String?  // JSON string for SQLite compatibility
+  decomposition String?  // JSON string for SQLite compatibility
+  createdAt     DateTime @default(now())
+
+  @@index([repoKey])
+  @@index([createdAt])
 }
 
 

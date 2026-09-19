@@ -156,6 +156,13 @@ export function startWorker() {
       report.overallScore = staticReport.staticScore;
       report.staticScore = staticReport.staticScore;
       report.scoreBasis = "measured+deterministic";
+      // Evidence-first decomposition: every dimension lists the findings that
+      // produced its score, plus the size/language cohort baseline.
+      report.index = staticReport.index;
+      report.decomposition = staticReport.decomposition;
+      report.normalization = staticReport.normalization;
+      report.unmeasured = staticReport.unmeasured;
+      report.indexFormula = staticReport.indexFormula;
       report.measuredSecurity = security.summary;
       report.auditFingerprint = auditReport ? reportFingerprint(auditReport) : null;
       report.worstFiles = staticReport.worstFiles;

@@ -25,4 +25,4 @@ export {
   type LicenseFinding,
   type LongTermDebtFinding,
   type EnterpriseReport,
-} from '../enterprise';
+} from '../enterprise.js';

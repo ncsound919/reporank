@@ -13,6 +13,7 @@ import { resolve } from "node:path";
 import { scanCommand } from "./scan.js";
 import { agentsGenerateCommand, agentsAuditCommand } from "./agents.js";
 import { registerImportCommand } from "./commands/import.js";
+import { registerPortfolioCommand } from "./commands/portfolio.js";
 
 const program = new Command();
 
@@ -510,5 +511,6 @@ program
   });
 
 registerImportCommand(program);
+registerPortfolioCommand(program);
 
 program.parse(process.argv);

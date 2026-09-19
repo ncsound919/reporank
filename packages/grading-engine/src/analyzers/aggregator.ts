@@ -5,6 +5,8 @@ import type { ProductionReport } from "./production";
 import type { CodeHygieneReport } from "./code-hygiene";
 import type { EnterpriseReport } from "./enterprise";
 import type { SecurityGroup } from "./security";
+import type { StructuralReport } from "./structural";
+import type { DeadCodeReport } from "./dead-code";
 
 export interface AnalysisResult {
   complexity: ComplexityReport;
@@ -15,6 +17,10 @@ export interface AnalysisResult {
   enterprise: EnterpriseReport;
   /** Measured security findings from audit-core. Optional for back-compat. */
   security?: SecurityGroup;
+  /** Resolved import-graph structure: cycles, layering, coupling. */
+  structure?: StructuralReport;
+  /** Deterministic dead-export plan (reused, not recomputed downstream). */
+  deadCode?: DeadCodeReport;
 }
 
 interface FileScoreEntry {
@@ -118,6 +124,32 @@ export function aggregateFileScores(result: AnalysisResult): Map<string, FileSco
         filePath: f.filePath,
         severity: f.severity,
         detail: `[${f.tool}] ${f.detail}`,
+      })),
+      f => f.filePath,
+    );
+  }
+
+  // Structural findings (cycles, layer violations, coupling) are located by
+  // construction, so they feed worst-files ranking directly.
+  if (result.structure) {
+    addFindings(
+      result.structure.findings.map(f => ({
+        filePath: f.filePath,
+        severity: f.severity,
+        detail: `[structure:${f.type}] ${f.detail}`,
+      })),
+      f => f.filePath,
+    );
+  }
+
+  // Dead-code plan (existing analyzer) is wired in rather than re-detected.
+  if (result.deadCode) {
+    const riskSeverity: Record<string, string> = { risky: "high", moderate: "medium", safe: "low" };
+    addFindings(
+      result.deadCode.steps.map(s => ({
+        filePath: s.file,
+        severity: riskSeverity[s.riskLevel] ?? "low",
+        detail: `[dead-code] ${s.reason}`,
       })),
       f => f.filePath,
     );
@@ -232,6 +264,23 @@ const RECOMMENDATION_RULES: RecommendationRule[] = [
     message: (r) =>
       `🔴 DEPLOY-BLOCKING: ${r.production.deployBlockers.length} issues prevent safe deployment`,
     priority: 12,
+  },
+  {
+    condition: (r) => (r.structure?.cycles.length ?? 0) > 0,
+    message: (r) => {
+      const cycles = r.structure!.cycles;
+      const biggest = cycles[0];
+      return `🔴 BREAK ${cycles.length} import cycle(s) — largest spans ${biggest.modules.length} modules (${biggest.modules[0]})`;
+    },
+    priority: 13,
+  },
+  {
+    condition: (r) => (r.structure?.layerViolations.length ?? 0) > 0,
+    message: (r) => {
+      const violations = r.structure!.layerViolations;
+      return `🟡 UNDO ${violations.length} layer violation(s) — ${violations[0].detail}`;
+    },
+    priority: 14,
   },
 ];
 

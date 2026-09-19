@@ -9,6 +9,7 @@ const SERIALIZED_FIELDS_BY_MODEL: Record<string, string[]> = {
   Scan: ["report", "complianceReport", "fixPack", "clawFindings", "builderMetadata"],
   ClawAgent: ["config"],
   ClawAlert: ["raw"],
+  PortfolioSnapshot: ["dimensions", "normalization", "decomposition"],
 };
 
 /** Serialize any array/object values to JSON strings in the given data object */

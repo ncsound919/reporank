@@ -1,0 +1,64 @@
+name: Portfolio budget
+
+# Structural-budget gate for the whole RepoRank repo (self-scan). Kept separate
+# from PR CI so a threshold breach on the repo's own score does not block
+# unrelated pull requests. Run manually with a chosen floor, or weekly.
+#
+# NOTE: RepoRank's index is a 0-100 *health* score (higher = better), so the
+# budget is a floor: the job fails when the index drops below `min_index` or any
+# `--max-dimension name=score` floor is breached.
+
+on:
+  workflow_dispatch:
+    inputs:
+      min_index:
+        description: Minimum structural index (health floor, 0-100; 0 = smoke only)
+        required: false
+        default: "0"
+  schedule:
+    - cron: "0 6 * * 1"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
+
+jobs:
+  portfolio-budget:
+    name: Structural budget gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 10.8.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build grading engine
+        run: pnpm --filter @reporank/grading-engine build
+
+      - name: Portfolio budget (self-scan, fails below the floor)
+        run: pnpm --filter @reporank/cli exec tsx src/index.ts portfolio budget ../.. --max-index ${{ github.event.inputs.min_index || 0 }} --json
+
+      - name: Upload budget report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: portfolio-budget-report
+          path: .reporank/history.json
+          if-no-files-found: ignore
+          retention-days: 14

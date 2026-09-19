@@ -91,6 +91,7 @@ export async function llmScan(input: ScanInput, opts: ScanOptions = {}): Promise
   const findings: Finding[] = [];
   const warnings: string[] = [];
   let mode: ScanResult["mode"] = "llm";
+  let llmSucceeded = false;
   let totalTokens = 0;
   let lastRaw: string | undefined;
 
@@ -113,6 +114,7 @@ export async function llmScan(input: ScanInput, opts: ScanOptions = {}): Promise
         raw = result.content;
         totalTokens += result.usage.total_tokens;
         lastRaw = raw;
+        llmSucceeded = true;
         if (process.env.MUTLY_DEBUG) {
           console.error(`[review] task=${input.id} chunk=${chunk.index} len=${prompt.length} raw=${raw.slice(0, 150)}`);
         }
@@ -136,6 +138,10 @@ export async function llmScan(input: ScanInput, opts: ScanOptions = {}): Promise
     warnings.push(`scanner error: ${(e as Error).message}`);
     mode = "heuristic";
   }
+
+  // Only claim the LLM was used when a call actually returned. If every chunk
+  // call failed (or there were no chunks), this is a heuristic-only result.
+  mode = llmSucceeded ? "llm" : "heuristic";
 
   return {
     taskId: input.id,

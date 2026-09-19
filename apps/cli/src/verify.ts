@@ -28,6 +28,19 @@ import { applyFixesFromVerify, type ApplyFixesFromVerifyOptions } from "./verify
 const SOURCE_EXTS = new Set([".ts", ".tsx", ".js", ".jsx", ".py", ".go", ".rs", ".java", ".rb"]);
 const SKIP_DIRS = new Set(["node_modules", ".git", "dist", "build", "coverage", ".next", "target", "vendor", ".aether_prime_cache"]);
 
+/** Base penalty per severity before confidence weighting. */
+const SEVERITY_PENALTY: Record<Finding["severity"], number> = {
+  critical: 10,
+  high: 5,
+  medium: 2,
+  low: 1,
+  info: 0,
+};
+/** Confidence assumed when a finding omits one. */
+const DEFAULT_CONFIDENCE = 0.7;
+/** Hard cap on total penalty, so the score cannot be driven below 0. */
+const MAX_TOTAL_PENALTY = 100;
+
 export interface VerifyOptions {
   /** Path to file or directory to analyze */
   path: string;
@@ -54,6 +67,8 @@ export interface FileReport {
   heuristicFindingCount: number;
   /** LLM-augmented finding count (0 if --no-llm) */
   llmFindingCount: number;
+  /** True only if at least one LLM call for this file actually succeeded */
+  llmUsed: boolean;
   /** Wall-clock time for this file in ms */
   durationMs: number;
   /** Any non-fatal errors encountered */
@@ -169,6 +184,7 @@ export async function runVerify(opts: VerifyOptions): Promise<{ report: VerifyRe
         findings: cached,
         heuristicFindingCount: cached.length,
         llmFindingCount: 0,
+        llmUsed: false,
         durationMs: 0,
         errors: [],
       });
@@ -206,7 +222,7 @@ export async function runVerify(opts: VerifyOptions): Promise<{ report: VerifyRe
         return sum;
       }, 0)
     : 0;
-  const qualityScore = Math.max(0, computeQualityScore(allFindings, fileReports.length) - hallucinationPenalty);
+  const qualityScore = Math.max(0, computeQualityScore(allFindings) - hallucinationPenalty);
   const passed = qualityScore >= opts.threshold;
 
   const report: VerifyReport = {
@@ -219,7 +235,7 @@ export async function runVerify(opts: VerifyOptions): Promise<{ report: VerifyRe
     hallucinations,
     qualityScore,
     passed,
-    usedLlm: !opts.noLlm,
+    usedLlm: fileReports.some((f) => f.llmUsed),
     durationMs: Date.now() - start,
     config: {
       threshold: opts.threshold,
@@ -234,25 +250,25 @@ export async function runVerify(opts: VerifyOptions): Promise<{ report: VerifyRe
 
 /**
  * Compute a 0-100 quality score from findings.
+ *
+ * Penalty per finding = severity weight x confidence factor. The total is
+ * capped, so the penalty is independent of how many files were analyzed —
+ * adding files (with identical findings) can never raise the score.
+ *
  * - 100 = perfect (no findings)
- * - -10 per critical, -5 per high, -2 per medium, -1 per low, 0 per info
- * - Normalized to 0-100 range
+ * - critical -10, high -5, medium -2, low -1, info 0 (before confidence weighting)
  */
-function computeQualityScore(findings: Finding[], fileCount: number): number {
-  if (fileCount === 0) return 100;
+export function computeQualityScore(findings: Finding[]): number {
   let penalty = 0;
   for (const f of findings) {
-    switch (f.severity) {
-      case "critical": penalty += 10; break;
-      case "high": penalty += 5; break;
-      case "medium": penalty += 2; break;
-      case "low": penalty += 1; break;
-      case "info": break;
-    }
+    const base = SEVERITY_PENALTY[f.severity] ?? 0;
+    const confidence = typeof f.confidence === "number"
+      ? Math.max(0, Math.min(1, f.confidence))
+      : DEFAULT_CONFIDENCE;
+    penalty += base * (0.5 + 0.5 * confidence);
   }
-  // Normalize penalty by file count to avoid penalizing large codebases
-  const normalized = penalty / Math.max(1, Math.sqrt(fileCount));
-  return Math.max(0, Math.round(100 - normalized));
+  const bounded = Math.min(penalty, MAX_TOTAL_PENALTY);
+  return Math.max(0, Math.round(100 - bounded));
 }
 
 function countBy<T>(items: T[], keyFn: (item: T) => string): Record<string, number> {
@@ -284,6 +300,7 @@ async function analyzeFile(
       findings: [],
       heuristicFindingCount: 0,
       llmFindingCount: 0,
+      llmUsed: false,
       durationMs: Date.now() - start,
       errors: [`Could not read file: ${(e as Error).message}`],
     };
@@ -296,6 +313,7 @@ async function analyzeFile(
 
   // LLM scan — optional
   let llmFindings: Finding[] = [];
+  let llmUsed = false;
   if (!opts.noLlm) {
     try {
       const scan = await llmScan(
@@ -309,6 +327,8 @@ async function analyzeFile(
         { promptMode: opts.promptMode ?? "strict" },
       );
       llmFindings = scan.findings;
+      // mode is "llm" only when at least one LLM call actually succeeded.
+      llmUsed = scan.mode === "llm";
       errors.push(...scan.warnings);
     } catch (e) {
       errors.push(`LLM scan failed: ${(e as Error).message}`);
@@ -322,6 +342,7 @@ async function analyzeFile(
     findings: merged,
     heuristicFindingCount: heuristic.length,
     llmFindingCount: llmFindings.length,
+    llmUsed,
     durationMs: Date.now() - start,
     errors,
   };

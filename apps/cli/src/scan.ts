@@ -1,8 +1,18 @@
 import chalk from "chalk";
 import cliProgress from "cli-progress";
 import { resolve } from "node:path";
+import { runDeepAnalysis, computeStructuralIndex } from "@reporank/grading-engine";
 import { runSemgrep } from "./scanners/semgrep-runner";
 import { SEMGREP_PRESETS } from "./scanners/rule-presets";
+import { runAuditCore, toSharedFindings } from "./core-client";
+import {
+  buildScanFindings,
+  gradeDimensions,
+  scanSecrets,
+  weightedOverall,
+  type ScanFinding,
+  type SecretHit,
+} from "./scan-findings";
 
 interface ScanOptions { token?: string; deep?: boolean; json?: boolean; }
 
@@ -75,17 +85,20 @@ export async function scanCommand(repo: string, options: ScanOptions) {
     for (const fp of sampled) {
       try { const f = await gh(`/repos/${owner}/${name}/contents/${fp}`); sourceFiles.push({ path: fp, content: Buffer.from(f.content, "base64").toString("utf-8").slice(0, 15000) }); } catch {}
     }
-    if (bar) bar.update(3, { status: "Running vibe analysis..." });
+    if (bar) bar.update(3, { status: "Running deterministic deep analysis..." });
 
-    // 2. Run vibe analysis
-    const vibe = await runVibeAnalysis(fileTree, sourceFiles);
-    if (bar) bar.update(4, { status: "Running security + deep analysis..." });
+    // 2. Deterministic deep analysis (grading-engine). Powers structured
+    //    findings and the config/dependency dimensions — no LLM involved.
+    const deep = runDeepAnalysis(null, fileTree, sourceFiles, packageJson);
+    const secrets: SecretHit[] = scanSecrets(sourceFiles);
+    const findings: ScanFinding[] = buildScanFindings(deep, secrets);
+    if (bar) bar.update(4, { status: "Running vibe analysis..." });
 
-    // 3. Run security + analysis
-    const secrets = await runSecretsScan(sourceFiles);
+    // 3. Heuristic vibe analysis (naming/modernity/hygiene).
+    const vibe = await runVibeAnalysis(fileTree, sourceFiles, deep, packageJson.length > 0);
 
-    // 3b. Deep scan with Semgrep
-    const deepFindings: any[] = [];
+    // 3b. Optional local Semgrep deep scan.
+    const deepFindings: ScanFinding[] = [];
     if (options.deep) {
       try {
         const presetKey = "default";
@@ -96,15 +109,39 @@ export async function scanCommand(repo: string, options: ScanOptions) {
           deepFindings.push({
             category: f.category,
             severity: f.severity === "error" ? "critical" : f.severity === "warning" ? "medium" : "low",
-            line: f.line,
+            line: f.line > 0 ? f.line : undefined,
+            path: f.path,
             type: f.ruleId.split(".").slice(-1)[0] || "semgrep",
             description: f.message,
             recommendation: `See: https://semgrep.dev/r/${f.ruleId}`,
             confidence: 0.9,
+            located: true,
+            source: "semgrep",
           });
         }
+        findings.push(...deepFindings);
       } catch (e: any) {
         if (!options.json) console.error(chalk.yellow(`  ⚠ Semgrep deep scan: ${e.message}`));
+      }
+    }
+
+    // 3c. Optional validation/lifecycle/gate via OpenHub's shared audit core.
+    //     A core outage is a soft failure — it must never fail the scan.
+    let core: unknown;
+    const coreUrl = process.env.OPENHUB_CORE_URL;
+    if (coreUrl) {
+      const result = await runAuditCore({
+        baseUrl: coreUrl,
+        token: process.env.OPENHUB_TOKEN,
+        targetDir: process.cwd(),
+        findings: toSharedFindings(findings),
+      });
+      if (result.ok) {
+        core = result.core;
+        if (!options.json) process.stdout.write(chalk.dim(`  ${coreSummaryLine(result.core)}`));
+      } else {
+        core = { ok: false, error: result.error };
+        if (!options.json) console.error(chalk.yellow(`  ⚠ OpenHub core: ${result.error}`));
       }
     }
 
@@ -112,11 +149,33 @@ export async function scanCommand(repo: string, options: ScanOptions) {
 
     // 4. Build and display report
     if (options.json) {
-      const output: any = { repo: displayName, score: vibe.overall, vibe, secrets, files: fileTree.length };
+      // Deterministic, decomposable structural index (no LLM). Emitted
+      // alongside the heuristic vibe score so the JSON is auditable.
+      const totalLoc = sourceFiles.reduce((s, f) => s + f.content.split(/\r?\n/).length, 0);
+      const structuralIndex = computeStructuralIndex(deep, {
+        mainLanguage: repoData.language || "unknown",
+        totalLoc,
+        structure: deep.structure,
+        deadCode: deep.deadCode,
+      });
+      const output: any = {
+        repo: displayName,
+        score: vibe.overall,
+        index: structuralIndex.index,
+        decomposition: structuralIndex.contributions,
+        normalization: structuralIndex.normalization,
+        indexFormula: structuralIndex.formula,
+        vibe,
+        secrets,
+        files: fileTree.length,
+        findings,
+        unmeasured: vibe.unmeasured,
+      };
+      if (core !== undefined) output.core = core;
       if (options.deep) output.deep = deepFindings;
       process.stdout.write(JSON.stringify(output, null, 2));
     } else {
-      displayReport(displayName, repoData, fileTree, vibe, secrets);
+      displayReport(displayName, repoData, fileTree, vibe, secrets, findings);
     }
 
     if (bar) { bar.update(6, { status: "Done!" }); bar.stop(); }
@@ -129,7 +188,26 @@ export async function scanCommand(repo: string, options: ScanOptions) {
   }
 }
 
-async function runVibeAnalysis(files: string[], sources: { path: string; content: string }[]) {
+interface CoreSummary {
+  validation?: { confirmed?: number; stale?: number };
+  gate?: { passed?: boolean };
+}
+
+/** Short, honest one-liner for the optional OpenHub core result. */
+function coreSummaryLine(core: unknown): string {
+  const c = (core ?? {}) as CoreSummary;
+  const confirmed = c.validation?.confirmed ?? 0;
+  const stale = c.validation?.stale ?? 0;
+  const gate = c.gate?.passed === true ? "pass" : c.gate?.passed === false ? "fail" : "unknown";
+  return `OpenHub core: confirmed=${confirmed} stale=${stale} gate=${gate}`;
+}
+
+async function runVibeAnalysis(
+  files: string[],
+  sources: { path: string; content: string }[],
+  deep: ReturnType<typeof runDeepAnalysis>,
+  hasPackageJson: boolean,
+) {
   // Naming conventions
   const conventions: Record<string, number> = { camelCase: 0, snake_case: 0, "kebab-case": 0, PascalCase: 0 };
   let total = 0;
@@ -169,63 +247,68 @@ async function runVibeAnalysis(files: string[], sources: { path: string; content
   if (consoleLogs > 5) hygieneScore -= 15;
   hygieneScore = Math.max(0, hygieneScore);
 
+  const dims = gradeDimensions(deep, hasPackageJson);
+  const roundedNaming = Math.round(namingScore);
+  const overall = weightedOverall({
+    naming: roundedNaming,
+    modernity: modernityScore,
+    hygiene: hygieneScore,
+    configCoherence: dims.configCoherence,
+    dependencyFreshness: dims.dependencyFreshness,
+  });
+
+  const heuristicRecommendations = [
+    namingScore < 70 ? "Mixed naming conventions — pick one style" : "",
+    !hasAsync ? "Use async/await instead of callbacks" : "",
+    !hasHooks ? "Adopt React hooks pattern" : "",
+    !hasTS ? "Add TypeScript for type safety" : "",
+    consoleLogs > 5 ? `Remove ${consoleLogs} console.log statements` : "",
+    commented > 10 ? `Clean up ${commented} commented-out code blocks` : "",
+  ].filter(Boolean);
+
   return {
-    overall: Math.round(namingScore * 0.25 + modernityScore * 0.25 + hygieneScore * 0.20 + 75 * 0.15 + 65 * 0.15),
-    namingScore: Math.round(namingScore), modernityScore, hygieneScore,
-    configCoherence: 75, dependencyFreshness: 65,
-    recommendations: [
-      namingScore < 70 ? "Mixed naming conventions — pick one style" : "",
-      !hasAsync ? "Use async/await instead of callbacks" : "",
-      !hasHooks ? "Adopt React hooks pattern" : "",
-      !hasTS ? "Add TypeScript for type safety" : "",
-      consoleLogs > 5 ? `Remove ${consoleLogs} console.log statements` : "",
-      commented > 10 ? `Clean up ${commented} commented-out code blocks` : "",
-    ].filter(Boolean),
+    overall,
+    namingScore: roundedNaming, modernityScore, hygieneScore,
+    // Dimensions below are measured by grading-engine analyzers, never hardcoded.
+    configCoherence: dims.configCoherence,
+    dependencyFreshness: dims.dependencyFreshness,
+    provenance: {
+      naming: { score: roundedNaming, measured: true, source: "heuristic:naming-convention" },
+      modernity: { score: modernityScore, measured: true, source: "heuristic:modernity-patterns" },
+      hygiene: { score: hygieneScore, measured: true, source: "heuristic:hygiene-patterns" },
+      ...dims.provenance,
+    },
+    unmeasured: dims.unmeasured,
+    recommendations: [...deep.topRecommendations, ...heuristicRecommendations].slice(0, 10),
   };
 }
 
-async function runSecretsScan(sources: { path: string; content: string }[]) {
-  const secretPatterns = [
-    { name: "aws-access-key", pattern: /AKIA[0-9A-Z]{16}/g },
-    { name: "github-token", pattern: /gh[pousr]_[A-Za-z0-9_]{36,}/g },
-    { name: "openai-api-key", pattern: /sk-[A-Za-z0-9]{20,}/g },
-    { name: "google-api-key", pattern: /AIza[0-9A-Za-z\-_]{35}/g },
-    { name: "private-key", pattern: /-----BEGIN\s+(RSA|EC|DSA|OPENSSH)\s+PRIVATE\s+KEY-----/g },
-    { name: "connection-string", pattern: /(postgresql|mysql|mongodb|redis):\/\/[^\s]{10,}/gi },
-    { name: "stripe-key", pattern: /(sk_live|pk_live|sk_test|pk_test)_[0-9A-Za-z]{24,}/g },
-  ];
-  const allContent = sources.map(f => f.content).join("\n");
-  const secrets: { type: string; line: number }[] = [];
-  const lines = allContent.split("\n");
-  for (let i = 0; i < lines.length; i++) {
-    for (const p of secretPatterns) {
-      const matches = lines[i].matchAll(p.pattern);
-      for (const m of matches) { if (m.index !== undefined && !m[0].includes("test") && !m[0].includes("example")) secrets.push({ type: p.name, line: i + 1 }); }
-    }
-  }
-  return { secretsFound: secrets.length, secrets: secrets.slice(0, 10), recommendation: secrets.length > 0 ? `Found ${secrets.length} potential secrets` : "No secrets detected" };
-}
-
-function displayReport(displayName: string, repoData: any, fileTree: string[], vibe: any, secrets: any) {
+function displayReport(displayName: string, repoData: any, fileTree: string[], vibe: any, secrets: any, findings: ScanFinding[]) {
   const colorFor = (score: number) => score >= 80 ? chalk.green : score >= 60 ? chalk.yellow : chalk.red;
 
   process.stdout.write(`  ${chalk.bold("Score:")}        ${colorFor(vibe.overall)(`${vibe.overall}/100`)}`);
   process.stdout.write(`  ${chalk.bold("Files:")}        ${fileTree.length}`);
+  process.stdout.write(`  ${chalk.bold("Findings:")}     ${findings.length} (${findings.filter((f) => f.located).length} located)`);
   process.stdout.write(`  ${chalk.bold("Language:")}     ${repoData.language || "Unknown"}`);
   process.stdout.write(`  ${chalk.bold("Stars:")}        ${repoData.stargazers_count || 0}  ${chalk.dim(`| Forks: ${repoData.forks_count || 0} | Issues: ${repoData.open_issues_count || 0}`)}`);
   process.stdout.write(`  ${chalk.bold("Last push:")}    ${repoData.pushed_at ? new Date(repoData.pushed_at).toLocaleDateString() : "Unknown"}`);
 
   process.stdout.write(`\n  ${chalk.bold("┌─────────────┬──────┐")}`);
-  const dims = [["Naming", vibe.namingScore], ["Modernity", vibe.modernityScore], ["Hygiene", vibe.hygieneScore], ["Config", vibe.configCoherence], ["Deps Fresh", vibe.dependencyFreshness]];
+  const dims: [string, number | null][] = [["Naming", vibe.namingScore], ["Modernity", vibe.modernityScore], ["Hygiene", vibe.hygieneScore], ["Config", vibe.configCoherence], ["Deps Fresh", vibe.dependencyFreshness]];
   for (const [label, score] of dims) {
-    const bar = "█".repeat(Math.floor((score as number) / 10)) + "░".repeat(10 - Math.floor((score as number) / 10));
-    process.stdout.write(`  ${chalk.bold("│")} ${(label as string).padEnd(11)} ${chalk.bold("│")} ${colorFor(score as number)(bar)} ${colorFor(score as number)(score as number)} ${chalk.bold("│")}`);
+    if (score === null || score === undefined) {
+      process.stdout.write(`  ${chalk.bold("│")} ${label.padEnd(11)} ${chalk.bold("│")} ${chalk.dim("unmeasured".padEnd(10))} ${chalk.dim("N/A")} ${chalk.bold("│")}`);
+      continue;
+    }
+    const bar = "█".repeat(Math.floor(score / 10)) + "░".repeat(10 - Math.floor(score / 10));
+    process.stdout.write(`  ${chalk.bold("│")} ${label.padEnd(11)} ${chalk.bold("│")} ${colorFor(score)(bar)} ${colorFor(score)(score)} ${chalk.bold("│")}`);
   }
   process.stdout.write(`  ${chalk.bold("└─────────────┴──────┘")}`);
 
-  if (secrets.secretsFound > 0) {
+  const secretHits: SecretHit[] = (secrets.secrets ?? []).slice(0, 5);
+  if (secretHits.length > 0) {
     process.stdout.write(`\n  ${chalk.red.bold(`⚠ ${secrets.secretsFound} secret(s) detected:`)}`);
-    for (const s of secrets.secrets.slice(0, 5)) process.stdout.write(`    ${chalk.red("●")} ${s.type} at line ${s.line}`);
+    for (const s of secretHits) process.stdout.write(`    ${chalk.red("●")} ${s.type} at ${s.path}:${s.line}`);
   }
 
   if (vibe.recommendations.length > 0) {
