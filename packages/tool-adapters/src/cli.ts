@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { Command } from 'commander';
-import { eslintAdapter, vitestAdapter, pytestAdapter } from './index.js';
+import { eslintAdapter, vitestAdapter, pytestAdapter, locAdapter } from './index.js';
 
 const program = new Command();
 
@@ -13,6 +13,7 @@ program
     if (tool === 'eslint') adapter = eslintAdapter;
     else if (tool === 'vitest') adapter = vitestAdapter;
     else if (tool === 'pytest') adapter = pytestAdapter;
+    else if (tool === 'loc') adapter = locAdapter;
     else {
       console.error(JSON.stringify({ error: `Unknown tool: ${tool}` }));
       process.exit(1);

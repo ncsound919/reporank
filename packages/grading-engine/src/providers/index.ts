@@ -58,9 +58,16 @@ export class LMStudioProvider implements AiProvider {
   constructor(private model: string = "", private endpoint: string = "http://localhost:1234") {}
 
   async generate(prompt: string): Promise<string> {
+    // Send the gateway key when the endpoint is an auth-enforcing OpenAI-
+    // compatible server (e.g. the fleet litellm gateway on :4100). Without this,
+    // pointing LOCAL_AI_ENDPOINT at litellm returns 401.
+    const apiKey = process.env.LOCAL_AI_API_KEY || process.env.LITELLM_MASTER_KEY || "";
     const res = await fetch(`${this.endpoint}/v1/chat/completions`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
+      },
       body: JSON.stringify({
         model: this.model || "local-model",
         messages: [

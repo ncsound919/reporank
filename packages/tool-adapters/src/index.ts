@@ -12,3 +12,4 @@ export interface ToolAdapter {
 export * from './adapters/eslint.js';
 export * from './adapters/vitest.js';
 export * from './adapters/pytest.js';
+export * from './adapters/loc.js';
