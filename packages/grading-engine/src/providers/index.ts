@@ -84,12 +84,50 @@ export class LMStudioProvider implements AiProvider {
   }
 }
 
+/**
+ * Fleet LiteLLM gateway provider — the ONE provider seam (per OPS.md). Speaks
+ * OpenAI-compatible /v1/chat/completions against the local LiteLLM proxy and
+ * carries the master key. Model is a LiteLLM GROUP (e.g. `fleet-free`,
+ * `opencode`), so daily provider rotation happens inside LiteLLM.
+ */
+export class LitellmProvider implements AiProvider {
+  name = "LiteLLM gateway";
+  isLocal = false;
+
+  constructor(private model: string = "opencode", private endpoint: string = "http://localhost:4100") {}
+
+  async generate(prompt: string): Promise<string> {
+    const apiKey = process.env.LITELLM_API_KEY || process.env.LITELLM_MASTER_KEY || "";
+    const res = await fetch(`${this.endpoint.replace(/\/+$/, "")}/v1/chat/completions`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
+      },
+      body: JSON.stringify({
+        model: this.model || "opencode",
+        messages: [
+          { role: "system", content: "You are a codebase auditor. Return ONLY valid JSON. No markdown, no code fences." },
+          { role: "user", content: prompt },
+        ],
+        temperature: 0.2,
+        max_tokens: 32768,
+      }),
+    });
+    if (!res.ok) throw new Error(`LiteLLM error: ${res.status}`);
+    const data: any = await res.json();
+    return data.choices?.[0]?.message?.content || "";
+  }
+}
+
 export function createProvider(type: string, apiKey: string, model?: string, endpoint?: string): AiProvider {
   switch (type) {
     case "ollama":
       return new OllamaProvider(model || "llama3", endpoint);
     case "lmstudio":
       return new LMStudioProvider(model || "", endpoint);
+    case "litellm":
+      return new LitellmProvider(model || process.env.LITELLM_AUDIT_MODEL || "opencode", endpoint);
     case "gemini":
     default:
       return new GeminiProvider(apiKey, model || "gemini-2.5-flash");

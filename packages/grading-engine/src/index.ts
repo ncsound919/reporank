@@ -2,12 +2,19 @@ import { callLLM } from "@overlay365/fleet-client";
 import type { HealthReport } from "@reporank/shared-types";
 import { buildGradingPrompt } from "./promptBuilder";
 import { parseHealthReport } from "./responseParser";
+import { applyGradingProvenance } from "./provenance";
 import type { ComplexityReport } from "./analyzers/complexity";
 import type { DependencyReport } from "./analyzers/dependency-health";
 import type { ArchitectureReport } from "./analyzers/architecture";
 import type { ProductionReport } from "./analyzers/production";
 import type { CodeHygieneReport } from "./analyzers/code-hygiene";
 import type { EnterpriseReport } from "./analyzers/enterprise";
+
+// Re-export the fleet Jev decision helpers so RepoRank (and other consumers of
+// this package) can make typed grade advisories without a direct fleet-client
+// dependency edge. See @overlay365/fleet-client/src/jev.ts.
+export { decideGrade, decideSystemOne, gradeReviewAdvisory, buildGradeReviewAdvisory } from "@overlay365/fleet-client";
+export type { GradeJevAdvisory, GradeAdvisoryInput } from "@overlay365/fleet-client";
 
 export interface GradeInput {
   repoUrl: string; repoName: string; repoOwner: string;
@@ -63,6 +70,15 @@ export class GradingService {
         report.openIssuesCount = input.openIssuesCount;
         report.lastPushedAt = input.lastPushedAt;
         report.scannedAt = new Date().toISOString();
+        // Neutralize fabricated fields, attach per-field provenance, and flag
+        // model citations that do not exist in the scanned tree. Runs on every
+        // grade so a model's invented valuation/percentile/license cannot be
+        // presented as measured.
+        applyGradingProvenance(report, {
+          scanners: scannerResults as Record<string, unknown> | undefined,
+          fileTree: input.fileTree,
+          sourceFiles: input.sourceFiles,
+        });
         return report;
       } catch (err: any) {
         lastError = err;
@@ -80,6 +96,13 @@ export class GradingService {
 
 export { buildGradingPrompt } from "./promptBuilder";
 export { parseHealthReport } from "./responseParser";
+export {
+  applyGradingProvenance,
+  applyFabricationGuards,
+  buildFieldProvenance,
+  findStaleCitations,
+  type GradingEvidenceInput,
+} from "./provenance";
 export { runDeepAnalysis } from "./analyzers/index";
 export {
   analyzeStructure,

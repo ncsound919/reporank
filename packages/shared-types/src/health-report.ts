@@ -29,6 +29,43 @@ export interface HealthReport {
   implementationPlan: ImplementationStep[];
   globalBenchmarkPercent: number;
   scannedAt: string;
+  /**
+   * Where the headline score came from. The LLM path never overrides the score
+   * with a measured value, so it is an estimate; `gradeRepoStatic` is the
+   * deterministic path. Additive field — older consumers ignore it.
+   */
+  scoreProvenance?: FieldProvenance;
+  /**
+   * Per-field provenance. A model can invent valuation dollars, a market
+   * percentile, a competitor list, or a license inventory with no real input;
+   * those fields are neutralized and labelled here rather than presented as
+   * measured. Mirrors Grader's `fieldProvenance`.
+   */
+  fieldProvenance?: Record<string, FieldProvenance>;
+  /**
+   * Model-cited `file`/`file:line` references (from bugsAndLeaks / quickWins)
+   * whose path does not exist in the scanned tree. Reported, never silently
+   * deleted — the citation is retained in its original field.
+   */
+  staleCitations?: StaleCitation[];
+}
+
+export interface FieldProvenance {
+  /** True only when a deterministic tool/input produced the value. */
+  measured: boolean;
+  /** `measured` | `ai-estimate` | `unavailable`. */
+  basis: string;
+  source?: string;
+  /** Why the value is not measured (always set when `measured` is false). */
+  reason?: string;
+}
+
+export interface StaleCitation {
+  /** The model's original citation text. */
+  citation: string;
+  /** Where it came from: `bugsAndLeaks` | `quickWins.filePath` | `structuralSmells`. */
+  field: string;
+  reason: string;
 }
 
 export interface VibeCodingScore {

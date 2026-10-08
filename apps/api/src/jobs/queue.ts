@@ -6,7 +6,7 @@ export interface ScanJobData {
   branch: string; userId: string; orgId?: string;
   localFiles?: { path: string; content: string }[];
   privateMode?: boolean;
-  aiProvider?: "gemini" | "ollama" | "lmstudio";
+  aiProvider?: "gemini" | "ollama" | "lmstudio" | "litellm";
   aiModel?: string;
   aiEndpoint?: string;
 }

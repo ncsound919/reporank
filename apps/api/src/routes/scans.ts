@@ -32,7 +32,7 @@ export const createLocalScanSchema = z.object({
     content: z.string().max(500000),
   })).min(1).max(500),
   privateMode: z.boolean().default(false),
-  aiProvider: z.enum(["gemini", "ollama", "lmstudio"]).default("gemini"),
+  aiProvider: z.enum(["gemini", "ollama", "lmstudio", "litellm"]).default("gemini"),
   aiModel: z.string().optional(),
   aiEndpoint: z.string().optional(),
   repoName: z.string().default("local-project"),

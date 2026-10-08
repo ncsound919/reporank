@@ -10,6 +10,7 @@ import {
   parseHealthReport,
   gradeRepoStatic,
   emptySecurityGroup,
+  decideGrade,
   type SecurityGroup,
 } from "@reporank/grading-engine";
 import { runNovelAnalysis } from "@reporank/grading-engine/novel";
@@ -166,6 +167,22 @@ export function startWorker() {
       report.measuredSecurity = security.summary;
       report.auditFingerprint = auditReport ? reportFingerprint(auditReport) : null;
       report.worstFiles = staticReport.worstFiles;
+
+      // Jev advisory over the deterministic grade (Vercel TypeSafe gateway →
+      // LocalJev). Best-effort and isolated: it never changes report.overallScore,
+      // and an offline Jev is recorded as source "offline". REPORANK_JEV=0 off.
+      if (process.env.REPORANK_JEV !== "0") {
+        const bySev = security.summary.bySeverity;
+        const findingCount = (bySev.critical || 0) + (bySev.high || 0) + (bySev.medium || 0) + (bySev.low || 0);
+        const { advisory } = await decideGrade({
+          kind: "repo",
+          score: typeof report.overallScore === "number" ? report.overallScore : null,
+          grade: typeof report.gradeCategory === "string" ? report.gradeCategory : undefined,
+          findingCount,
+          criticalCount: bySev.critical || 0,
+        });
+        report.jev = advisory;
+      }
 
       const fixPacks = generateFixPacks(report);
       report.roadmap = buildRoadmap(report.quickWins, report.overallScore);
