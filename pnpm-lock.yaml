@@ -27,8 +27,8 @@ importers:
   apps/api:
     dependencies:
       '@overlay365/audit-core':
-        specifier: file:../../../../../packages/audit-core
-        version: file:../../../packages/audit-core
+        specifier: file:../../../../packages/audit-core
+        version: file:../../packages/audit-core
       '@prisma/client':
         specifier: ^6.5.0
         version: 6.19.3(prisma@6.19.3(magicast@0.3.5)(typescript@5.9.3))(typescript@5.9.3)
@@ -315,8 +315,8 @@ importers:
         specifier: ^2.4.0
         version: 2.17.0
       '@overlay365/fleet-client':
-        specifier: file:../../../../../packages/fleet-client
-        version: file:../../../packages/fleet-client
+        specifier: file:../../../model-router/client
+        version: file:../model-router/client
       '@reporank/shared-types':
         specifier: workspace:*
         version: link:../shared-types
@@ -913,12 +913,12 @@ packages:
   '@nodable/entities@3.0.0':
     resolution: {integrity: sha512-8L9xFeTYKhm49xfIypoe2W5wV1m/3Z58kT+7kR9A8OyFxcPduI4VmxaUMQyKYrRjUoLLSXv6EKKID5Tvj9cUVw==}
 
-  '@overlay365/audit-core@file:../../../packages/audit-core':
-    resolution: {directory: ../../../packages/audit-core, type: directory}
+  '@overlay365/audit-core@file:../../packages/audit-core':
+    resolution: {directory: ../../packages/audit-core, type: directory}
     engines: {node: '>=20'}
 
-  '@overlay365/fleet-client@file:../../../packages/fleet-client':
-    resolution: {directory: ../../../packages/fleet-client, type: directory}
+  '@overlay365/fleet-client@file:../model-router/client':
+    resolution: {directory: ../model-router/client, type: directory}
 
   '@paralleldrive/cuid2@2.3.1':
     resolution: {integrity: sha512-XO7cAxhnTZl0Yggq6jOgjiOHhbgcO4NqFqwSmQpjK3b6TEE6Uj/jfSk6wzYyemh3+I0sHirKSetjQwn5cZktFw==}
@@ -3375,9 +3375,9 @@ snapshots:
 
   '@nodable/entities@3.0.0': {}
 
-  '@overlay365/audit-core@file:../../../packages/audit-core': {}
+  '@overlay365/audit-core@file:../../packages/audit-core': {}
 
-  '@overlay365/fleet-client@file:../../../packages/fleet-client': {}
+  '@overlay365/fleet-client@file:../model-router/client': {}
 
   '@paralleldrive/cuid2@2.3.1':
     dependencies:
